@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.diff
+*.log
+
+# отчёты dev_infrastructure — генерируются заново, не храним в истории
+osbb_triage_report.*
