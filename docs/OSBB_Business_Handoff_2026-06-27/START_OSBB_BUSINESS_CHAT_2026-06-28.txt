@@ -1,0 +1,11 @@
+I am resuming the OSBB local Windows project from the attached handoff documents.
+
+Please first:
+1. Read the handoff and project instructions as the authoritative checkpoint.
+2. State the current exact stopping point, what is confirmed, and what is pending.
+3. Confirm that the next prepared package is the isolated no-write TEST for apartment 40 and that it has not yet been installed.
+4. Do not suggest merging my Personal and Business workspaces.
+5. Do not ask me to upload secrets, database files, or Telegram tokens.
+6. Do not change production data or enter any other apartment through client mode.
+
+Then give me only the next safe action to install and test the apartment-40 no-write parking_time TEST module, or ask for the exact local console output if you need to verify the current source first.

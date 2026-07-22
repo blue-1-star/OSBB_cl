@@ -1,0 +1,43 @@
+Folder PATH listing for volume Transcend
+Volume serial number is 0000015F 4E12:A90A
+G:\PROGRAMMING\PY\OSBB\CORE_NEW
+|   __init__.py
+|   
++---adapters
+|   |   cashier_adapter.py
+|   |   db_adapter.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           db_adapter.cpython-313.pyc
+|           __init__.cpython-313.pyc
+|           
++---domain
+|   |   apartments.py
+|   |   cashbox.py
+|   |   payments.py
+|   |   residents.py
+|   |   service_catalog.py
+|   |   vehicles.py
+|   |   vehicle_candidate.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           apartments.cpython-313.pyc
+|           cashbox.cpython-313.pyc
+|           payments.cpython-313.pyc
+|           residents.cpython-313.pyc
+|           service_catalog.cpython-313.pyc
+|           vehicles.cpython-313.pyc
+|           vehicle_candidate.cpython-313.pyc
+|           __init__.cpython-313.pyc
+|           
+\---__pycache__
+        __init__.cpython-313.pyc
+        
+Folder PATH listing for volume Transcend
+Volume serial number is 000002DF 4E12:A90A
+G:\PROGRAMMING\PY\OSBB\FINANCE_CORE
+Invalid path - \PROGRAMMING\PY\OSBB\FINANCE_CORE
+No subfolders exist 
+

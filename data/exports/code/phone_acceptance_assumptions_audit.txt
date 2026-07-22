@@ -1,0 +1,96 @@
+====================================================================================================
+OSBB phone acceptance assumptions audit - READ ONLY
+====================================================================================================
+Generated: 2026-06-29 21:18:28
+Root: G:\Programming\Py\OSBB
+DB: G:\Programming\Py\OSBB\Data\db\sandbox\osbb_test_live_services_2026-06-26_20-13-26.db
+
+====================================================================================================
+1. DB TABLE REALITY
+====================================================================================================
+OK   service_interests                        rows=0     cols=19
+OK   service_order_interests                  rows=3     cols=23
+OK   phone_access_requests                    rows=1     cols=21
+OK   phone_access_request_points              rows=2     cols=11
+OK   phone_barrier_access_interests           rows=0     cols=8
+OK   phone_barrier_access_interest_points     rows=0     cols=7
+OK   phone_barrier_access_order_points        rows=0     cols=11
+OK   phone_barrier_access_points              rows=2     cols=10
+OK   service_orders                           rows=6     cols=24
+OK   service_access_credentials               rows=3     cols=15
+OK   access_operation_journal                 rows=6     cols=13
+
+====================================================================================================
+2. SOURCE-CODE WRITE TARGETS
+====================================================================================================
+
+service_preorders_core.py :: create_service_interest()
+Lines: 365-472
+INSERT targets: service_order_interests
+SELECT/FROM targets: -
+
+phone_barrier_access_core.py :: create_phone_access_request_from_interest()
+Lines: 1432-1533
+INSERT targets: phone_access_request_points, phone_access_requests
+SELECT/FROM targets: -
+
+====================================================================================================
+3. ACCEPTANCE / INSPECTION TOOL ASSUMPTIONS
+====================================================================================================
+audit_phone_acceptance_assumptions.py:
+  mentions: access_operation_journal, phone_access_request_points, phone_access_requests, phone_barrier_access_interest_points, phone_barrier_access_interests, phone_barrier_access_order_points, phone_barrier_access_points, service_access_credentials, service_interests, service_order_interests, service_orders
+inspect_phone_access_legacy.py:
+  mentions: phone_access_requests, phone_barrier_access_interest_points, phone_barrier_access_interests, phone_barrier_access_order_points, phone_barrier_access_points, service_access_credentials, service_interests, service_orders
+test_phone_access_acceptance.py:
+  mentions: phone_barrier_access_interests, phone_barrier_access_order_points, phone_barrier_access_points, service_access_credentials, service_interests, service_orders
+test_phone_access_legacy_create_request.py:
+  mentions: phone_access_requests, service_access_credentials, service_interests, service_orders
+trace_phone_interest_pipeline.py:
+  mentions: phone_access_requests, service_interests, service_orders
+
+====================================================================================================
+4. MISMATCHES
+====================================================================================================
+WARN Acceptance tools mention service_interests, but create_service_interest() writes to service_order_interests.
+WARN service_interests exists and is empty; service_order_interests exists and is likely the active generic interest table.
+WARN phone_barrier_access_interest_points is empty, while legacy phone_access_request_points is the active selected-points table.
+
+====================================================================================================
+5. RECOMMENDED CURRENT ACCEPTANCE MODEL
+====================================================================================================
+For Production Sprint #1, acceptance tests should treat this as current reality:
+
+Generic resident intention:
+ - service_order_interests
+
+Phone request:
+ - phone_access_requests
+ - phone_access_request_points
+
+Order / activation:
+ - service_orders
+ - service_access_credentials
+
+Future/unified tables may exist but should not be blockers unless the live flow uses them:
+ - service_interests
+ - phone_barrier_access_interests
+ - phone_barrier_access_interest_points
+ - phone_barrier_access_order_points
+
+====================================================================================================
+6. NEXT PROGRAMMING ACTIONS
+====================================================================================================
+1. Patch test_phone_access_acceptance.py:
+   - check service_order_interests instead of service_interests
+   - check phone_access_request_points
+   - downgrade unused future tables to WARN, not FAIL
+
+2. Patch test_phone_access_legacy_create_request.py:
+   - count service_order_interests
+   - count phone_access_request_points
+   - verify returned phone_access_request.id by reopening the temp DB
+
+3. Keep the source DB untouched and continue write tests only on temporary DB copies.
+
+RESULT: WARN (3 warning(s))
+READ ONLY COMPLETED

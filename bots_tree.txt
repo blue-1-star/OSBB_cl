@@ -1,0 +1,85 @@
+Folder PATH listing for volume Transcend
+Volume serial number is 00000207 4E12:A90A
+G:\PROGRAMMING\PY\OSBB\BOTS
+|   data_park_bot.py
+|   db_access.py
+|   hello.py
+|   parking_bot.py
+|   sandbox_bot.py
+|   Start_OSBB_Bot.bat
+|   Start_OSBB_Bot_training_vika.bat
+|   Start_OSBB_Bot_working_pult_test.bat
+|   Start_OSBB_Guard_Sandbox_Bot.bat
+|   Start_OSBB_Guard_Sandbox_Bot_v2.bat
+|   Start_Sandbox_Bot.bat
+|   
++---backups
++---handlers
+|   |   agreement.MODULE.md
+|   |   agreement.py
+|   |   audit_viewer.MODULE.md
+|   |   audit_viewer.py
+|   |   cashier_operator.MODULE.md
+|   |   cashier_operator.py
+|   |   cashier_operator_v2.py
+|   |   CHANGELOG.md
+|   |   client_portal.MODULE.md
+|   |   client_portal.py
+|   |   client_portal_safe_linking.MODULE.md
+|   |   client_portal_safe_linking.py
+|   |   client_portal_v2.py
+|   |   client_portal_v3.py
+|   |   commercial_contract_editor.MODULE.md
+|   |   commercial_contract_editor.py
+|   |   guard_workspace.MODULE.md
+|   |   guard_workspace.py
+|   |   INSTALL.md
+|   |   profile_parking_time_test_workspace.MODULE.md
+|   |   profile_parking_time_test_workspace.py
+|   |   profile_verification_workspace.MODULE.md
+|   |   profile_verification_workspace.py
+|   |   service_orders_workspace.MODULE.md
+|   |   service_orders_workspace.py
+|   |   unit_registry_editor.MODULE.md
+|   |   unit_registry_editor.py
+|   |   vehicle_card_editor.MODULE.md
+|   |   vehicle_card_editor.py
+|   |   vehicle_card_editor_prev.py
+|   |   vehicle_full_list.MODULE.md
+|   |   vehicle_full_list.py
+|   |   vehicle_verification.MODULE.md
+|   |   vehicle_verification.py
+|   |   __init___.MODULE.md
+|   |   __init___.py
+|   |   
+|   \---__pycache__
+|           agreement.cpython-313.pyc
+|           audit_viewer.cpython-313.pyc
+|           cashier_operator.cpython-313.pyc
+|           cashier_operator_v2.cpython-313.pyc
+|           client_portal.cpython-313.pyc
+|           client_portal_v2.cpython-313.pyc
+|           client_portal_v3.cpython-313.pyc
+|           commercial_contract_editor.cpython-313.pyc
+|           guard_workspace.cpython-313.pyc
+|           profile_parking_time_test_workspace.cpython-313.pyc
+|           profile_verification_workspace.cpython-313.pyc
+|           service_orders_workspace.cpython-313.pyc
+|           service_orders_workspace.py.cpython-313.pyc
+|           unit_registry_editor.cpython-313.pyc
+|           vehicle_card_editor.cpython-313.pyc
+|           vehicle_full_list.cpython-313.pyc
+|           vehicle_verification.cpython-313.pyc
+|           
+\---__pycache__
+        db_access.cpython-313.pyc
+        parking_bot.cpython-313.pyc
+        
+Folder PATH listing for volume Transcend
+Volume serial number is 000001E6 4E12:A90A
+G:\PROGRAMMING\PY\OSBB\MIGRATIONS
+    2026-07-14_001_create_vehicle_candidates.py
+    2026-07-15_002_allow_null_apartment_number_in_payments.py
+    
+No subfolders exist 
+

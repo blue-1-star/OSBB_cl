@@ -1,0 +1,1 @@
+"""OSBB cashier editor."""

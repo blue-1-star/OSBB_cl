@@ -1,8 +1,10 @@
 # config.py (в корне OSBB_cl/)
 #
-# Кроссплатформенный конфиг путей, но, в отличие от старого общего
-# config.py в Py/, этот — выделенный, только под нужды OSBB_cl.
-# Никакого Music/Flat/чужих проектов здесь нет и не будет.
+# Кроссплатформенный конфиг путей, выделенный только под OSBB_cl.
+# Структура ЗЕРКАЛЬНА старому OSBB (Bots/, tools/, core_new/, Data/, Docs/) —
+# осознанное решение: минимум риска сломать импорты при переносе.
+# Реорганизация по подсистемам (presentation/, business_core/ и т.п.) —
+# отдельная, постепенная задача на потом, когда всё уже работает.
 
 import sys
 import platform
@@ -31,34 +33,43 @@ class ProjectPaths:
         self.TELEGRAM_SECRETS_FILE = self.SECRETS_DIR / "telegram_osbb.py"
 
         # ==================================================
-        # ДАННЫЕ
+        # ДАННЫЕ — имена папок зеркальны старому OSBB
         # ==================================================
-        self.DATA_DIR = self.PROJECT_ROOT / "data"
+        self.DATA_DIR = self.PROJECT_ROOT / "Data"
+        self.RAW_DIR = self.DATA_DIR / "raw"
+        self.TYPED_DIR = self.RAW_DIR / "typed"
         self.DB_DIR = self.DATA_DIR / "db"
-        self.DB_FILE = self.DB_DIR / "osbb.db"          # бывший osbb_test.db
+        self.EXPORTS_DIR = self.DATA_DIR / "exports"
         self.LOGS_DIR = self.DATA_DIR / "logs"
-        self.EXPORTS_DIR = self.DATA_DIR / "exports"      # для отчётов dev_infrastructure
+        self.BACKUPS_DIR = self.DB_DIR / "backups"
+
+        self.DB_FILE = self.DB_DIR / "osbb.db"  # бывший osbb_test.db — переименование файла, импортов не касается
 
         # ==================================================
-        # ПОДСИСТЕМЫ (для удобных импортов и диагностики)
+        # СОВМЕСТИМОСТЬ СО СТАРЫМ ИНТЕРФЕЙСОМ config.py
         # ==================================================
-        self.CORE_NEW_DIR = self.PROJECT_ROOT / "core_new"
-        self.FINANCE_CORE_DIR = self.PROJECT_ROOT / "finance_core"
-        self.PRESENTATION_DIR = self.PROJECT_ROOT / "presentation"
-        self.DEV_INFRA_DIR = self.PROJECT_ROOT / "dev_infrastructure"
+        # Старый код (ещё не адаптированный) ожидает paths.OSBB_TEST_DB_FILE /
+        # paths.OSBB_DB_FILE и глобальную USE_TEST_DB. В OSBB_cl база одна —
+        # но вместо правки каждого файла-потребителя (десятки мест) даём
+        # мягкие алиасы на ту же самую БД. Тот же принцип, что и db_adapter.py:
+        # не переписывать вызывающих, а подставить совместимую прослойку.
+        self.OSBB_TEST_DB_FILE = self.DB_FILE
+        self.OSBB_DB_FILE = self.DB_FILE
 
         # ==================================================
         # ДОКУМЕНТАЦИЯ
         # ==================================================
-        self.DOCS_DIR = self.PROJECT_ROOT / "docs"
+        self.DOCS_DIR = self.PROJECT_ROOT / "Docs"
 
     def ensure_directories(self):
         """Создаёт недостающие рабочие папки (не трогает git/секреты)."""
         dirs = [
             self.DATA_DIR,
+            self.RAW_DIR,
+            self.TYPED_DIR,
             self.DB_DIR,
-            self.LOGS_DIR,
             self.EXPORTS_DIR,
+            self.LOGS_DIR,
             self.DOCS_DIR,
         ]
         for d in dirs:
@@ -67,3 +78,9 @@ class ProjectPaths:
 
 # ✅ ЕДИНЫЙ ЭКЗЕМПЛЯР — как и в старом config.py
 paths = ProjectPaths()
+
+# Совместимость: старый код делает "from config import paths, USE_TEST_DB".
+# В OSBB_cl база одна (paths.DB_FILE), но само имя оставляем существующим,
+# чтобы не редактировать каждого потребителя. Значение не влияет на то,
+# какая БД используется — она одна и та же в любом случае.
+USE_TEST_DB = True

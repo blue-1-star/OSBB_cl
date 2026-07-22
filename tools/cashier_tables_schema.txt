@@ -1,0 +1,141 @@
+
+====================================================================================================
+cashier_receipts
+====================================================================================================
+CREATE TABLE cashier_receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            receipt_number TEXT NOT NULL UNIQUE,
+            receipt_kind TEXT NOT NULL,
+            entry_status TEXT NOT NULL DEFAULT 'DRAFT',
+            cashbox_code TEXT,
+            receipt_date TEXT NOT NULL,
+            document_date TEXT,
+            origin_kind TEXT NOT NULL DEFAULT 'HAND_TO_HAND',
+            origin_cashbox_code TEXT,
+            payer_name TEXT,
+            apartment_id INTEGER,
+            apartment_number TEXT,
+            service_hint TEXT,
+            period_code TEXT,
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'UAH',
+            evidence_type TEXT NOT NULL DEFAULT 'ORAL',
+            paper_ref TEXT,
+            source_text TEXT,
+            designation_status TEXT NOT NULL DEFAULT 'UNSPECIFIED',
+            allocation_status TEXT NOT NULL DEFAULT 'NOT_APPLICABLE',
+            payment_id INTEGER,
+            cashbox_operation_id INTEGER,
+            void_payment_id INTEGER,
+            void_cashbox_operation_id INTEGER,
+            operator_id TEXT,
+            confirmed_by TEXT,
+            confirmed_at TEXT,
+            voided_by TEXT,
+            voided_at TEXT,
+            void_reason TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT
+        , "payment_notice_id" INTEGER, "cashier_batch_id" INTEGER, "service_item_code" TEXT, "review_status" TEXT)
+
+====================================================================================================
+cashbox_operations
+====================================================================================================
+CREATE TABLE cashbox_operations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            operation_date TEXT NOT NULL,
+            cashbox_code TEXT NOT NULL,
+            operation_type TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            amount REAL NOT NULL,
+            currency TEXT NOT NULL DEFAULT 'UAH',
+            period_code TEXT,
+            apartment_number TEXT,
+            vehicle_id INTEGER,
+            service_code TEXT,
+            payment_id INTEGER,
+            charge_id INTEGER,
+            batch_id TEXT,
+            source_type TEXT DEFAULT 'cashier_journal',
+            source_ref TEXT,
+            operator_id TEXT,
+            actor_type TEXT DEFAULT 'operator',
+            comment TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, service_item_code TEXT, base_service_code TEXT, service_type TEXT, "commercial_contract_id" INTEGER, "commercial_unit_id" INTEGER, "cashier_receipt_id" INTEGER, "transfer_group_ref" TEXT, "payment_notice_id" INTEGER, "cashier_batch_id" INTEGER,
+            FOREIGN KEY (cashbox_code) REFERENCES cashboxes(cashbox_code),
+            FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+            FOREIGN KEY (payment_id) REFERENCES payments(id),
+            FOREIGN KEY (charge_id) REFERENCES charges(id)
+        )
+
+====================================================================================================
+bank_transactions
+====================================================================================================
+CREATE TABLE bank_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transaction_ref TEXT UNIQUE,
+            entry_status TEXT NOT NULL DEFAULT 'CONFIRMED',
+            transaction_date TEXT NOT NULL,
+            value_date TEXT,
+            apartment_id INTEGER,
+            apartment_number TEXT,
+            period_code TEXT,
+            service_code TEXT,
+            service_item_code TEXT,
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT 'UAH',
+            payer_text TEXT,
+            bank_name TEXT,
+            source_type TEXT NOT NULL DEFAULT 'manual_operator',
+            source_ref TEXT,
+            payment_notice_id INTEGER,
+            payment_id INTEGER,
+            cashier_batch_id INTEGER,
+            operator_id TEXT,
+            operator_note TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT,
+            FOREIGN KEY(apartment_id) REFERENCES apartments(id),
+            FOREIGN KEY(payment_notice_id) REFERENCES payment_notices(id)
+        )
+
+====================================================================================================
+operator_audit_log
+====================================================================================================
+CREATE TABLE operator_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT,
+            operator_id TEXT,
+            user_id TEXT,
+            actor_type TEXT,
+            action_type TEXT,
+            table_name TEXT,
+            row_id TEXT,
+            field_name TEXT,
+            old_value TEXT,
+            new_value TEXT,
+            action_status TEXT DEFAULT 'applied',
+            review_status TEXT DEFAULT 'pending',
+            source_context TEXT,
+            comment TEXT
+        , db_mode TEXT, db_file TEXT, reviewed_by TEXT, reviewed_at TEXT, review_comment TEXT, extra_json TEXT)
+
+====================================================================================================
+vehicles
+====================================================================================================
+CREATE TABLE vehicles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        apartment_id INTEGER,
+        license_plate TEXT,
+        car_model TEXT,
+        car_color TEXT,
+        parking_time TEXT,
+        status TEXT,
+        source TEXT,
+        notes TEXT,
+        created_at TEXT,
+        created_by TEXT,
+        updated_at TEXT,
+        updated_by TEXT, license_plate_normalized TEXT, plate_format_status TEXT, car_model_normalized TEXT, car_color_normalized TEXT, lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE', review_status TEXT NOT NULL DEFAULT 'VERIFIED', archived_at TEXT, archive_reason TEXT, archived_by TEXT, created_source TEXT,
+        FOREIGN KEY(apartment_id) REFERENCES apartments(id)
+    )

@@ -1,0 +1,84 @@
+====================================================================================================
+OSBB operator/admin candidates inspector - READ ONLY
+====================================================================================================
+Generated: 2026-06-30 10:56:15
+DB: G:\Programming\Py\OSBB\Data\db\osbb_test.db
+
+====================================================================================================
+TABLE COUNTS
+====================================================================================================
+ - bot_admins: 1
+ - resident_accounts: 2
+ - persons: 343
+ - contact_methods: 0
+ - operator_audit_log: 114
+
+====================================================================================================
+BOT ADMINS
+====================================================================================================
+ - {'id': 1, 'telegram_user_id': 210312208, 'telegram_username': None, 'display_name': None, 'role': 'super_admin', 'can_read': 1, 'can_write': 1, 'can_manage_users': 1, 'can_manage_payments': 1, 'can_manage_bot': 1, 'is_active': 1, 'created_at': '2026-06-12 19:26:16', 'updated_at': '2026-06-12 19:26:16', 'notes': 'Seeded from telegram_osbb.py'}
+
+====================================================================================================
+OPERATOR CANDIDATES
+====================================================================================================
+
+Candidate: @blue1star / Третяк Меланія Петрівна / кв.174
+ - operator_alias: @blue1star / Третяк Меланія Петрівна / кв.174
+ - resident_account_id: 1
+ - telegram_user_id: 210312208
+ - telegram_username: blue1star
+ - telegram_name: Blue1star
+ - apartment_id: 166
+ - apartment_number: 174
+ - resident_role: resident
+ - resident_status: apartment_confirmed
+ - language_code: uk
+ - person_names: ['Третяк Меланія Петрівна', 'Третяк С. О.']
+ - person_phones: ['066 953 98 45 Елена', '380665556555']
+ - contact_values: []
+ - is_bot_admin: True
+ - bot_admin_role: super_admin
+ - bot_admin_can_read: 1
+ - bot_admin_can_write: 1
+ - bot_admin_can_manage_users: 1
+ - bot_admin_can_manage_payments: 1
+ - bot_admin_can_manage_bot: 1
+
+Candidate: @TEST_REMOTE_DEBT_GATE / Галічева Валентина Олександрівна / кв.89
+ - operator_alias: @TEST_REMOTE_DEBT_GATE / Галічева Валентина Олександрівна / кв.89
+ - resident_account_id: 355
+ - telegram_user_id: -901782660751
+ - telegram_username: TEST_REMOTE_DEBT_GATE
+ - telegram_name: TEST DEBT_GATE
+ - apartment_id: 87
+ - apartment_number: 89
+ - resident_role: resident
+ - resident_status: test_fixture
+ - language_code: ru
+ - person_names: ['Галічева Валентина Олександрівна', 'Галічева Валентина Олександрівна', 'Галічева Валентина Олександрівна', "В'язовченко Анатолій Михайлович"]
+ - person_phones: ['3800509197996', '3800504115957']
+ - contact_values: []
+ - is_bot_admin: False
+ - bot_admin_role: None
+ - bot_admin_can_read: None
+ - bot_admin_can_write: None
+ - bot_admin_can_manage_users: None
+ - bot_admin_can_manage_payments: None
+ - bot_admin_can_manage_bot: None
+
+====================================================================================================
+RAW RESIDENT ACCOUNTS
+====================================================================================================
+ - {'id': 1, 'telegram_user_id': 210312208, 'telegram_username': 'blue1star', 'telegram_first_name': 'Blue1star', 'telegram_last_name': None, 'apartment_id': 166, 'apartment_number': '174', 'role': 'resident', 'status': 'apartment_confirmed', 'language_code': 'uk', 'created_at': '2026-06-12 22:22:00', 'updated_at': '2026-06-25 15:30:23', 'verified_at': '2026-06-25 10:50:01', 'last_seen_at': '2026-06-25 15:30:23', 'notes': ' | operator_verified'}
+ - {'id': 355, 'telegram_user_id': -901782660751, 'telegram_username': 'TEST_REMOTE_DEBT_GATE', 'telegram_first_name': 'TEST', 'telegram_last_name': 'DEBT_GATE', 'apartment_id': 87, 'apartment_number': '89', 'role': 'resident', 'status': 'test_fixture', 'language_code': 'ru', 'created_at': '2026-06-28 18:32:31', 'updated_at': '2026-06-28 18:32:31', 'verified_at': None, 'last_seen_at': None, 'notes': 'TEST_DEBT_GATE_FIXTURE; synthetic account for sandbox pult debt gate test; created_at=2026-06-28 18:32:31; do not use as real resident.'}
+
+====================================================================================================
+RECOMMENDED NEXT ACTIONS
+====================================================================================================
+1. Add operators by readable alias, not by Telegram ID alone.
+2. For future chairman/base-review role use CHAIRMAN_REVIEWER or BOARD_REVIEWER.
+3. Minimal permissions for this role: view_apartments, view_residents, view_vehicles, verify_apartment_data, edit_contact_basic, edit_vehicle_basic, review_verification_tasks.
+4. Keep money/access-activation permissions separate.
+5. Log all admin changes in operator_audit_log.
+
+READ ONLY COMPLETED

@@ -1,0 +1,1 @@
+ g:\Programming\Py\venv\Scripts\python.exe G:\Programming\Py\OSBB\manage_staff_access_v2.py --sandbox "G:\Programming\Py\OSBB\Data\db\sandbox\osbb_test_cashier_v2_compat_check_2026-06-25_19-47-09_guard_check_2026-06-26_12-56-09.db" --grant-role 210312208 GUARD_O --name "Тестовый охранник O" --note "Sandbox проверка кабинета охраны" --apply

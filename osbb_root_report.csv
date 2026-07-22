@@ -1,0 +1,298 @@
+﻿path,size_kb,category,reason
+build_plate_candidates.py,8.8,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+build_plate_evidence_by_digits_and_apartment.py,9.7,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+build_plate_evidence_from_telegram.py,4.3,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+CHECK_guard_sandbox_service_orders.py,15.3,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_guard_sandbox_service_orders.py,15.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+CHECK_guard_sandbox_service_orders_v2.py,14.1,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_guard_sandbox_service_orders_v2.py,14.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+CHECK_guard_sandbox_service_orders_v2.py,14.1,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: CHECK_guard_sandbox_service_orders.py"
+CHECK_phone_barrier_access_operational_sandbox.py,2.9,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_phone_barrier_access_operational_sandbox.py,2.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+CHECK_phone_barrier_access_sandbox_schema.py,3.7,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_phone_barrier_access_sandbox_schema.py,3.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+CHECK_profile_button_early_route_fix.py,1.9,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_profile_confirmation_ready_visibility_fix.py,1.1,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_profile_critical_codes_fix.py,1.1,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_profile_parking_time_test_sandbox.py,2.7,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_profile_parking_time_test_sandbox.py,2.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+CHECK_profile_test_candidate_apartment_40.py,10.2,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_profile_verification_sandbox.py,2.5,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_profile_verification_sandbox.py,2.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+CHECK_profile_verification_terminology_v2.py,2.2,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+CHECK_service_code_compatibility_phone_v2.py,3.7,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Collect_sheets.py,6.8,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+Collect_sheets1.py,7.6,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+Collect_word_tables.py,4.7,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+create_clean_live_sandbox.py,15.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+create_isolated_live_sandbox_v2.py,15.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Development_Conventions.md,0.9,REVIEW:duplicate_doc_name,"файл с именем 'Development_Conventions.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+diagnose_sandbox_charges.py,7.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+extract_telegram_remote_facts.py,7.7,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+extract_telegram_vehicle_facts.py,11.9,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+find_sandbox_telegram_id.py,5.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+FIX_live_services_sandbox_payment_schema.py,11.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Generate_Stetement.py,6.2,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+guard_workspace_preflight_v2.py,13.0,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: guard_workspace_preflight.py"
+import_house_registry.py,4.1,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+import_ohorona_list1_to_central_cashbox.py,33.2,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+import_ohorona_sheet1_payments.py,26.9,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+import_ohorona_to_cashbox.py,37.1,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+import_osbb_telegram_messages.py,5.0,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+import_paper_parking.py,8.1,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+import_tbot_quarantine.py,3.9,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+INSTALL_cashier_route_after_phone_v2.py,2.8,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_PHONE_ACCESS_UI_FIX.bat,1.3,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_PHONE_ACCESS_UI_FIX_v2.bat,0.4,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_PHONE_ACCESS_UI_FIX_v2.bat,0.4,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: INSTALL_PHONE_ACCESS_UI_FIX.bat"
+INSTALL_PHONE_ACCESS_UI_FIX_v2.py,4.1,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_PHONE_ACCESS_UI_FIX_v2.py,4.1,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: INSTALL_PHONE_ACCESS_UI_FIX.py"
+INSTALL_PHONE_ACCESS_UI_FIX_v3.bat,0.3,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_PHONE_ACCESS_UI_FIX_v3.bat,0.3,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: INSTALL_PHONE_ACCESS_UI_FIX.bat"
+INSTALL_PHONE_ACCESS_UI_FIX_v3.py,3.3,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_PHONE_ACCESS_UI_FIX_v3.py,3.3,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: INSTALL_PHONE_ACCESS_UI_FIX.py"
+INSTALL_phone_barrier_access_v2.py,4.4,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_profile_button_early_route_fix.py,2.3,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_profile_confirmation_ready_visibility_fix.py,2.2,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_profile_critical_codes_fix.py,2.2,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_profile_parking_time_test_v1.py,3.8,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_profile_verification_terminology_v2.py,3.8,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_profile_verification_v1.py,2.7,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+INSTALL_service_code_compatibility_phone_v2.py,3.4,HIGH:one_off_fix_bundle,часть связки INSTALL_*/MIGRATE_*/RUN_*/README_* одного точечного фикса
+manage_staff_access_v2.py,15.0,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: manage_staff_access.py"
+migrate_operator_audit_log_v2.py,5.1,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: migrate_operator_audit_log.py"
+MIGRATE_phone_barrier_access_operational_sandbox.py,4.7,HIGH:one_off_fix_bundle,"одноразовый MIGRATE_* (заглавный) — часть связки точечного фикса, не история миграций БД"
+MIGRATE_phone_barrier_access_operational_sandbox.py,4.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+MIGRATE_phone_barrier_access_sandbox.py,4.5,HIGH:one_off_fix_bundle,"одноразовый MIGRATE_* (заглавный) — часть связки точечного фикса, не история миграций БД"
+MIGRATE_phone_barrier_access_sandbox.py,4.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+MIGRATE_profile_parking_time_test_sandbox.py,3.0,HIGH:one_off_fix_bundle,"одноразовый MIGRATE_* (заглавный) — часть связки точечного фикса, не история миграций БД"
+MIGRATE_profile_parking_time_test_sandbox.py,3.0,REVIEW:sandbox_name,в пути встречается 'sandbox'
+MIGRATE_profile_verification_sandbox.py,2.5,HIGH:one_off_fix_bundle,"одноразовый MIGRATE_* (заглавный) — часть связки точечного фикса, не история миграций БД"
+MIGRATE_profile_verification_sandbox.py,2.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+MIGRATE_simplified_services_sandbox.py,4.4,HIGH:one_off_fix_bundle,"одноразовый MIGRATE_* (заглавный) — часть связки точечного фикса, не история миграций БД"
+MIGRATE_simplified_services_sandbox.py,4.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+OSBB_apartment_40_profile_test_preflight.zip,4.9,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_cashier_route_fix.zip,7.9,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_cashier_route_repair_after_phone_v2.zip,10.2,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_phone_access_ui_fix.zip,15.2,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_phone_access_ui_fix_v3.zip,16.4,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_phone_access_ui_fix_v3.zip,16.4,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: OSBB_phone_access_ui_fix.zip"
+OSBB_phone_barrier_access_schema_migration.zip,12.4,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_phone_barrier_access_v2_working_sandbox.zip,57.4,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_phone_barrier_access_v2_working_sandbox.zip,57.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+OSBB_profile_button_early_route_fix_v2.zip,12.8,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_profile_confirmation_ready_visibility_fix.zip,10.2,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_profile_parking_time_test_v1_sandbox.zip,25.5,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_profile_parking_time_test_v1_sandbox.zip,25.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+OSBB_profile_verification_terminology_v2 (1).zip,39.1,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_profile_verification_v1_sandbox_final.zip,47.3,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_profile_verification_v1_sandbox_final.zip,47.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+OSBB_service_code_compatibility_repair_phone_v2.zip,38.7,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_Service_Orders_Foundation_v1.zip,22.5,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+OSBB_simplified_services_preorders_bundle.zip,34.8,HIGH:root_zip_bundle,готовый zip-бандл точечного патча в корне проекта
+patch_cashier_v2_core_period_and_schemafix.py,15.6,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_cashier_v2_core_schemafix.py,13.2,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_guard_workspace_default_cash_note.py,6.8,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_guard_workspace_direct_notice_confirm.py,5.0,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_cashier_operator.py,6.4,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_client_cabinet.py,5.2,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_client_portal.py,6.9,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_guard_workspace_v2.py,9.6,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_guard_workspace_v3.py,8.4,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_guard_workspace_v4.py,9.0,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_launch_queues_menu.py,3.6,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_service_orders_ui_v1.py,11.5,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_service_orders_ui_v2.py,16.9,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+patch_parking_bot_service_orders_v1.py,3.1,HIGH:patch_script,"одноразовый скрипт-патч исходников (история применения, не рабочий код)"
+plate_consensus_apply.py,10.1,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+plate_consensus_report.py,23.8,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+plate_consensus_report_v3.py,22.0,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+plate_consensus_report_v3.py,22.0,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: plate_consensus_report.py"
+plate_consensus_top6.py,2.7,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+README_APARTMENT_40_PROFILE_TEST_PREFLIGHT.txt,1.4,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_CASHIER_ROUTE_FIX.txt,1.6,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_CASHIER_ROUTE_REPAIR_AFTER_PHONE_V2.txt,1.7,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_LIVE_SERVICES_SANDBOX.txt,2.6,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_LIVE_SERVICES_SANDBOX.txt,2.6,REVIEW:sandbox_name,в пути встречается 'sandbox'
+README_LIVE_SERVICE_UI.txt,0.7,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PHONE_ACCESS_FIX.txt,3.1,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PHONE_ACCESS_FIX_v2.txt,1.6,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PHONE_ACCESS_FIX_v2.txt,1.6,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: README_PHONE_ACCESS_FIX.txt"
+README_PHONE_ACCESS_FIX_v3.txt,1.8,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PHONE_ACCESS_FIX_v3.txt,1.8,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: README_PHONE_ACCESS_FIX.txt"
+README_PHONE_BARRIER_ACCESS_SCHEMA_MIGRATION.txt,3.5,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PHONE_BARRIER_ACCESS_V2.txt,7.5,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PROFILE_BUTTON_EARLY_ROUTE_FIX.txt,2.3,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PROFILE_CONFIRMATION_READY_VISIBILITY_FIX.txt,1.6,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PROFILE_CRITICAL_CODES_FIX.txt,2.3,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PROFILE_PARKING_TIME_TEST_V1.txt,4.5,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PROFILE_VERIFICATION_TERMINOLOGY_V2.txt,5.3,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_PROFILE_VERIFICATION_V1.txt,3.9,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_SERVICE_CODE_COMPATIBILITY_PHONE_V2.txt,2.1,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+README_SIMPLIFIED_SERVICES.txt,3.8,HIGH:one_off_fix_bundle,README_*.txt — описание одноразового фикса
+report_bot_admins.py,4.2,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+report_plate_candidates.py,6.2,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+report_verification_evidence.py,5.4,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+report_verification_tasks.py,3.7,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+report_verification_tasks_enriched.py,7.0,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+RETIRE_legacy_new_remote_test_orders_sandbox.py,4.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+run_bot_guard_sandbox.py,7.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+run_bot_guard_sandbox_v2.py,7.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+run_bot_guard_sandbox_v2.py,7.4,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: run_bot_guard_sandbox.py"
+run_bot_guard_sandbox_v3.py,7.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+run_bot_guard_sandbox_v3.py,7.4,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: run_bot_guard_sandbox.py"
+run_bot_live_services_sandbox_v1.py,33.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+run_bot_live_service_sandbox_v4.py,8.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+run_bot_sandbox_v2.py,9.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_cashier_route_after_phone_v2.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_guard_sandbox_service_orders.bat,0.9,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_guard_sandbox_service_orders.bat,0.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_guard_sandbox_service_orders_v2.bat,0.8,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_guard_sandbox_service_orders_v2.bat,0.8,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_guard_sandbox_service_orders_v2.bat,0.8,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: RUN_CHECK_guard_sandbox_service_orders.bat"
+RUN_CHECK_phone_barrier_access_operational_sandbox.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_phone_barrier_access_operational_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_phone_barrier_access_sandbox_schema.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_phone_barrier_access_sandbox_schema.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_profile_button_early_route_fix.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_profile_confirmation_ready_visibility_fix.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_profile_critical_codes_fix.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_profile_parking_time_test_sandbox.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_profile_parking_time_test_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_profile_test_candidate_apartment_40.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_profile_verification_sandbox.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_profile_verification_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_CHECK_profile_verification_terminology_v2.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_CHECK_service_code_compatibility_phone_v2.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_FIND_actual_service_order_state.bat,0.8,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_FIX_live_services_sandbox_payment_schema.bat,1.1,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_FIX_live_services_sandbox_payment_schema.bat,1.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_fix_source_ref_schema.bat,0.8,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_cashier_route_after_phone_v2.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_phone_barrier_access_v2.bat,0.4,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_profile_button_early_route_fix.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_profile_confirmation_ready_visibility_fix.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_profile_critical_codes_fix.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_profile_parking_time_test_v1.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_profile_verification_terminology_v2.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_profile_verification_v1.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_INSTALL_service_code_compatibility_phone_v2.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_MIGRATE_phone_barrier_access_operational_sandbox.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_MIGRATE_phone_barrier_access_operational_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_MIGRATE_phone_barrier_access_sandbox.bat,0.4,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_MIGRATE_phone_barrier_access_sandbox.bat,0.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_MIGRATE_profile_parking_time_test_sandbox.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_MIGRATE_profile_parking_time_test_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_MIGRATE_profile_verification_sandbox.bat,0.3,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_MIGRATE_profile_verification_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_MIGRATE_simplified_services_sandbox.bat,0.8,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_MIGRATE_simplified_services_sandbox.bat,0.8,REVIEW:sandbox_name,в пути встречается 'sandbox'
+RUN_RETIRE_legacy_new_remote_test_orders_sandbox.bat,0.5,HIGH:one_off_fix_bundle,RUN_*.bat — запускатель одноразового фикса
+RUN_RETIRE_legacy_new_remote_test_orders_sandbox.bat,0.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+service_access_policy_old.py,11.0,HIGH:old_suffix,явный суффикс _old при наличии файла без него: service_access_policy.py
+Start_OSBB_Guard_Sandbox_Bot_v2.bat,1.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Start_OSBB_Live_Services_Sandbox_Bot_v1.bat,1.0,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Start_OSBB_Live_Service_Sandbox_Bot.bat,1.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+STOP_old_guard_sandbox_bots.bat,0.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Word_table_to_Excel.py,2.6,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+billing\import_ohorona_parking_time.py,13.3,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+billing\import_ohorona_parking_time_simple_preview.py,14.2,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+billing\import_parking_time_hints_from_ohorona.py,9.8,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+billing\report_missing_parking_time.py,0.0,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+billing\report_parking_time_review_tasks.py,6.2,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+billing\report_parking_time_with_hints.py,13.7,REVIEW:data_pipeline_history,"часть пайплайна оцифровки/переноса данных (бумага → Word → Excel → БД) — исторически ценно, но не часть работающего приложения"
+Bots\sandbox_bot.py,15.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Bots\Start_OSBB_Guard_Sandbox_Bot.bat,1.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Bots\Start_OSBB_Guard_Sandbox_Bot_v2.bat,1.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Bots\Start_OSBB_Guard_Sandbox_Bot_v2.bat,1.2,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: Start_OSBB_Guard_Sandbox_Bot.bat"
+Bots\Start_Sandbox_Bot.bat,1.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+cashier_route_repair_payload\run_bot_live_services_sandbox_v1.py,24.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Data\24А ПОЛНЫЙ СПИСОК Сервис Житлобуд1 - Copy.xlsx,24.1,REVIEW:config_referenced,"путь явно упомянут в config.py (paths.*) — похоже на мусор по имени, но это активный файл проекта; исходное правило: HIGH:manual_copy (похоже на ручную копию (' - Copy' / '_copy'))"
+Data\check_passport_columns.py,1.6,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Docs\Project_Log.md,2.6,REVIEW:duplicate_doc_name,"файл с именем 'Project_Log.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+Docs\ROADMAP.md,4.3,REVIEW:duplicate_doc_name,"файл с именем 'ROADMAP.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+KNOWLEDGE\Development_Conventions.md,1.2,REVIEW:duplicate_doc_name,"файл с именем 'Development_Conventions.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+parking_time_test_payload\run_bot_live_services_sandbox_v1.py,33.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+profile_button_early_route_payload\run_bot_live_services_sandbox_v1.py,30.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+profile_verification_payload\run_bot_live_services_sandbox_v1.py,29.6,REVIEW:sandbox_name,в пути встречается 'sandbox'
+tools\cashier_unpaid_preview_v2.py,9.7,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: cashier_unpaid_preview.py"
+tools\cashier_unpaid_preview_v3.py,22.8,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: cashier_unpaid_preview.py"
+tools\check_service_policy_v1.py,11.7,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+tools\db_inspector_v3.py,12.5,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: db_inspector.py"
+tools\dump_service_codes_live_sandbox.py,3.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+tools\harvest_lost_features_from_sandboxes.py,17.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+tools\project_passport_v2.py,19.6,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: project_passport.py"
+tools\promote_sandbox_to_training_db.py,6.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+tools\sandbox_switch_admin_apartment.py,11.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+tools\user_onboarding\ADMIN_UI_V2.md,0.3,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: ADMIN_UI.md"
+tools\user_onboarding\patch_parking_bot_admin_ui_v2.py,4.4,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: patch_parking_bot_admin_ui.py"
+Recovered_Releases\2026-06-26__OSBB_Live_Service_UI_v1\run_bot_live_service_sandbox_v4.py,8.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_cashier_route_fix\run_bot_live_services_sandbox_v1.py,24.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\CREATE_TEST_PAYMENT_FOR_OPEN_SERVICE_ORDER.bat,0.8,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\CREATE_TEST_PAYMENT_FOR_OPEN_SERVICE_ORDER.py,5.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\patch_parking_bot_service_orders_v1.py,3.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\README_LIVE_SERVICES_SANDBOX.txt,2.6,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\run_bot_live_services_sandbox_v1.py,19.8,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\Start_OSBB_Live_Services_Sandbox_Bot_v1.bat,1.0,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\STOP_old_guard_sandbox_bots.bat,0.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_schema_migration\CHECK_phone_barrier_access_sandbox_schema.py,3.7,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_schema_migration\CHECK_phone_barrier_access_sandbox_schema.py,3.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_schema_migration\MIGRATE_phone_barrier_access_sandbox.py,4.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_schema_migration\RUN_CHECK_phone_barrier_access_sandbox_schema.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_schema_migration\RUN_MIGRATE_phone_barrier_access_sandbox.bat,0.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\CHECK_phone_barrier_access_operational_sandbox.py,2.9,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\CHECK_phone_barrier_access_operational_sandbox.py,2.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\INSTALL_phone_barrier_access_v2.py,4.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\MIGRATE_phone_barrier_access_operational_sandbox.py,4.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\README_PHONE_BARRIER_ACCESS_V2.txt,7.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\RUN_CHECK_phone_barrier_access_operational_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\RUN_INSTALL_phone_barrier_access_v2.bat,0.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\RUN_MIGRATE_phone_barrier_access_operational_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_terminology_v2\CHECK_profile_verification_terminology_v2.py,2.2,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Recovered_Releases\2026-06-27__OSBB_profile_verification_terminology_v2 (1)\CHECK_profile_verification_terminology_v2.py,2.2,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\CHECK_profile_verification_sandbox.py,2.5,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\CHECK_profile_verification_sandbox.py,2.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\INSTALL_profile_verification_v1.py,2.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\MIGRATE_profile_verification_sandbox.py,2.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\README_PROFILE_VERIFICATION_V1.txt,3.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\RUN_CHECK_profile_verification_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\RUN_INSTALL_profile_verification_v1.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\RUN_MIGRATE_profile_verification_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_simplified_services_preorders_bundle\MIGRATE_simplified_services_sandbox.py,2.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_simplified_services_preorders_bundle\RETIRE_legacy_new_remote_test_orders_sandbox.py,4.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_simplified_services_preorders_bundle\RUN_MIGRATE_simplified_services_sandbox.bat,0.8,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_simplified_services_preorders_bundle\RUN_RETIRE_legacy_new_remote_test_orders_sandbox.bat,0.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\CHECK_profile_parking_time_test_sandbox.py,2.7,REVIEW:check_script,разовый диагностический скрипт CHECK_*
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\CHECK_profile_parking_time_test_sandbox.py,2.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\INSTALL_profile_parking_time_test_v1.py,3.8,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\MIGRATE_profile_parking_time_test_sandbox.py,3.0,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\README_PROFILE_PARKING_TIME_TEST_V1.txt,4.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\RUN_CHECK_profile_parking_time_test_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\RUN_INSTALL_profile_parking_time_test_v1.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\RUN_MIGRATE_profile_parking_time_test_sandbox.bat,0.3,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\parking_time_test_payload\profile_parking_time_test_core.py,24.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\parking_time_test_payload\run_bot_live_services_sandbox_v1.py,33.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-28__OSBB_profile_parking_time_test_v1_sandbox\parking_time_test_payload\Bots\handlers\profile_parking_time_test_workspace.py,12.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\profile_verification_payload\profile_verification_core.py,47.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\profile_verification_payload\run_bot_live_services_sandbox_v1.py,29.6,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\profile_verification_payload\Bots\handlers\profile_verification_workspace.py,27.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_verification_v1_sandbox_final\profile_verification_payload\Bots\handlers\service_orders_workspace.py,78.7,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_profile_button_early_route_fix_v2\profile_button_early_route_payload\run_bot_live_services_sandbox_v1.py,30.9,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\phone_barrier_access_v2_payload\phone_barrier_access_core.py,71.6,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\phone_barrier_access_v2_payload\phone_barrier_access_service.py,6.4,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\phone_barrier_access_v2_payload\service_orders_core.py,41.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\phone_barrier_access_v2_payload\service_preorders_core.py,43.0,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_phone_barrier_access_v2_working_sandbox\phone_barrier_access_v2_payload\Bots\handlers\service_orders_workspace.py,73.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_live_services_sandbox_bundle\Bots\handlers\service_orders_workspace.py,60.2,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Recovered_Releases\2026-06-27__OSBB_cashier_route_repair_after_phone_v2\cashier_route_repair_payload\run_bot_live_services_sandbox_v1.py,24.5,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Docs\Architecture\Finance_Core.md,2.7,REVIEW:duplicate_doc_name,"файл с именем 'Finance_Core.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+Docs\Architecture\ADR\ADR-2026-07-19-Finance-Core.md,1.9,REVIEW:duplicate_doc_name,"файл с именем 'ADR-2026-07-19-Finance-Core.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+Data\exports\debt_policy\service_codes_live_sandbox.txt,22.1,REVIEW:sandbox_name,в пути встречается 'sandbox'
+Bots\handlers\cashier_operator_v2.py,44.6,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: cashier_operator.py"
+Bots\handlers\client_portal_v2.py,28.5,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v2), и рядом существует файл без суффикса: client_portal.py"
+Bots\handlers\client_portal_v3.py,2.8,REVIEW:versioned_duplicate,"есть версия с суффиксом (_v3), и рядом существует файл без суффикса: client_portal.py"
+Bots\handlers\vehicle_card_editor_prev.py,18.9,REVIEW:variant_suffix,похоже на вариант/дубль базового модуля: vehicle_card_editor
+.doc_installer_backups\20260719-210858-990797\Docs\Project_Log.md,1.3,REVIEW:duplicate_doc_name,"файл с именем 'Project_Log.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+.doc_installer_backups\20260719-210858-984267\Docs\ROADMAP.md,3.1,REVIEW:duplicate_doc_name,"файл с именем 'ROADMAP.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+.doc_installer_backups\20260719-210858-976962\Docs\Architecture\ADR\ADR-2026-07-19-Finance-Core.md,5.2,REVIEW:duplicate_doc_name,"файл с именем 'ADR-2026-07-19-Finance-Core.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"
+.doc_installer_backups\20260719-210856-761970\Docs\Architecture\Finance_Core.md,2.2,REVIEW:duplicate_doc_name,"файл с именем 'Finance_Core.md' встречается в нескольких папках проекта — возможен конфликт содержимого, а не просто дубль (проверьте вручную)"

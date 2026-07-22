@@ -1,0 +1,477 @@
+====================================================================================================
+OSBB phone interest pipeline trace - READ ONLY
+====================================================================================================
+Generated: 2026-06-29 21:05:18
+Root: G:\Programming\Py\OSBB
+
+
+====================================================================================================
+phone_barrier_access_service.py :: create_phone_barrier_access_interest()
+====================================================================================================
+Lines: 30-105
+
+SIGNALS
+48:     The underlying generic interest keeps quantity = number of selected
+50:     actual business selection and per-barrier tariff snapshots are stored in
+51:     phone_access_requests and phone_access_request_points.
+56:     conn = conn or get_conn()
+63:             conn=conn,
+83:             conn=conn,
+91:             conn=conn,
+97:             conn.commit()
+101:             conn.rollback()
+
+FULL FUNCTION
+30: def create_phone_barrier_access_interest(
+31:     *,
+32:     resident_account_id: int | None,
+33:     telegram_user_id: int | str | None,
+34:     apartment_id: int | None,
+35:     apartment_number: str,
+36:     service_item_code: str,
+37:     phone: str,
+38:     access_point_codes: Iterable[str],
+39:     parking_debt_check_mode: str = "MANUAL_REVIEW",
+40:     parking_debt_check_note: str = "",
+41:     quote_date: str | date | datetime | None = None,
+42:     conn: sqlite3.Connection | None = None,
+43: ) -> dict:
+44:     """
+45:     Record one resident intention, but calculate connection price from the
+46:     dedicated effective-dated access tariffs.
+47: 
+48:     The underlying generic interest keeps quantity = number of selected
+49:     barriers solely to preserve payment/reconciliation compatibility. The
+50:     actual business selection and per-barrier tariff snapshots are stored in
+51:     phone_access_requests and phone_access_request_points.
+52:     """
+53:     points = normalise_access_point_codes(access_point_codes)
+54:     phone = normalise_phone_number(phone)
+55:     owns = conn is None
+56:     conn = conn or get_conn()
+57:     try:
+58:         ensure_simplified_service_schema(conn)
+59:         ensure_phone_access_operational_schema(conn)
+60:         quote = quote_phone_barrier_access(
+61:             access_point_codes=points,
+62:             registration_date=quote_date,
+63:             conn=conn,
+64:         )
+65:         quantity = len(points)
+66:         unit_price = round(float(quote["connection_total"]) / quantity, 2)
+67:         interest = create_service_interest(
+68:             resident_account_id=resident_account_id,
+69:             telegram_user_id=telegram_user_id,
+70:             apartment_id=apartment_id,
+71:             apartment_number=text(apartment_number),
+72:             service_item_code=service_item_code,
+73:             quantity=quantity,
+74:             resident_comment=(
+75:                 f"ACCESS_PHONE={phone}\n"
+76:                 f"ACCESS_POINTS={','.join(points)}\n"
+77:                 f"ACCESS_MODEL=PHONE_BARRIER_V2"
+78:             ),
+79:             service_name_snapshot_override="Телефонний доступ до шлагбаума(ів)",
+80:             unit_price_snapshot_override=unit_price,
+81:             amount_due_snapshot_override=float(quote["connection_total"]),
+82:             currency_snapshot_override=text(quote["currency"]) or "UAH",
+83:             conn=conn,
+84:         )
+85:         request = create_phone_access_request_from_interest(
+86:             interest=interest,
+87:             phone=phone,
+88:             quote=quote,
+89:             parking_debt_check_mode=parking_debt_check_mode,
+90:             parking_debt_check_note=parking_debt_check_note,
+91:             conn=conn,
+92:         )
+93:         result = dict(interest)
+94:         result["phone_access_request"] = request
+95:         result["phone_access_quote"] = quote
+96:         if owns:
+97:             conn.commit()
+98:         return result
+99:     except Exception:
+100:         if owns:
+101:             conn.rollback()
+102:         raise
+103:     finally:
+104:         if owns:
+105:             conn.close()
+
+====================================================================================================
+service_preorders_core.py :: create_service_interest()
+====================================================================================================
+Lines: 365-472
+
+SIGNALS
+385:     conn = conn or get_conn()
+430:         cur.execute(
+432:             INSERT INTO service_order_interests (
+438:                 resident_comment, created_at, updated_at
+462:         result = get_service_interest(int(cur.lastrowid), conn=conn)
+464:             conn.commit()
+468:             conn.rollback()
+
+FULL FUNCTION
+365: def create_service_interest(
+366:     *,
+367:     resident_account_id: int | None,
+368:     telegram_user_id: int | str | None,
+369:     apartment_id: int | None,
+370:     apartment_number: str,
+371:     service_item_code: str,
+372:     quantity: int,
+373:     resident_comment: str = "",
+374:     service_name_snapshot_override: str = "",
+375:     unit_price_snapshot_override: float | None = None,
+376:     amount_due_snapshot_override: float | None = None,
+377:     currency_snapshot_override: str = "",
+378:     conn: sqlite3.Connection | None = None,
+379: ) -> dict:
+380:     """Record non-binding demand. It becomes an operational order only after payment."""
+381:     quantity = int(quantity)
+382:     if quantity <= 0:
+383:         raise ValueError("Количество должно быть больше нуля.")
+384:     owns = conn is None
+385:     conn = conn or get_conn()
+386:     try:
+387:         ensure_simplified_service_schema(conn)
+388:         cur = conn.cursor()
+389:         item = _service_item_snapshot(cur, service_item_code)
+390:         workflow = get_service_workflow(cur, service_item_code)
+391:         if int(workflow.get("resident_request_enabled") or 0) != 1:
+392:             raise PermissionError("Эта услуга пока недоступна для самостоятельной заявки.")
+393:         catalog_price, catalog_currency = effective_price(cur, service_item_code)
+394:         override_used = any(
+395:             value is not None and value != ""
+396:             for value in (
+397:                 unit_price_snapshot_override,
+398:                 amount_due_snapshot_override,
+399:                 currency_snapshot_override,
+400:                 service_name_snapshot_override,
+401:             )
+402:         )
+403:         if override_used:
+404:             if unit_price_snapshot_override is None or amount_due_snapshot_override is None:
+405:                 raise ValueError(
+406:                     "Для фиксированной цены намерения нужны цена единицы и итоговая сумма."
+407:                 )
+408:             price = round(float(unit_price_snapshot_override), 2)
+409:             amount_due = round(float(amount_due_snapshot_override), 2)
+410:             if price < 0 or amount_due < 0:
+411:                 raise ValueError("Фиксированная цена намерения не может быть отрицательной.")
+412:             expected = round(price * quantity, 2)
+413:             if abs(expected - amount_due) > 0.01:
+414:                 raise ValueError(
+415:                     "Итоговая фиксированная сумма не соответствует цене единицы и количеству."
+416:                 )
+417:             currency = text(currency_snapshot_override) or text(catalog_currency) or "UAH"
+418:             service_name_snapshot = (
+419:                 text(service_name_snapshot_override)
+420:                 or text(item.get("service_item_name"))
+421:                 or service_item_code
+422:             )
+423:         else:
+424:             price, currency = catalog_price, catalog_currency
+425:             if price is None or float(price) <= 0:
+426:                 raise ValueError("Для услуги не задана положительная цена.")
+427:             amount_due = round(float(price) * quantity, 2)
+428:             service_name_snapshot = text(item.get("service_item_name")) or service_item_code
+429:         interest_number = _number("SI", cur, "service_order_interests", "interest_number")
+430:         cur.execute(
+431:             """
+432:             INSERT INTO service_order_interests (
+433:                 interest_number, resident_account_id, telegram_user_id,
+434:                 apartment_id, apartment_number,
+435:                 service_code, service_item_code, service_name_snapshot,
+436:                 workflow_profile_code, quantity, unit_price_snapshot,
+437:                 amount_due_snapshot, currency, interest_status,
+438:                 resident_comment, created_at, updated_at
+439:             )
+440:             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+441:             """,
+442:             (
+443:                 interest_number,
+444:                 resident_account_id,
+445:                 str(telegram_user_id) if telegram_user_id is not None else None,
+446:                 apartment_id,
+447:                 text(apartment_number),
+448:                 text(item.get("service_code")) or None,
+449:                 service_item_code,
+450:                 service_name_snapshot,
+451:                 workflow["workflow_profile_code"],
+452:                 quantity,
+453:                 float(price),
+454:                 amount_due,
+455:                 currency or "UAH",
+456:                 INTEREST,
+457:                 text(resident_comment) or None,
+458:                 now_db(),
+459:                 now_db(),
+460:             ),
+461:         )
+462:         result = get_service_interest(int(cur.lastrowid), conn=conn)
+463:         if owns:
+464:             conn.commit()
+465:         return result
+466:     except Exception:
+467:         if owns:
+468:             conn.rollback()
+469:         raise
+470:     finally:
+471:         if owns:
+472:             conn.close()
+
+====================================================================================================
+phone_barrier_access_core.py :: create_phone_access_request_from_interest()
+====================================================================================================
+Lines: 1432-1533
+
+SIGNALS
+1441:     """Persist phone and selected barriers next to an already-created interest."""
+1457:         return phone_access_request_summary(interest_id=interest_id, conn=conn)
+1463:     request_number = _next_number("PAR", cur, "phone_access_requests", "request_number")
+1465:     cur.execute(
+1467:         INSERT INTO phone_access_requests (
+1471:             quoted_at, created_at, updated_at
+1492:     request_id = int(cur.lastrowid)
+1494:         cur.execute(
+1496:             INSERT INTO phone_access_request_points (
+1500:                 currency, created_at, updated_at
+1533:     return phone_access_request_summary(interest_id=interest_id, conn=conn)
+
+FULL FUNCTION
+1432: def create_phone_access_request_from_interest(
+1433:     *,
+1434:     interest: dict,
+1435:     phone: str,
+1436:     quote: dict,
+1437:     parking_debt_check_mode: str = "MANUAL_REVIEW",
+1438:     parking_debt_check_note: str = "",
+1439:     conn: sqlite3.Connection,
+1440: ) -> dict:
+1441:     """Persist phone and selected barriers next to an already-created interest."""
+1442:     ensure_phone_access_operational_schema(conn)
+1443:     phone = normalise_phone_number(phone)
+1444:     mode = text(parking_debt_check_mode).upper() or "MANUAL_REVIEW"
+1445:     allowed = {
+1446:         "CHECK_LINKED_PARKING_ACCOUNT",
+1447:         "NOT_APPLICABLE_NO_PARKING",
+1448:         "MANUAL_REVIEW",
+1449:     }
+1450:     if mode not in allowed:
+1451:         raise ValueError("Некорректный режим проверки парковочной задолженности.")
+1452: 
+1453:     cur = conn.cursor()
+1454:     interest_id = int(interest["id"])
+1455:     existing = _request_row(cur, interest_id=interest_id)
+1456:     if existing:
+1457:         return phone_access_request_summary(interest_id=interest_id, conn=conn)
+1458: 
+1459:     points = list(quote.get("access_points") or [])
+1460:     if not points:
+1461:         raise ValueError("В намерении не выбраны шлагбаумы.")
+1462: 
+1463:     request_number = _next_number("PAR", cur, "phone_access_requests", "request_number")
+1464:     now = now_db()
+1465:     cur.execute(
+1466:         """
+1467:         INSERT INTO phone_access_requests (
+1468:             request_number, interest_id, resident_account_id, telegram_user_id,
+1469:             apartment_id, apartment_number, phone_normalized, request_status,
+1470:             parking_debt_check_mode, parking_debt_check_note, policy_version_id,
+1471:             quoted_at, created_at, updated_at
+1472:         )
+1473:         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+1474:         """,
+1475:         (
+1476:             request_number,
+1477:             interest_id,
+1478:             interest.get("resident_account_id"),
+1479:             text(interest.get("telegram_user_id")) or None,
+1480:             interest.get("apartment_id"),
+1481:             text(interest.get("apartment_number")),
+1482:             phone,
+1483:             REQUEST_INTEREST,
+1484:             mode,
+1485:             text(parking_debt_check_note) or None,
+1486:             int(quote["policy_version_id"]),
+1487:             now,
+1488:             now,
+1489:             now,
+1490:         ),
+1491:     )
+1492:     request_id = int(cur.lastrowid)
+1493:     for point in points:
+1494:         cur.execute(
+1495:             """
+1496:             INSERT INTO phone_access_request_points (
+1497:                 request_id, access_point_code, access_point_name_snapshot,
+1498:                 connect_tariff_version_id, connect_unit_price_snapshot,
+1499:                 monthly_tariff_version_id, monthly_unit_price_snapshot,
+1500:                 currency, created_at, updated_at
+1501:             )
+1502:             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+1503:             """,
+1504:             (
+1505:                 request_id,
+1506:                 point["access_point_code"],
+1507:                 point.get("access_point_name_uk") or point["access_point_code"],
+1508:                 point.get("connect_tariff_version_id"),
+1509:                 float(point["connect_unit_price"]),
+1510:                 point.get("monthly_tariff_version_id"),
+1511:                 float(point["monthly_unit_price"]),
+1512:                 point.get("currency") or quote.get("currency") or "UAH",
+1513:                 now,
+1514:                 now,
+1515:             ),
+1516:         )
+1517: 
+1518:     _record_change(
+1519:         cur,
+1520:         event_number=_next_number("AOP", cur, "access_operation_journal", "event_number"),
+1521:         event_type="PHONE_ACCESS_INTEREST_CREATED",
+1522:         source_context="phone_access_request",
+1523:         payload={
+1524:             "request_number": request_number,
+1525:             "interest_id": interest_id,
+1526:             "phone": phone,
+1527:             "access_points": [row["access_point_code"] for row in points],
+1528:             "connection_total": quote["connection_total"],
+1529:             "monthly_total": quote["monthly_total"],
+1530:         },
+1531:         actor_id=text(interest.get("telegram_user_id")) or "resident",
+1532:     )
+1533:     return phone_access_request_summary(interest_id=interest_id, conn=conn)
+
+====================================================================================================
+phone_barrier_access_core.py :: _request_row()
+====================================================================================================
+Lines: 1400-1416
+
+SIGNALS
+1408:             cur, "SELECT * FROM phone_access_requests WHERE interest_id = ?", (int(interest_id),)
+1413:             "SELECT * FROM phone_access_requests WHERE service_order_id = ?",
+
+FULL FUNCTION
+1400: def _request_row(
+1401:     cur: sqlite3.Cursor,
+1402:     *,
+1403:     interest_id: int | None = None,
+1404:     service_order_id: int | None = None,
+1405: ) -> dict | None:
+1406:     if interest_id is not None:
+1407:         return _fetchone_dict(
+1408:             cur, "SELECT * FROM phone_access_requests WHERE interest_id = ?", (int(interest_id),)
+1409:         )
+1410:     if service_order_id is not None:
+1411:         return _fetchone_dict(
+1412:             cur,
+1413:             "SELECT * FROM phone_access_requests WHERE service_order_id = ?",
+1414:             (int(service_order_id),),
+1415:         )
+1416:     raise ValueError("Нужно указать interest_id или service_order_id.")
+
+====================================================================================================
+phone_barrier_access_core.py :: phone_access_request_summary()
+====================================================================================================
+Lines: 1588-1621
+
+SIGNALS
+ - no SQL/connection signals found
+
+FULL FUNCTION
+1588: def phone_access_request_summary(
+1589:     *,
+1590:     interest_id: int | None = None,
+1591:     order_id: int | None = None,
+1592:     conn: sqlite3.Connection,
+1593: ) -> dict | None:
+1594:     cur = conn.cursor()
+1595:     request = _request_row(cur, interest_id=interest_id, service_order_id=order_id)
+1596:     if not request:
+1597:         return None
+1598:     points = _request_points(cur, int(request["id"]))
+1599:     subscription = _subscription_row(
+1600:         cur,
+1601:         order_id=request.get("service_order_id"),
+1602:         interest_id=request.get("interest_id"),
+1603:     )
+1604:     result = dict(request)
+1605:     result["points"] = points
+1606:     result["connection_total"] = round(
+1607:         sum(float(row.get("connect_unit_price_snapshot") or 0) for row in points), 2
+1608:     )
+1609:     result["monthly_total"] = round(
+1610:         sum(float(row.get("monthly_unit_price_snapshot") or 0) for row in points), 2
+1611:     )
+1612:     result["currency"] = text(points[0].get("currency")) if points else "UAH"
+1613:     if subscription:
+1614:         result["subscription"] = subscription
+1615:         result["subscription_points"] = _subscription_points(cur, int(subscription["id"]))
+1616:         result["charges"] = _subscription_charges(cur, int(subscription["id"]))
+1617:     else:
+1618:         result["subscription"] = None
+1619:         result["subscription_points"] = []
+1620:         result["charges"] = []
+1621:     return result
+
+====================================================================================================
+CALL SITES
+====================================================================================================
+
+create_phone_barrier_access_interest call sites in phone_barrier_access_service.py:
+ - none inside same file
+
+create_service_interest call sites in service_preorders_core.py:
+ - none inside same file
+
+create_phone_access_request_from_interest call sites in phone_barrier_access_core.py:
+ - none inside same file
+
+_request_row call sites in phone_barrier_access_core.py:
+--------------------------------------------------------------------------------
+1452: 
+1453:     cur = conn.cursor()
+1454:     interest_id = int(interest["id"])
+1455:     existing = _request_row(cur, interest_id=interest_id)
+1456:     if existing:
+1457:         return phone_access_request_summary(interest_id=interest_id, conn=conn)
+1458: 
+--------------------------------------------------------------------------------
+1592:     conn: sqlite3.Connection,
+1593: ) -> dict | None:
+1594:     cur = conn.cursor()
+1595:     request = _request_row(cur, interest_id=interest_id, service_order_id=order_id)
+1596:     if not request:
+1597:         return None
+1598:     points = _request_points(cur, int(request["id"]))
+--------------------------------------------------------------------------------
+1740:     """
+1741:     ensure_phone_access_operational_schema(conn)
+1742:     cur = conn.cursor()
+1743:     request = _request_row(cur, interest_id=int(interest["id"]))
+1744:     if not request:
+1745:         return None
+1746: 
+
+phone_access_request_summary call sites in phone_barrier_access_core.py:
+--------------------------------------------------------------------------------
+1454:     interest_id = int(interest["id"])
+1455:     existing = _request_row(cur, interest_id=interest_id)
+1456:     if existing:
+1457:         return phone_access_request_summary(interest_id=interest_id, conn=conn)
+1458: 
+1459:     points = list(quote.get("access_points") or [])
+1460:     if not points:
+--------------------------------------------------------------------------------
+1530:         },
+1531:         actor_id=text(interest.get("telegram_user_id")) or "resident",
+1532:     )
+1533:     return phone_access_request_summary(interest_id=interest_id, conn=conn)
+1534: 
+1535: 
+1536: def _subscription_row(
+
+READ ONLY COMPLETED

@@ -1,0 +1,157 @@
+====================================================================================================
+LINES 960-1035
+====================================================================================================
+960:         ),
+961:     ]
+962:     await update.message.reply_text(
+963:         "\n".join(lines),
+964:         reply_markup=kb(
+965:             [[tr(lang, "create_interest")], [tr(lang, "cancel"), BACK], [HOME]]
+966:         ),
+967:     )
+968: 
+969: def _create_interest_from_state(state: dict, user_id: int) -> dict:
+970:     if _is_phone_offer(state.get("offer")):
+971:         phone = _normalise_phone(state.get("requested_phone"))
+972:         if not _valid_phone(phone):
+973:             raise ValueError(tr(state.get("lang") or "ru", "wrong_phone"))
+974:         gate = _phone_profile_gate(
+975:             {"account": state["account"], "unit": state["unit"]}
+976:         )
+977:         if not gate.get("allowed"):
+978:             raise ValueError(_phone_profile_gate_text(gate))
+979:         return create_phone_barrier_access_interest(
+980:             resident_account_id=int(state["account"]["id"]),
+981:             telegram_user_id=user_id,
+982:             apartment_id=int(state["unit"]["id"]),
+983:             apartment_number=text(state["unit"].get("apartment_number")),
+984:             service_item_code=state["offer"]["service_item_code"],
+985:             phone=phone,
+986:             access_point_codes=state.get("phone_access_points") or [],
+987:             parking_debt_check_mode=text(gate.get("parking_debt_check_mode")) or "MANUAL_REVIEW",
+988:             parking_debt_check_note=text(gate.get("parking_debt_check_note")),
+989:         )
+990:     return create_service_interest(
+991:         resident_account_id=int(state["account"]["id"]),
+992:         telegram_user_id=user_id,
+993:         apartment_id=int(state["unit"]["id"]),
+994:         apartment_number=text(state["unit"].get("apartment_number")),
+995:         service_item_code=state["offer"]["service_item_code"],
+996:         quantity=int(state.get("quantity") or 1),
+997:     )
+998: 
+999: def _notice_for_interest(interest: dict, state: dict, notice_type: str) -> dict:
+1000:     service = {
+1001:         "service_code": interest.get("service_code") or interest.get("service_item_code"),
+1002:         "service_item_code": interest.get("service_item_code"),
+1003:         "service_type": "ONE_TIME",
+1004:         "service_name": interest.get("service_name_snapshot"),
+1005:     }
+1006:     return create_payment_notice(
+1007:         account=state["account"],
+1008:         apartment=state["unit"],
+1009:         notice_type=notice_type,
+1010:         declared_cashbox_code="O" if notice_type == "CASH_HANDOVER" else None,
+1011:         period_code=None,
+1012:         service=service,
+1013:         amount=float(interest.get("amount_due_snapshot") or 0),
+1014:         resident_comment=(
+1015:             f"Намір {interest.get('interest_number')}; кількість {interest.get('quantity')}."
+1016:             + (
+1017:                 f" Телефон доступу: {_requested_phone(interest)}."
+1018:                 if _requested_phone(interest) else ""
+1019:             )
+1020:             + (
+1021:                 (
+1022:                     " Шлагбауми: "
+1023:                     + _phone_point_text(
+1024:                         (_phone_access_summary_for_interest(interest.get("id")) or {}).get("points") or []
+1025:                     )
+1026:                     + "."
+1027:                 )
+1028:                 if _phone_access_summary_for_interest(interest.get("id")) else ""
+1029:             )
+1030:         ),
+1031:     )
+1032: 
+1033: 
+1034: async def _show_resident_records(update: Update, state: dict, lang: str) -> None:
+1035:     try:
+====================================================================================================
+LINES 1200-1240
+====================================================================================================
+1200:         if message_text == tr(lang, "create_interest"):
+1201:             try:
+1202:                 interest = _create_interest_from_state(state, user_id)
+1203:             except Exception as exc:
+1204:                 await update.message.reply_text(f"⚠️ {exc}")
+1205:                 return True
+1206:             await update.message.reply_text(tr(lang, "interest_saved"))
+1207:             await _show_interest_card(update, state, int(interest["id"]), lang)
+1208:             return True
+1209:         if message_text == tr(lang, "cancel"):
+1210:             await show_resident_services(update, user_states, user_id, lang=lang)
+1211:             return True
+1212:         await update.message.reply_text(tr(lang, "wrong"))
+1213:         return True
+1214:     if mode == "resident_records":
+1215:         selected = (state.get("resident_record_buttons") or {}).get(message_text)
+1216:         if selected:
+1217:             kind, record_id = selected
+1218:             if kind == "interest":
+1219:                 await _show_interest_card(update, state, record_id, lang)
+1220:             else:
+1221:                 await _show_resident_order(update, state, record_id, lang)
+1222:             return True
+1223:         await update.message.reply_text(tr(lang, "wrong"))
+1224:         return True
+1225:     if mode == "resident_interest_card":
+1226:         if message_text in {tr(lang, "cash_notice"), tr(lang, "bank_notice")}:
+1227:             interest = get_service_interest(int(state["interest_id"]))
+1228:             notice_type = "CASH_HANDOVER" if message_text == tr(lang, "cash_notice") else "BANK_TRANSFER"
+1229:             try:
+1230:                 notice = _notice_for_interest(interest, state, notice_type)
+1231:                 attach_payment_notice_to_interest(int(interest["id"]), notice)
+1232:             except Exception as exc:
+1233:                 await update.message.reply_text(f"⚠️ {exc}")
+1234:                 return True
+1235:             await update.message.reply_text(tr(lang, "notice_saved", number=notice.get("notice_number") or "—"))
+1236:             await _show_interest_card(update, state, int(interest["id"]), lang)
+1237:             return True
+1238:         if message_text == tr(lang, "my_requests"):
+1239:             await _show_resident_records(update, state, lang)
+1240:             return True
+====================================================================================================
+LINES 1620-1650
+====================================================================================================
+1620:                 return True
+1621: 
+1622:             # Compatibility path for legacy manually-created orders that do
+1623:             # not contain a resident-requested number.
+1624:             state["mode"] = "operator_phone_input"
+1625:             await update.message.reply_text(
+1626:                 tr(lang, "phone_prompt"),
+1627:                 reply_markup=kb([["⬅️ К оператору"], [HOME]]),
+1628:             )
+1629:             return True
+1630:         try:
+1631:             if action == "program_done":
+1632:                 _program(order, user_id)
+1633:             elif action == "return_remote":
+1634:                 _return_own_remote(order, user_id)
+1635:             elif action == "issue_new":
+1636:                 issue_new_remotes_from_batch(service_order_id=int(order["id"]), actor_id=user_id)
+1637:         except Exception as exc:
+1638:             await update.message.reply_text(f"⚠️ {exc}"); return True
+1639:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+1640:     if mode == "operator_remote_label":
+1641:         label = text(message_text)
+1642:         if len(label) < 3:
+1643:             await update.message.reply_text("Маркировка должна содержать минимум 3 символа."); return True
+1644:         order = service_order_summary(int(state["order_id"]))
+1645:         try:
+1646:             _receive_resident_remote(order, label, user_id)
+1647:         except Exception as exc:
+1648:             await update.message.reply_text(f"⚠️ {exc}"); return True
+1649:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+1650:     if mode == "operator_phone_input":

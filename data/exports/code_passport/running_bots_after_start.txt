@@ -1,0 +1,63 @@
+==========================================================================================
+OSBB running bot/process diagnostic - READ ONLY
+==========================================================================================
+Found OSBB-related processes: 6
+
+------------------------------------------------------------------------------------------
+PID : 17088
+Name: cmd.exe
+Kind: Live Services Sandbox BAT v1
+Cmd :
+C:\WINDOWS\system32\cmd.exe /c ""G:\Programming\Py\OSBB\Start_OSBB_Live_Services_Sandbox_Bot_v1.bat" "
+------------------------------------------------------------------------------------------
+PID : 27844
+Name: python.exe
+Kind: OSBB Python process
+Cmd :
+"G:\Programming\Py\venv\Scripts\python.exe"  "G:\Programming\Py\OSBB\run_bot_live_services_sandbox_v1.py" --run
+------------------------------------------------------------------------------------------
+PID : 9164
+Name: python.exe
+Kind: OSBB Python process
+Cmd :
+"G:\Programming\Py\venv\Scripts\python.exe"  "G:\Programming\Py\OSBB\run_bot_live_services_sandbox_v1.py" --run
+------------------------------------------------------------------------------------------
+PID : 34420
+Name: python.exe
+Kind: OSBB Python process
+Cmd :
+"G:\Programming\Py\venv\Scripts\python.exe" .\OSBB\tools\show_running_osbb_bots.py
+------------------------------------------------------------------------------------------
+PID : 13292
+Name: python.exe
+Kind: OSBB Python process
+Cmd :
+"G:\Programming\Py\venv\Scripts\python.exe" .\OSBB\tools\show_running_osbb_bots.py
+------------------------------------------------------------------------------------------
+PID : 32800
+Name: powershell.exe
+Kind: OSBB Python process
+Cmd :
+powershell -NoProfile -ExecutionPolicy Bypass -Command "
+Get-CimInstance Win32_Process |
+Where-Object {
+    $_.Name -match 'python|cmd|powershell' -and
+    $_.CommandLine -match 'OSBB|parking_bot|run_bot_guard_sandbox|Start_OSBB|Live_Services|Guard_Sandbox'
+} |
+Select-Object ProcessId,Name,CommandLine |
+ConvertTo-Json -Depth 3
+"
+
+==========================================================================================
+Summary
+==========================================================================================
+OSBB-related processes: 6
+Bot-like processes    : 6
+
+WARNING: more than one bot-like process is running.
+Telegram getUpdates Conflict is expected until only one bot instance remains.
+
+To stop a specific PID after checking it:
+python .\OSBB\tools\show_running_osbb_bots.py --kill PID --yes
+
+READ ONLY COMPLETED

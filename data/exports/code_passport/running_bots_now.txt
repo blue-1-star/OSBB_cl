@@ -1,0 +1,51 @@
+==========================================================================================
+OSBB running bot/process diagnostic - READ ONLY
+==========================================================================================
+Found OSBB-related processes: 4
+
+------------------------------------------------------------------------------------------
+PID : 38176
+Name: cmd.exe
+Kind: OSBB launcher shell
+Cmd :
+C:\WINDOWS\system32\cmd.exe /c ""G:\Programming\Py\OSBB\RUN_INSTALL_profile_parking_time_test_v1.bat" "
+------------------------------------------------------------------------------------------
+PID : 3068
+Name: python.exe
+Kind: OSBB Python process
+Cmd :
+"G:\Programming\Py\venv\Scripts\python.exe" .\OSBB\tools\show_running_osbb_bots.py
+------------------------------------------------------------------------------------------
+PID : 2876
+Name: python.exe
+Kind: OSBB Python process
+Cmd :
+"G:\Programming\Py\venv\Scripts\python.exe" .\OSBB\tools\show_running_osbb_bots.py
+------------------------------------------------------------------------------------------
+PID : 38300
+Name: powershell.exe
+Kind: OSBB Python process
+Cmd :
+powershell -NoProfile -ExecutionPolicy Bypass -Command "
+Get-CimInstance Win32_Process |
+Where-Object {
+    $_.Name -match 'python|cmd|powershell' -and
+    $_.CommandLine -match 'OSBB|parking_bot|run_bot_guard_sandbox|Start_OSBB|Live_Services|Guard_Sandbox'
+} |
+Select-Object ProcessId,Name,CommandLine |
+ConvertTo-Json -Depth 3
+"
+
+==========================================================================================
+Summary
+==========================================================================================
+OSBB-related processes: 4
+Bot-like processes    : 3
+
+WARNING: more than one bot-like process is running.
+Telegram getUpdates Conflict is expected until only one bot instance remains.
+
+To stop a specific PID after checking it:
+python .\OSBB\tools\show_running_osbb_bots.py --kill PID --yes
+
+READ ONLY COMPLETED

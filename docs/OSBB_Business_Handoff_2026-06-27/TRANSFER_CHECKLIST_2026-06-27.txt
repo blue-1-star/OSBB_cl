@@ -1,0 +1,35 @@
+OSBB transfer checklist — do this now
+======================================
+
+1. Download this whole handoff ZIP and save it locally, for example:
+   G:\Programming\Py\OSBB\Docs\ChatGPT_Business_Handoff_2026-06-27.zip
+
+2. Do NOT merge Personal into Business.
+   Keep the personal workspace as an archive of this discussion.
+
+3. Do not run more migrations or install the pending apartment-40 TEST package
+   tonight. The local sandbox and code are already at a clean checkpoint.
+
+Tomorrow in ChatGPT Business:
+-----------------------------
+1. Switch to the Business workspace.
+2. Create a Project named: OSBB
+3. Upload:
+   - OSBB_BUSINESS_HANDOFF_2026-06-27.md
+   - OSBB_PROJECT_INSTRUCTIONS.md
+4. Start a new project chat.
+5. Paste the contents of:
+   START_OSBB_BUSINESS_CHAT_2026-06-28.txt
+6. Keep the project unshared initially. Add other members only when you decide
+   exactly what project files they may access.
+
+Never upload:
+-------------
+- G:\Prog_secret\telegram_osbb.py
+- any bot tokens or passwords
+- .env files
+- osbb.db, sandbox DBs, DB backups
+- raw full resident/phone/payment spreadsheets
+
+The operational local project will remain on G:\Programming\Py\OSBB regardless
+of ChatGPT plan/workspace changes.

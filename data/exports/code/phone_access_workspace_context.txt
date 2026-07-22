@@ -1,0 +1,231 @@
+====================================================================================================
+LINES 730-805
+====================================================================================================
+730:         lines.append(f"Кількість: {interest.get('quantity')}")
+731:         if _requested_phone(interest):
+732:             lines.append(f"Телефон доступу: {_requested_phone(interest)}")
+733:     lines += [
+734:         f"Сума: {money(interest.get('amount_due_snapshot'))} {interest.get('currency') or 'UAH'}",
+735:         f"Статус: {status_label}",
+736:     ]
+737:     return "\n".join(lines)
+738: 
+739: 
+740: _PROFILE_VERIFY_BUTTON = {
+741:     "ru": "📋 Проверить мои данные",
+742:     "uk": "📋 Перевірити мої дані",
+743:     "en": "📋 Verify my data",
+744: }
+745: 
+746: 
+747: def _phone_profile_gate(data: dict) -> dict:
+748:     """Gate phone access by profile readiness, never by phone matching."""
+749:     conn = get_conn()
+750:     try:
+751:         gate = phone_access_eligibility(
+752:             resident_account_id=int(data["account"]["id"]),
+753:             apartment_id=data["unit"].get("id"),
+754:             apartment_number=text(data["unit"].get("apartment_number")),
+755:             conn=conn,
+756:         )
+757:         conn.commit()
+758:         return gate
+759:     except Exception:
+760:         conn.rollback()
+761:         raise
+762:     finally:
+763:         conn.close()
+764: 
+765: 
+766: def _phone_profile_gate_text(gate: dict) -> str:
+767:     structural = gate.get("structural_critical") or []
+768:     if structural:
+769:         lines = [
+770:             "⛔ Підключення телефонного доступу неможливе.",
+771:             "",
+772:             "Спочатку завершіть обов’язкові дані у кабінеті:",
+773:         ]
+774:         lines += [f"• {item.get('text')}" for item in structural]
+775:     else:
+776:         lines = [
+777:             "🟡 Обов’язкові дані заповнені, але ще не підтверджені.",
+778:             "",
+779:             "Відкрийте «Перевірити мої дані» та натисніть:",
+780:             "«✅ Підтвердити обов’язкові дані».",
+781:         ]
+782:     lines += [
+783:         "",
+784:         "Номер для відкриття є окремим непублічним номером доступу; "
+785:         "він може не збігатися з контактними телефонами.",
+786:     ]
+787:     return "\n".join(lines)
+788: 
+789: 
+790: def _phone_point_status_lines(points: list[dict]) -> list[str]:
+791:     """Show each selected barrier separately in resident/operator order cards."""
+792:     result: list[str] = []
+793:     icon_by_status = {
+794:         "ACTIVE": "✅",
+795:         "PENDING_ACTIVATION": "⌛",
+796:         "SUSPENDED_FOR_DEBT": "⚠️",
+797:         "DEACTIVATED_FOR_DEBT": "⛔",
+798:         "DEACTIVATED_MANUAL": "⛔",
+799:         "EXTERNAL_SYNC_ERROR": "❌",
+800:     }
+801:     for point in points:
+802:         name = (
+803:             text(point.get("access_point_name_snapshot"))
+804:             or text(point.get("access_point_name_uk"))
+805:             or text(point.get("access_point_code"))
+====================================================================================================
+LINES 1100-1160
+====================================================================================================
+1100:         return
+1101:     state["mode"] = "resident_order_card"
+1102:     state["order_id"] = int(order_id)
+1103:     await update.message.reply_text(_order_card(order, title="📄 Моє замовлення"), reply_markup=kb([[tr(lang, "my_requests")], [BACK], [HOME]]))
+1104: 
+1105: 
+1106: async def _handle_resident(update: Update, user_states: dict, user_id: int, message_text: str, *, lang: str, state: dict) -> bool:
+1107:     if _home(message_text):
+1108:         user_states.pop(user_id, None)
+1109:         return False
+1110:     if _service_back(message_text):
+1111:         await show_resident_services(update, user_states, user_id, lang=lang)
+1112:         return True
+1113:     mode = text(state.get("mode"))
+1114:     if mode == "resident_home":
+1115:         if message_text == tr(lang, "my_requests"):
+1116:             await _show_resident_records(update, state, lang)
+1117:             return True
+1118:         offer = (state.get("offer_buttons") or {}).get(message_text)
+1119:         if offer:
+1120:             state["offer"] = offer
+1121:             state["lang"] = lang
+1122:             if _is_phone_offer(offer):
+1123:                 state["quantity"] = 1
+1124:                 state.pop("phone_access_points", None)
+1125:                 state.pop("phone_quote", None)
+1126:                 state.pop("requested_phone", None)
+1127:                 await _show_phone_access_points(update, state, lang)
+1128:             elif text(offer.get("workflow_profile_code")) == NEW_REMOTE_PROFILE:
+1129:                 await _show_quantity(update, state, lang)
+1130:             else:
+1131:                 state["quantity"] = 1
+1132:                 await _show_preview(update, state, lang)
+1133:             return True
+1134:         if message_text == tr(lang, "back_portal"):
+1135:             user_states.pop(user_id, None)
+1136:             return False
+1137: 
+1138:         # Keyboard-independent fallback for the phone page. A phone entered
+1139:         # before choosing a barrier is retained, then the resident chooses
+1140:         # Far No.1, Near No.2 or both.
+1141:         if state.get("resident_section") == "phone" and _valid_phone(message_text):
+1142:             offer = _resident_phone_offer()
+1143:             if not offer:
+1144:                 await update.message.reply_text(
+1145:                     "⚠️ Активна послуга телефонного доступу не знайдена."
+1146:                 )
+1147:                 return True
+1148:             state["offer"] = offer
+1149:             state["lang"] = lang
+1150:             state["requested_phone"] = _normalise_phone(message_text)
+1151:             state["quantity"] = 1
+1152:             await _show_phone_access_points(update, state, lang)
+1153:             return True
+1154: 
+1155:         await update.message.reply_text(tr(lang, "wrong"))
+1156:         return True
+1157:     if mode == "resident_phone_points":
+1158:         points = (state.get("phone_point_buttons") or {}).get(message_text)
+1159:         if not points:
+1160:             await update.message.reply_text(tr(lang, "wrong"))
+====================================================================================================
+LINES 1470-1505
+====================================================================================================
+1470:         cur = conn.cursor()
+1471:         row = cur.execute("SELECT resident_asset_id FROM remote_order_details WHERE service_order_id = ?", (int(order["id"]),)).fetchone()
+1472:         if not row or not row[0]:
+1473:             raise ValueError("Нет принятого пульта жильца.")
+1474:         result = record_remote_movement(
+1475:             remote_asset_id=int(row[0]), service_order_id=int(order["id"]),
+1476:             movement_type="RETURNED_TO_RESIDENT", to_state="WITH_RESIDENT", actor_id=user_id,
+1477:             apartment_id=int(order["apartment_id"]) if order.get("apartment_id") is not None else None,
+1478:             apartment_number=text(order.get("apartment_number")), note="Собственный пульт возвращён жильцу.",
+1479:             confirm_step_code="RESIDENT_REMOTE_RETURNED", conn=conn,
+1480:         )
+1481:         conn.commit()
+1482:         return result["order"]
+1483:     except Exception:
+1484:         conn.rollback(); raise
+1485:     finally:
+1486:         conn.close()
+1487: 
+1488: 
+1489: def _activate_phone(order: dict, phone: str, user_id: int) -> dict:
+1490:     _assert_order_access(user_id, order, "CONFIRM")
+1491:     summary = _phone_access_summary_for_order(order.get("id"))
+1492:     if summary:
+1493:         return activate_phone_barrier_access_order(
+1494:             order_id=int(order["id"]),
+1495:             actor_id=user_id,
+1496:         )["order"]
+1497:     # Compatibility path for completed/legacy generic phone orders created
+1498:     # before the two-barrier subscription model was introduced.
+1499:     return activate_access_credential(
+1500:         order_id=int(order["id"]), credential_value=phone, actor_id=user_id,
+1501:         apartment_id=int(order["apartment_id"]) if order.get("apartment_id") is not None else None,
+1502:         apartment_number=text(order.get("apartment_number")), note="Телефонный доступ активирован оператором.",
+1503:     )["order"]
+1504: 
+1505: async def _show_supplier_demand(update: Update, state: dict, user_id: int, lang: str) -> None:
+====================================================================================================
+LINES 1650-1695
+====================================================================================================
+1650:             if ServiceAccessDenied is not None and isinstance(exc, ServiceAccessDenied):
+1651:                 await update.message.reply_text(
+1652:                     result_to_short_text(exc.result) if result_to_short_text else f"⚠️ {exc}"
+1653:                 )
+1654:                 return True
+1655:             await update.message.reply_text(f"⚠️ {exc}"); return True
+1656:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+1657:     if mode == "operator_remote_label":
+1658:         label = text(message_text)
+1659:         if len(label) < 3:
+1660:             await update.message.reply_text("Маркировка должна содержать минимум 3 символа."); return True
+1661:         order = service_order_summary(int(state["order_id"]))
+1662:         try:
+1663:             _receive_resident_remote(order, label, user_id)
+1664:         except Exception as exc:
+1665:             await update.message.reply_text(f"⚠️ {exc}"); return True
+1666:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+1667:     if mode == "operator_phone_input":
+1668:         phone = re.sub(r"[\s()\-]", "", text(message_text))
+1669:         if not re.fullmatch(r"\+?\d{8,20}", phone):
+1670:             await update.message.reply_text(tr(lang, "wrong_phone")); return True
+1671:         order = service_order_summary(int(state["order_id"]))
+1672:         try:
+1673:             _activate_phone(order, phone, user_id)
+1674:         except Exception as exc:
+1675:             await update.message.reply_text(f"⚠️ {exc}"); return True
+1676:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+1677:     if mode == "operator_demand":
+1678:         service_item_code = (state.get("demand_buttons") or {}).get(message_text)
+1679:         if not service_item_code:
+1680:             await update.message.reply_text(tr(lang, "wrong")); return True
+1681:         try:
+1682:             batch = create_supplier_batch(service_item_code=service_item_code, actor_id=user_id)
+1683:         except Exception as exc:
+1684:             await update.message.reply_text(f"⚠️ {exc}"); return True
+1685:         await update.message.reply_text(f"✅ Створено {batch['batch_number']}: {batch['quantity_requested']} шт.")
+1686:         await _show_batch_card(update, state, int(batch["id"]), lang); return True
+1687:     if mode == "operator_batches":
+1688:         batch_id = (state.get("batch_buttons") or {}).get(message_text)
+1689:         if not batch_id:
+1690:             await update.message.reply_text(tr(lang, "wrong")); return True
+1691:         await _show_batch_card(update, state, int(batch_id), lang); return True
+1692:     if mode == "operator_batch_card":
+1693:         if message_text == tr(lang, "receive_delivery"):
+1694:             state["mode"] = "operator_delivery_qty"
+1695:             await update.message.reply_text(tr(lang, "delivery_qty_prompt"), reply_markup=kb([["⬅️ К оператору"], [HOME]])); return True

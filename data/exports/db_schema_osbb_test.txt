@@ -1,0 +1,1753 @@
+====================================================================================================
+DB SCHEMA REPORT
+DB: G:\Programming\Py\OSBB\Data\db\osbb_test.db
+Tables: 52
+====================================================================================================
+
+====================================================================================================
+TABLE: adjustment_assignments | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: adjustment_code TEXT notnull=1 default=None pk=0
+ - 2: adjustment_type TEXT notnull=1 default=None pk=0
+ - 3: apartment_id INTEGER notnull=0 default=None pk=0
+ - 4: apartment_number TEXT notnull=0 default=None pk=0
+ - 5: contact_id INTEGER notnull=0 default=None pk=0
+ - 6: vehicle_id INTEGER notnull=0 default=None pk=0
+ - 7: base_service_code TEXT notnull=0 default=None pk=0
+ - 8: service_item_code TEXT notnull=0 default=None pk=0
+ - 9: calculation_kind TEXT notnull=1 default=None pk=0
+ - 10: calculation_value REAL notnull=0 default=None pk=0
+ - 11: credit_total_amount REAL notnull=0 default=None pk=0
+ - 12: credit_remaining_amount REAL notnull=0 default=None pk=0
+ - 13: valid_from TEXT notnull=0 default=None pk=0
+ - 14: valid_to TEXT notnull=0 default=None pk=0
+ - 15: status TEXT notnull=1 default='ACTIVE' pk=0
+ - 16: approval_reference TEXT notnull=0 default=None pk=0
+ - 17: public_note TEXT notnull=0 default=None pk=0
+ - 18: internal_note TEXT notnull=0 default=None pk=0
+ - 19: approved_by TEXT notnull=0 default=None pk=0
+ - 20: created_by TEXT notnull=0 default=None pk=0
+ - 21: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 22: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_adjust_assign_status_dates unique=0 origin=c
+    * status
+    * valid_from
+    * valid_to
+ - idx_adjust_assign_vehicle unique=0 origin=c
+    * vehicle_id
+ - idx_adjust_assign_apt unique=0 origin=c
+    * apartment_number
+ - idx_adjust_assign_code unique=0 origin=c
+    * adjustment_code
+
+FOREIGN KEYS:
+ - adjustment_code -> adjustment_catalog.adjustment_code on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: adjustment_catalog | rows=6
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: adjustment_code TEXT notnull=1 default=None pk=0
+ - 2: adjustment_name TEXT notnull=1 default=None pk=0
+ - 3: adjustment_type TEXT notnull=1 default=None pk=0
+ - 4: default_calculation_kind TEXT notnull=0 default=None pk=0
+ - 5: default_calculation_value REAL notnull=0 default=None pk=0
+ - 6: is_sensitive INTEGER notnull=1 default=0 pk=0
+ - 7: is_active INTEGER notnull=1 default=1 pk=0
+ - 8: public_note_template TEXT notnull=0 default=None pk=0
+ - 9: internal_description TEXT notnull=0 default=None pk=0
+ - 10: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 11: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_adjustment_catalog_active unique=0 origin=c
+    * is_active
+ - idx_adjustment_catalog_type unique=0 origin=c
+    * adjustment_type
+ - sqlite_autoindex_adjustment_catalog_1 unique=1 origin=u
+    * adjustment_code
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: apartment_link_requests | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: resident_account_id INTEGER notnull=1 default=None pk=0
+ - 2: telegram_user_id TEXT notnull=1 default=None pk=0
+ - 3: current_apartment_id INTEGER notnull=0 default=None pk=0
+ - 4: current_apartment_number TEXT notnull=0 default=None pk=0
+ - 5: requested_apartment_id INTEGER notnull=1 default=None pk=0
+ - 6: requested_apartment_number TEXT notnull=1 default=None pk=0
+ - 7: status TEXT notnull=1 default='NEW' pk=0
+ - 8: resident_comment TEXT notnull=0 default=None pk=0
+ - 9: operator_id TEXT notnull=0 default=None pk=0
+ - 10: operator_note TEXT notnull=0 default=None pk=0
+ - 11: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 12: updated_at TEXT notnull=0 default=None pk=0
+ - 13: reviewed_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_apartment_link_requests_requested_unit unique=0 origin=c
+    * requested_apartment_id
+    * status
+ - idx_apartment_link_requests_resident unique=0 origin=c
+    * resident_account_id
+    * status
+    * created_at
+ - idx_apartment_link_requests_status unique=0 origin=c
+    * status
+    * created_at
+
+FOREIGN KEYS:
+ - requested_apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+ - current_apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+ - resident_account_id -> resident_accounts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: apartment_verification | rows=231
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=1 default=None pk=0
+ - 2: apartment_number TEXT notnull=1 default=None pk=0
+ - 3: status TEXT notnull=1 default='new' pk=0
+ - 4: comment TEXT notnull=0 default=None pk=0
+ - 5: verified_by INTEGER notnull=0 default=None pk=0
+ - 6: verified_at TEXT notnull=0 default=None pk=0
+ - 7: created_at TEXT notnull=0 default=None pk=0
+ - 8: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_apartment_verification_apartment_number unique=0 origin=c
+    * apartment_number
+ - idx_apartment_verification_status unique=0 origin=c
+    * status
+ - sqlite_autoindex_apartment_verification_1 unique=1 origin=u
+    * apartment_id
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: apartments | rows=236
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_number TEXT notnull=1 default=None pk=0
+ - 2: entrance TEXT notnull=0 default=None pk=0
+ - 3: entrance_source TEXT notnull=0 default=None pk=0
+ - 4: total_area REAL notnull=0 default=None pk=0
+ - 5: object_type TEXT notnull=0 default=None pk=0
+ - 6: status TEXT notnull=0 default='active' pk=0
+ - 7: source TEXT notnull=0 default=None pk=0
+ - 8: notes TEXT notnull=0 default=None pk=0
+ - 9: created_at TEXT notnull=0 default=None pk=0
+ - 10: created_by TEXT notnull=0 default=None pk=0
+ - 11: updated_at TEXT notnull=0 default=None pk=0
+ - 12: updated_by TEXT notnull=0 default=None pk=0
+ - 13: unit_type TEXT notnull=0 default='RESIDENTIAL' pk=0
+ - 14: unit_code TEXT notnull=0 default=None pk=0
+ - 15: entrance_number INTEGER notnull=0 default=None pk=0
+ - 16: official_number TEXT notnull=0 default=None pk=0
+ - 17: display_name TEXT notnull=0 default=None pk=0
+ - 18: area_sqm REAL notnull=0 default=None pk=0
+ - 19: record_status TEXT notnull=0 default='LEGACY' pk=0
+ - 20: source_note TEXT notnull=0 default=None pk=0
+ - 21: internal_note TEXT notnull=0 default=None pk=0
+ - 22: unit_updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_apartments_unit_code_unique unique=1 origin=c
+    * unit_code
+ - sqlite_autoindex_apartments_1 unique=1 origin=u
+    * apartment_number
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: audit_log | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: event_time TEXT notnull=0 default=None pk=0
+ - 2: username TEXT notnull=0 default=None pk=0
+ - 3: table_name TEXT notnull=0 default=None pk=0
+ - 4: record_id TEXT notnull=0 default=None pk=0
+ - 5: action TEXT notnull=0 default=None pk=0
+ - 6: field_name TEXT notnull=0 default=None pk=0
+ - 7: old_value TEXT notnull=0 default=None pk=0
+ - 8: new_value TEXT notnull=0 default=None pk=0
+ - 9: comment TEXT notnull=0 default=None pk=0
+ - 10: actor_role TEXT notnull=0 default=None pk=0
+ - 11: actor_name TEXT notnull=0 default=None pk=0
+ - 12: source TEXT notnull=0 default='bot' pk=0
+ - 13: telegram_user_id INTEGER notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_audit_log_event_time unique=0 origin=c
+    * event_time
+ - idx_audit_log_table_record unique=0 origin=c
+    * table_name
+    * record_id
+ - idx_audit_log_actor unique=0 origin=c
+    * telegram_user_id
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: bank_transactions | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: transaction_ref TEXT notnull=0 default=None pk=0
+ - 2: entry_status TEXT notnull=1 default='CONFIRMED' pk=0
+ - 3: transaction_date TEXT notnull=1 default=None pk=0
+ - 4: value_date TEXT notnull=0 default=None pk=0
+ - 5: apartment_id INTEGER notnull=0 default=None pk=0
+ - 6: apartment_number TEXT notnull=0 default=None pk=0
+ - 7: period_code TEXT notnull=0 default=None pk=0
+ - 8: service_code TEXT notnull=0 default=None pk=0
+ - 9: service_item_code TEXT notnull=0 default=None pk=0
+ - 10: amount REAL notnull=1 default=0 pk=0
+ - 11: currency TEXT notnull=1 default='UAH' pk=0
+ - 12: payer_text TEXT notnull=0 default=None pk=0
+ - 13: bank_name TEXT notnull=0 default=None pk=0
+ - 14: source_type TEXT notnull=1 default='manual_operator' pk=0
+ - 15: source_ref TEXT notnull=0 default=None pk=0
+ - 16: payment_notice_id INTEGER notnull=0 default=None pk=0
+ - 17: payment_id INTEGER notnull=0 default=None pk=0
+ - 18: cashier_batch_id INTEGER notnull=0 default=None pk=0
+ - 19: operator_id TEXT notnull=0 default=None pk=0
+ - 20: operator_note TEXT notnull=0 default=None pk=0
+ - 21: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 22: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_bank_transactions_unit unique=0 origin=c
+    * apartment_id
+    * apartment_number
+    * transaction_date
+ - idx_bank_transactions_ref unique=0 origin=c
+    * transaction_ref
+ - sqlite_autoindex_bank_transactions_1 unique=1 origin=u
+    * transaction_ref
+
+FOREIGN KEYS:
+ - payment_notice_id -> payment_notices.id on_update=NO ACTION on_delete=NO ACTION
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: barrier_phone_access | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_number TEXT notnull=0 default=None pk=0
+ - 2: contact_id INTEGER notnull=0 default=None pk=0
+ - 3: phone_number TEXT notnull=0 default=None pk=0
+ - 4: access_status TEXT notnull=1 default='ACTIVE' pk=0
+ - 5: status_reason TEXT notnull=0 default=None pk=0
+ - 6: blocked_by TEXT notnull=0 default=None pk=0
+ - 7: blocked_at TEXT notnull=0 default=None pk=0
+ - 8: unblocked_by TEXT notnull=0 default=None pk=0
+ - 9: unblocked_at TEXT notnull=0 default=None pk=0
+ - 10: debt_amount REAL notnull=0 default=0 pk=0
+ - 11: comment TEXT notnull=0 default=None pk=0
+ - 12: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 13: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_barrier_phone_access_status unique=0 origin=c
+    * access_status
+ - idx_barrier_phone_access_phone unique=0 origin=c
+    * phone_number
+ - idx_barrier_phone_access_apt unique=0 origin=c
+    * apartment_number
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: bot_admins | rows=1
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: telegram_user_id INTEGER notnull=0 default=None pk=0
+ - 2: telegram_username TEXT notnull=0 default=None pk=0
+ - 3: display_name TEXT notnull=0 default=None pk=0
+ - 4: role TEXT notnull=0 default='viewer' pk=0
+ - 5: can_read INTEGER notnull=0 default=1 pk=0
+ - 6: can_write INTEGER notnull=0 default=0 pk=0
+ - 7: can_manage_users INTEGER notnull=0 default=0 pk=0
+ - 8: can_manage_payments INTEGER notnull=0 default=0 pk=0
+ - 9: can_manage_bot INTEGER notnull=0 default=0 pk=0
+ - 10: is_active INTEGER notnull=0 default=1 pk=0
+ - 11: created_at TEXT notnull=0 default=None pk=0
+ - 12: updated_at TEXT notnull=0 default=None pk=0
+ - 13: notes TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_bot_admins_role unique=0 origin=c
+    * role
+ - idx_bot_admins_active unique=0 origin=c
+    * is_active
+ - idx_bot_admins_telegram_user unique=0 origin=c
+    * telegram_user_id
+ - sqlite_autoindex_bot_admins_1 unique=1 origin=u
+    * telegram_user_id
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: bot_user_sessions | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: telegram_user_id INTEGER notnull=0 default=None pk=0
+ - 2: current_state TEXT notnull=0 default=None pk=0
+ - 3: context_json TEXT notnull=0 default=None pk=0
+ - 4: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_bot_user_sessions_user unique=0 origin=c
+    * telegram_user_id
+ - sqlite_autoindex_bot_user_sessions_1 unique=1 origin=u
+    * telegram_user_id
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: cashbox_operations | rows=93
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: operation_date TEXT notnull=1 default=None pk=0
+ - 2: cashbox_code TEXT notnull=1 default=None pk=0
+ - 3: operation_type TEXT notnull=1 default=None pk=0
+ - 4: direction TEXT notnull=1 default=None pk=0
+ - 5: amount REAL notnull=1 default=None pk=0
+ - 6: currency TEXT notnull=1 default='UAH' pk=0
+ - 7: period_code TEXT notnull=0 default=None pk=0
+ - 8: apartment_number TEXT notnull=0 default=None pk=0
+ - 9: vehicle_id INTEGER notnull=0 default=None pk=0
+ - 10: service_code TEXT notnull=0 default=None pk=0
+ - 11: payment_id INTEGER notnull=0 default=None pk=0
+ - 12: charge_id INTEGER notnull=0 default=None pk=0
+ - 13: batch_id TEXT notnull=0 default=None pk=0
+ - 14: source_type TEXT notnull=0 default='cashier_journal' pk=0
+ - 15: source_ref TEXT notnull=0 default=None pk=0
+ - 16: operator_id TEXT notnull=0 default=None pk=0
+ - 17: actor_type TEXT notnull=0 default='operator' pk=0
+ - 18: comment TEXT notnull=0 default=None pk=0
+ - 19: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 20: service_item_code TEXT notnull=0 default=None pk=0
+ - 21: base_service_code TEXT notnull=0 default=None pk=0
+ - 22: service_type TEXT notnull=0 default=None pk=0
+ - 23: commercial_contract_id INTEGER notnull=0 default=None pk=0
+ - 24: commercial_unit_id INTEGER notnull=0 default=None pk=0
+ - 25: cashier_receipt_id INTEGER notnull=0 default=None pk=0
+ - 26: transfer_group_ref TEXT notnull=0 default=None pk=0
+ - 27: payment_notice_id INTEGER notnull=0 default=None pk=0
+ - 28: cashier_batch_id INTEGER notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_cashbox_operations_transfer_group unique=0 origin=c
+    * transfer_group_ref
+ - idx_cashbox_operations_cashier_receipt unique=0 origin=c
+    * cashier_receipt_id
+ - idx_cashbox_operations_commercial_contract unique=0 origin=c
+    * commercial_contract_id
+    * commercial_unit_id
+ - idx_cashbox_operations_service_type unique=0 origin=c
+    * service_type
+ - idx_cashbox_operations_base_service unique=0 origin=c
+    * base_service_code
+ - idx_cashbox_operations_service_item unique=0 origin=c
+    * service_item_code
+ - idx_cashbox_operations_operator unique=0 origin=c
+    * operator_id
+ - idx_cashbox_operations_batch unique=0 origin=c
+    * batch_id
+ - idx_cashbox_operations_payment unique=0 origin=c
+    * payment_id
+ - idx_cashbox_operations_vehicle unique=0 origin=c
+    * vehicle_id
+ - idx_cashbox_operations_apt unique=0 origin=c
+    * apartment_number
+ - idx_cashbox_operations_cashbox unique=0 origin=c
+    * cashbox_code
+ - idx_cashbox_operations_date unique=0 origin=c
+    * operation_date
+
+FOREIGN KEYS:
+ - charge_id -> charges.id on_update=NO ACTION on_delete=NO ACTION
+ - payment_id -> payments.id on_update=NO ACTION on_delete=NO ACTION
+ - vehicle_id -> vehicles.id on_update=NO ACTION on_delete=NO ACTION
+ - cashbox_code -> cashboxes.cashbox_code on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: cashboxes | rows=10
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: cashbox_code TEXT notnull=1 default=None pk=0
+ - 2: cashbox_name TEXT notnull=1 default=None pk=0
+ - 3: currency TEXT notnull=1 default='UAH' pk=0
+ - 4: initial_balance REAL notnull=1 default=0 pk=0
+ - 5: current_balance REAL notnull=1 default=0 pk=0
+ - 6: is_active INTEGER notnull=1 default=1 pk=0
+ - 7: comment TEXT notnull=0 default=None pk=0
+ - 8: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 9: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_cashboxes_active unique=0 origin=c
+    * is_active
+ - idx_cashboxes_code unique=0 origin=c
+    * cashbox_code
+ - sqlite_autoindex_cashboxes_1 unique=1 origin=u
+    * cashbox_code
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: cashier_batch_items | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: batch_id INTEGER notnull=1 default=None pk=0
+ - 2: apartment_id INTEGER notnull=0 default=None pk=0
+ - 3: apartment_number TEXT notnull=1 default=None pk=0
+ - 4: charge_id INTEGER notnull=0 default=None pk=0
+ - 5: receipt_id INTEGER notnull=0 default=None pk=0
+ - 6: payment_id INTEGER notnull=0 default=None pk=0
+ - 7: amount_expected REAL notnull=0 default=None pk=0
+ - 8: amount_received REAL notnull=1 default=0 pk=0
+ - 9: cashbox_code TEXT notnull=0 default=None pk=0
+ - 10: period_code TEXT notnull=0 default=None pk=0
+ - 11: service_code TEXT notnull=0 default=None pk=0
+ - 12: service_item_code TEXT notnull=0 default=None pk=0
+ - 13: item_status TEXT notnull=1 default='PENDING' pk=0
+ - 14: exception_note TEXT notnull=0 default=None pk=0
+ - 15: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 16: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_cashier_batch_items_unit unique=0 origin=c
+    * apartment_id
+    * apartment_number
+    * period_code
+ - idx_cashier_batch_items_batch unique=0 origin=c
+    * batch_id
+    * item_status
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+ - batch_id -> cashier_batches.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: cashier_batches | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: batch_id TEXT notnull=1 default=None pk=0
+ - 2: batch_type TEXT notnull=1 default=None pk=0
+ - 3: period_code TEXT notnull=0 default=None pk=0
+ - 4: cashbox_code TEXT notnull=0 default=None pk=0
+ - 5: service_code TEXT notnull=0 default=None pk=0
+ - 6: default_amount REAL notnull=0 default=None pk=0
+ - 7: default_tariff TEXT notnull=0 default=None pk=0
+ - 8: operator_id TEXT notnull=0 default=None pk=0
+ - 9: actor_type TEXT notnull=0 default='operator' pk=0
+ - 10: total_rows INTEGER notnull=0 default=0 pk=0
+ - 11: total_amount REAL notnull=0 default=0 pk=0
+ - 12: comment TEXT notnull=0 default=None pk=0
+ - 13: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 14: applied_at TEXT notnull=0 default=None pk=0
+ - 15: batch_status TEXT notnull=0 default='draft' pk=0
+
+INDEXES:
+ - idx_cashier_batches_operator unique=0 origin=c
+    * operator_id
+ - idx_cashier_batches_status unique=0 origin=c
+    * batch_status
+ - idx_cashier_batches_batch_id unique=0 origin=c
+    * batch_id
+ - sqlite_autoindex_cashier_batches_1 unique=1 origin=u
+    * batch_id
+
+FOREIGN KEYS:
+ - cashbox_code -> cashboxes.cashbox_code on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: cashier_receipts | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: receipt_number TEXT notnull=1 default=None pk=0
+ - 2: receipt_kind TEXT notnull=1 default=None pk=0
+ - 3: entry_status TEXT notnull=1 default='DRAFT' pk=0
+ - 4: cashbox_code TEXT notnull=0 default=None pk=0
+ - 5: receipt_date TEXT notnull=1 default=None pk=0
+ - 6: document_date TEXT notnull=0 default=None pk=0
+ - 7: origin_kind TEXT notnull=1 default='HAND_TO_HAND' pk=0
+ - 8: origin_cashbox_code TEXT notnull=0 default=None pk=0
+ - 9: payer_name TEXT notnull=0 default=None pk=0
+ - 10: apartment_id INTEGER notnull=0 default=None pk=0
+ - 11: apartment_number TEXT notnull=0 default=None pk=0
+ - 12: service_hint TEXT notnull=0 default=None pk=0
+ - 13: period_code TEXT notnull=0 default=None pk=0
+ - 14: amount REAL notnull=1 default=0 pk=0
+ - 15: currency TEXT notnull=1 default='UAH' pk=0
+ - 16: evidence_type TEXT notnull=1 default='ORAL' pk=0
+ - 17: paper_ref TEXT notnull=0 default=None pk=0
+ - 18: source_text TEXT notnull=0 default=None pk=0
+ - 19: designation_status TEXT notnull=1 default='UNSPECIFIED' pk=0
+ - 20: allocation_status TEXT notnull=1 default='NOT_APPLICABLE' pk=0
+ - 21: payment_id INTEGER notnull=0 default=None pk=0
+ - 22: cashbox_operation_id INTEGER notnull=0 default=None pk=0
+ - 23: void_payment_id INTEGER notnull=0 default=None pk=0
+ - 24: void_cashbox_operation_id INTEGER notnull=0 default=None pk=0
+ - 25: operator_id TEXT notnull=0 default=None pk=0
+ - 26: confirmed_by TEXT notnull=0 default=None pk=0
+ - 27: confirmed_at TEXT notnull=0 default=None pk=0
+ - 28: voided_by TEXT notnull=0 default=None pk=0
+ - 29: voided_at TEXT notnull=0 default=None pk=0
+ - 30: void_reason TEXT notnull=0 default=None pk=0
+ - 31: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 32: updated_at TEXT notnull=0 default=None pk=0
+ - 33: payment_notice_id INTEGER notnull=0 default=None pk=0
+ - 34: cashier_batch_id INTEGER notnull=0 default=None pk=0
+ - 35: service_item_code TEXT notnull=0 default=None pk=0
+ - 36: review_status TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_receipts_notice_v2 unique=0 origin=c
+    * payment_notice_id
+ - idx_cashier_receipts_allocation unique=0 origin=c
+    * allocation_status
+    * entry_status
+ - idx_cashier_receipts_apartment unique=0 origin=c
+    * apartment_id
+    * apartment_number
+    * period_code
+ - idx_cashier_receipts_cashbox unique=0 origin=c
+    * cashbox_code
+    * receipt_date
+ - idx_cashier_receipts_status unique=0 origin=c
+    * entry_status
+    * receipt_date
+    * id
+ - sqlite_autoindex_cashier_receipts_1 unique=1 origin=u
+    * receipt_number
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: cashier_reconciliation_cases | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: case_type TEXT notnull=1 default=None pk=0
+ - 2: case_status TEXT notnull=1 default='OPEN' pk=0
+ - 3: priority TEXT notnull=1 default='NORMAL' pk=0
+ - 4: apartment_id INTEGER notnull=0 default=None pk=0
+ - 5: apartment_number TEXT notnull=0 default=None pk=0
+ - 6: amount REAL notnull=0 default=None pk=0
+ - 7: currency TEXT notnull=1 default='UAH' pk=0
+ - 8: period_code TEXT notnull=0 default=None pk=0
+ - 9: service_code TEXT notnull=0 default=None pk=0
+ - 10: related_payment_id INTEGER notnull=0 default=None pk=0
+ - 11: related_receipt_id INTEGER notnull=0 default=None pk=0
+ - 12: related_notice_id INTEGER notnull=0 default=None pk=0
+ - 13: related_bank_transaction_id INTEGER notnull=0 default=None pk=0
+ - 14: related_batch_id INTEGER notnull=0 default=None pk=0
+ - 15: description TEXT notnull=1 default=None pk=0
+ - 16: operator_id TEXT notnull=0 default=None pk=0
+ - 17: resolution_note TEXT notnull=0 default=None pk=0
+ - 18: resolved_at TEXT notnull=0 default=None pk=0
+ - 19: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 20: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_cashier_reconciliation_unit unique=0 origin=c
+    * apartment_id
+    * apartment_number
+    * case_status
+ - idx_cashier_reconciliation_status unique=0 origin=c
+    * case_status
+    * priority
+    * created_at
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: charge_adjustments | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: charge_id INTEGER notnull=1 default=None pk=0
+ - 2: adjustment_assignment_id INTEGER notnull=0 default=None pk=0
+ - 3: adjustment_code TEXT notnull=1 default=None pk=0
+ - 4: adjustment_type TEXT notnull=1 default=None pk=0
+ - 5: calculation_kind TEXT notnull=1 default=None pk=0
+ - 6: applied_amount REAL notnull=1 default=None pk=0
+ - 7: public_note TEXT notnull=0 default=None pk=0
+ - 8: internal_note TEXT notnull=0 default=None pk=0
+ - 9: reason_snapshot TEXT notnull=0 default=None pk=0
+ - 10: applied_by TEXT notnull=0 default=None pk=0
+ - 11: source_context TEXT notnull=0 default=None pk=0
+ - 12: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+
+INDEXES:
+ - idx_charge_adjustments_code unique=0 origin=c
+    * adjustment_code
+ - idx_charge_adjustments_assignment unique=0 origin=c
+    * adjustment_assignment_id
+ - idx_charge_adjustments_charge unique=0 origin=c
+    * charge_id
+
+FOREIGN KEYS:
+ - adjustment_assignment_id -> adjustment_assignments.id on_update=NO ACTION on_delete=NO ACTION
+ - charge_id -> charges.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: charges | rows=95
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: period_code TEXT notnull=1 default=None pk=0
+ - 2: apartment_number TEXT notnull=1 default=None pk=0
+ - 3: vehicle_id INTEGER notnull=0 default=None pk=0
+ - 4: service_code TEXT notnull=1 default=None pk=0
+ - 5: quantity REAL notnull=1 default=1 pk=0
+ - 6: unit_price REAL notnull=1 default=None pk=0
+ - 7: amount REAL notnull=1 default=None pk=0
+ - 8: currency TEXT notnull=1 default='UAH' pk=0
+ - 9: status TEXT notnull=1 default='unpaid' pk=0
+ - 10: source TEXT notnull=0 default=None pk=0
+ - 11: created_by TEXT notnull=0 default=None pk=0
+ - 12: comment TEXT notnull=0 default=None pk=0
+ - 13: created_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+ - 14: updated_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+ - 15: service_item_code TEXT notnull=0 default=None pk=0
+ - 16: base_service_code TEXT notnull=0 default=None pk=0
+ - 17: service_type TEXT notnull=0 default=None pk=0
+ - 18: gross_amount REAL notnull=0 default=None pk=0
+ - 19: adjustment_amount REAL notnull=1 default=0 pk=0
+ - 20: net_amount REAL notnull=0 default=None pk=0
+ - 21: adjustment_public_note TEXT notnull=0 default=None pk=0
+ - 22: adjustment_internal_note TEXT notnull=0 default=None pk=0
+ - 23: adjustment_updated_at TEXT notnull=0 default=None pk=0
+ - 24: commercial_contract_id INTEGER notnull=0 default=None pk=0
+ - 25: commercial_contract_item_id INTEGER notnull=0 default=None pk=0
+ - 26: commercial_due_date TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_charges_commercial_contract unique=0 origin=c
+    * commercial_contract_id
+    * commercial_contract_item_id
+    * commercial_due_date
+ - idx_charges_adjustment_amount unique=0 origin=c
+    * adjustment_amount
+ - idx_charges_service_type unique=0 origin=c
+    * service_type
+ - idx_charges_base_service unique=0 origin=c
+    * base_service_code
+ - idx_charges_service_item unique=0 origin=c
+    * service_item_code
+ - idx_charges_status unique=0 origin=c
+    * status
+ - idx_charges_service unique=0 origin=c
+    * service_code
+ - idx_charges_vehicle unique=0 origin=c
+    * vehicle_id
+ - idx_charges_apartment unique=0 origin=c
+    * apartment_number
+ - idx_charges_period unique=0 origin=c
+    * period_code
+
+FOREIGN KEYS:
+ - service_code -> service_catalog.service_code on_update=NO ACTION on_delete=NO ACTION
+ - vehicle_id -> vehicles.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: commercial_access_actions | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: contract_id INTEGER notnull=1 default=None pk=0
+ - 2: access_phone_id INTEGER notnull=0 default=None pk=0
+ - 3: notification_id INTEGER notnull=0 default=None pk=0
+ - 4: action_type TEXT notnull=1 default=None pk=0
+ - 5: action_status TEXT notnull=1 default='OPEN' pk=0
+ - 6: debt_amount_snapshot REAL notnull=1 default=0 pk=0
+ - 7: days_overdue_snapshot INTEGER notnull=1 default=0 pk=0
+ - 8: reason TEXT notnull=0 default=None pk=0
+ - 9: operator_id TEXT notnull=0 default=None pk=0
+ - 10: performed_at TEXT notnull=0 default=None pk=0
+ - 11: comment TEXT notnull=0 default=None pk=0
+ - 12: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 13: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_commercial_actions_contract_status unique=0 origin=c
+    * contract_id
+    * action_status
+    * action_type
+
+FOREIGN KEYS:
+ - notification_id -> commercial_notifications.id on_update=NO ACTION on_delete=NO ACTION
+ - access_phone_id -> commercial_access_phones.id on_update=NO ACTION on_delete=NO ACTION
+ - contract_id -> commercial_contracts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: commercial_access_phones | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: contract_id INTEGER notnull=1 default=None pk=0
+ - 2: phone_normalized TEXT notnull=1 default=None pk=0
+ - 3: phone_display TEXT notnull=0 default=None pk=0
+ - 4: access_purpose TEXT notnull=1 default='STAFF' pk=0
+ - 5: status TEXT notnull=1 default='ACTIVE' pk=0
+ - 6: status_reason TEXT notnull=0 default=None pk=0
+ - 7: status_changed_at TEXT notnull=0 default=None pk=0
+ - 8: note TEXT notnull=0 default=None pk=0
+ - 9: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 10: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - ux_commercial_phone_per_contract unique=1 origin=c
+    * contract_id
+    * phone_normalized
+ - idx_commercial_access_phone_contract_status unique=0 origin=c
+    * contract_id
+    * status
+
+FOREIGN KEYS:
+ - contract_id -> commercial_contracts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: commercial_contract_items | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: contract_id INTEGER notnull=1 default=None pk=0
+ - 2: item_code TEXT notnull=0 default=None pk=0
+ - 3: item_name TEXT notnull=1 default=None pk=0
+ - 4: reference_service_code TEXT notnull=0 default=None pk=0
+ - 5: calculation_mode TEXT notnull=1 default='FIXED_MONTHLY' pk=0
+ - 6: fixed_amount REAL notnull=0 default=None pk=0
+ - 7: rate_amount REAL notnull=0 default=None pk=0
+ - 8: quantity_default REAL notnull=1 default=1 pk=0
+ - 9: currency TEXT notnull=1 default='UAH' pk=0
+ - 10: blocks_phone_access_on_debt INTEGER notnull=1 default=0 pk=0
+ - 11: is_active INTEGER notnull=1 default=1 pk=0
+ - 12: valid_from TEXT notnull=0 default=None pk=0
+ - 13: valid_to TEXT notnull=0 default=None pk=0
+ - 14: note TEXT notnull=0 default=None pk=0
+ - 15: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 16: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_commercial_contract_items_contract unique=0 origin=c
+    * contract_id
+    * is_active
+    * valid_from
+    * valid_to
+
+FOREIGN KEYS:
+ - contract_id -> commercial_contracts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: commercial_contract_recipients | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: contract_id INTEGER notnull=1 default=None pk=0
+ - 2: resident_account_id INTEGER notnull=0 default=None pk=0
+ - 3: telegram_user_id TEXT notnull=0 default=None pk=0
+ - 4: recipient_name TEXT notnull=0 default=None pk=0
+ - 5: recipient_role TEXT notnull=1 default='REPRESENTATIVE' pk=0
+ - 6: is_primary INTEGER notnull=1 default=0 pk=0
+ - 7: notification_enabled INTEGER notnull=1 default=1 pk=0
+ - 8: status TEXT notnull=1 default='ACTIVE' pk=0
+ - 9: note TEXT notnull=0 default=None pk=0
+ - 10: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 11: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_commercial_recipients_telegram unique=0 origin=c
+    * telegram_user_id
+ - idx_commercial_recipients_contract_status unique=0 origin=c
+    * contract_id
+    * notification_enabled
+    * status
+
+FOREIGN KEYS:
+ - resident_account_id -> resident_accounts.id on_update=NO ACTION on_delete=NO ACTION
+ - contract_id -> commercial_contracts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: commercial_contracts | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: unit_id INTEGER notnull=1 default=None pk=0
+ - 2: contract_number TEXT notnull=0 default=None pk=0
+ - 3: counterparty_type TEXT notnull=1 default='UNKNOWN' pk=0
+ - 4: counterparty_name TEXT notnull=0 default=None pk=0
+ - 5: status TEXT notnull=1 default='DRAFT' pk=0
+ - 6: valid_from TEXT notnull=0 default=None pk=0
+ - 7: valid_to TEXT notnull=0 default=None pk=0
+ - 8: payment_due_day INTEGER notnull=1 default=10 pk=0
+ - 9: grace_days INTEGER notnull=1 default=0 pk=0
+ - 10: reminder_days_before_due INTEGER notnull=1 default=3 pk=0
+ - 11: warning_days_overdue INTEGER notnull=1 default=3 pk=0
+ - 12: suspension_candidate_days_overdue INTEGER notnull=1 default=7 pk=0
+ - 13: internal_note TEXT notnull=0 default=None pk=0
+ - 14: created_by TEXT notnull=0 default=None pk=0
+ - 15: updated_by TEXT notnull=0 default=None pk=0
+ - 16: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 17: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - ux_commercial_one_active_contract_per_unit unique=1 origin=c
+    * unit_id
+ - idx_commercial_contracts_unit_status unique=0 origin=c
+    * unit_id
+    * status
+    * valid_from
+    * valid_to
+
+FOREIGN KEYS:
+ - unit_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: commercial_notifications | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: contract_id INTEGER notnull=1 default=None pk=0
+ - 2: recipient_id INTEGER notnull=0 default=None pk=0
+ - 3: telegram_user_id TEXT notnull=0 default=None pk=0
+ - 4: notification_type TEXT notnull=1 default=None pk=0
+ - 5: status TEXT notnull=1 default='DRAFT' pk=0
+ - 6: dedupe_key TEXT notnull=1 default=None pk=0
+ - 7: charge_ids_json TEXT notnull=0 default=None pk=0
+ - 8: debt_amount_snapshot REAL notnull=1 default=0 pk=0
+ - 9: days_overdue_snapshot INTEGER notnull=1 default=0 pk=0
+ - 10: message_text TEXT notnull=1 default=None pk=0
+ - 11: created_by TEXT notnull=0 default=None pk=0
+ - 12: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 13: sent_at TEXT notnull=0 default=None pk=0
+ - 14: failed_at TEXT notnull=0 default=None pk=0
+ - 15: delivery_error TEXT notnull=0 default=None pk=0
+ - 16: cancelled_at TEXT notnull=0 default=None pk=0
+ - 17: cancelled_by TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - ux_commercial_notification_dedupe unique=1 origin=c
+    * dedupe_key
+ - idx_commercial_notifications_contract unique=0 origin=c
+    * contract_id
+    * notification_type
+ - idx_commercial_notifications_queue unique=0 origin=c
+    * status
+    * created_at
+
+FOREIGN KEYS:
+ - recipient_id -> commercial_contract_recipients.id on_update=NO ACTION on_delete=NO ACTION
+ - contract_id -> commercial_contracts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: contact_methods | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=0 default=None pk=0
+ - 2: person_id INTEGER notnull=0 default=None pk=0
+ - 3: contact_type TEXT notnull=0 default=None pk=0
+ - 4: contact_value TEXT notnull=0 default=None pk=0
+ - 5: telegram_user_id TEXT notnull=0 default=None pk=0
+ - 6: telegram_username TEXT notnull=0 default=None pk=0
+ - 7: contact_owner TEXT notnull=0 default=None pk=0
+ - 8: is_primary INTEGER notnull=0 default=0 pk=0
+ - 9: source TEXT notnull=0 default=None pk=0
+ - 10: notes TEXT notnull=0 default=None pk=0
+ - 11: created_at TEXT notnull=0 default=None pk=0
+ - 12: created_by TEXT notnull=0 default=None pk=0
+ - 13: updated_at TEXT notnull=0 default=None pk=0
+ - 14: updated_by TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - person_id -> persons.id on_update=NO ACTION on_delete=NO ACTION
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: events | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=0 default=None pk=0
+ - 2: event_time TEXT notnull=0 default=None pk=0
+ - 3: event_group TEXT notnull=0 default=None pk=0
+ - 4: event_type TEXT notnull=0 default=None pk=0
+ - 5: amount REAL notnull=0 default=None pk=0
+ - 6: status TEXT notnull=0 default=None pk=0
+ - 7: source TEXT notnull=0 default=None pk=0
+ - 8: related_table TEXT notnull=0 default=None pk=0
+ - 9: related_record_id TEXT notnull=0 default=None pk=0
+ - 10: file_path TEXT notnull=0 default=None pk=0
+ - 11: comment TEXT notnull=0 default=None pk=0
+ - 12: created_at TEXT notnull=0 default=None pk=0
+ - 13: created_by TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: extracted_facts | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: raw_message_id INTEGER notnull=0 default=None pk=0
+ - 2: apartment_number TEXT notnull=0 default=None pk=0
+ - 3: fact_type TEXT notnull=0 default=None pk=0
+ - 4: amount REAL notnull=0 default=None pk=0
+ - 5: fact_date TEXT notnull=0 default=None pk=0
+ - 6: confidence REAL notnull=0 default=None pk=0
+ - 7: status TEXT notnull=0 default='new' pk=0
+ - 8: comment TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - raw_message_id -> raw_messages.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: message_sources | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: source_type TEXT notnull=0 default=None pk=0
+ - 2: source_name TEXT notnull=0 default=None pk=0
+ - 3: source_id TEXT notnull=0 default=None pk=0
+ - 4: notes TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: operator_audit_log | rows=114
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: created_at TEXT notnull=0 default=None pk=0
+ - 2: operator_id TEXT notnull=0 default=None pk=0
+ - 3: user_id TEXT notnull=0 default=None pk=0
+ - 4: actor_type TEXT notnull=0 default=None pk=0
+ - 5: action_type TEXT notnull=0 default=None pk=0
+ - 6: table_name TEXT notnull=0 default=None pk=0
+ - 7: row_id TEXT notnull=0 default=None pk=0
+ - 8: field_name TEXT notnull=0 default=None pk=0
+ - 9: old_value TEXT notnull=0 default=None pk=0
+ - 10: new_value TEXT notnull=0 default=None pk=0
+ - 11: action_status TEXT notnull=0 default='applied' pk=0
+ - 12: review_status TEXT notnull=0 default='pending' pk=0
+ - 13: source_context TEXT notnull=0 default=None pk=0
+ - 14: comment TEXT notnull=0 default=None pk=0
+ - 15: db_mode TEXT notnull=0 default=None pk=0
+ - 16: db_file TEXT notnull=0 default=None pk=0
+ - 17: reviewed_by TEXT notnull=0 default=None pk=0
+ - 18: reviewed_at TEXT notnull=0 default=None pk=0
+ - 19: review_comment TEXT notnull=0 default=None pk=0
+ - 20: extra_json TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_operator_audit_table_row unique=0 origin=c
+    * table_name
+    * row_id
+ - idx_operator_audit_user unique=0 origin=c
+    * user_id
+ - idx_operator_audit_review unique=0 origin=c
+    * review_status
+ - idx_operator_audit_action unique=0 origin=c
+    * action_type
+ - idx_operator_audit_actor unique=0 origin=c
+    * actor_type
+ - idx_operator_audit_operator unique=0 origin=c
+    * operator_id
+ - idx_operator_audit_created unique=0 origin=c
+    * created_at
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: parking_time_review_tasks | rows=35
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_number TEXT notnull=0 default=None pk=0
+ - 2: vehicle_id INTEGER notnull=0 default=None pk=0
+ - 3: license_plate TEXT notnull=0 default=None pk=0
+ - 4: car_model TEXT notnull=0 default=None pk=0
+ - 5: current_parking_time TEXT notnull=0 default=None pk=0
+ - 6: suggested_day_count INTEGER notnull=0 default=None pk=0
+ - 7: suggested_night_count INTEGER notnull=0 default=None pk=0
+ - 8: task_type TEXT notnull=0 default=None pk=0
+ - 9: priority INTEGER notnull=0 default=50 pk=0
+ - 10: source_name TEXT notnull=0 default=None pk=0
+ - 11: source_details TEXT notnull=0 default=None pk=0
+ - 12: status TEXT notnull=0 default='new' pk=0
+ - 13: created_at TEXT notnull=0 default=None pk=0
+ - 14: created_by TEXT notnull=0 default=None pk=0
+ - 15: reviewed_at TEXT notnull=0 default=None pk=0
+ - 16: reviewed_by TEXT notnull=0 default=None pk=0
+ - 17: decision TEXT notnull=0 default=None pk=0
+ - 18: decision_comment TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_ptrt_apartment unique=0 origin=c
+    * apartment_number
+ - idx_ptrt_status unique=0 origin=c
+    * status
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: payment_allocations | rows=13
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: payment_id INTEGER notnull=1 default=None pk=0
+ - 2: charge_id INTEGER notnull=1 default=None pk=0
+ - 3: amount REAL notnull=1 default=None pk=0
+ - 4: created_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+ - 5: service_item_code TEXT notnull=0 default=None pk=0
+ - 6: base_service_code TEXT notnull=0 default=None pk=0
+ - 7: service_type TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_payment_allocations_service_type unique=0 origin=c
+    * service_type
+ - idx_payment_allocations_base_service unique=0 origin=c
+    * base_service_code
+ - idx_payment_allocations_service_item unique=0 origin=c
+    * service_item_code
+
+FOREIGN KEYS:
+ - charge_id -> charges.id on_update=NO ACTION on_delete=NO ACTION
+ - payment_id -> payments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: payment_notices | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: notice_number TEXT notnull=1 default=None pk=0
+ - 2: notice_type TEXT notnull=1 default=None pk=0
+ - 3: notice_status TEXT notnull=1 default='NEW' pk=0
+ - 4: resident_account_id INTEGER notnull=1 default=None pk=0
+ - 5: telegram_user_id TEXT notnull=1 default=None pk=0
+ - 6: apartment_id INTEGER notnull=0 default=None pk=0
+ - 7: apartment_number TEXT notnull=0 default=None pk=0
+ - 8: declared_cashbox_code TEXT notnull=0 default=None pk=0
+ - 9: declared_period_code TEXT notnull=0 default=None pk=0
+ - 10: declared_service_code TEXT notnull=0 default=None pk=0
+ - 11: declared_service_item_code TEXT notnull=0 default=None pk=0
+ - 12: declared_amount REAL notnull=1 default=0 pk=0
+ - 13: currency TEXT notnull=1 default='UAH' pk=0
+ - 14: declared_at TEXT notnull=1 default=None pk=0
+ - 15: resident_comment TEXT notnull=0 default=None pk=0
+ - 16: evidence_text TEXT notnull=0 default=None pk=0
+ - 17: matched_cashier_receipt_id INTEGER notnull=0 default=None pk=0
+ - 18: matched_bank_transaction_id INTEGER notnull=0 default=None pk=0
+ - 19: matched_payment_id INTEGER notnull=0 default=None pk=0
+ - 20: operator_id TEXT notnull=0 default=None pk=0
+ - 21: operator_note TEXT notnull=0 default=None pk=0
+ - 22: reviewed_at TEXT notnull=0 default=None pk=0
+ - 23: confirmed_at TEXT notnull=0 default=None pk=0
+ - 24: rejected_at TEXT notnull=0 default=None pk=0
+ - 25: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 26: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_payment_notices_unit unique=0 origin=c
+    * apartment_id
+    * apartment_number
+    * notice_status
+ - idx_payment_notices_status unique=0 origin=c
+    * notice_status
+    * declared_at
+ - sqlite_autoindex_payment_notices_1 unique=1 origin=u
+    * notice_number
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+ - resident_account_id -> resident_accounts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: payments | rows=92
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: payment_date TEXT notnull=0 default=None pk=0
+ - 2: period_code TEXT notnull=0 default=None pk=0
+ - 3: apartment_number TEXT notnull=1 default=None pk=0
+ - 4: vehicle_id INTEGER notnull=0 default=None pk=0
+ - 5: amount REAL notnull=1 default=None pk=0
+ - 6: currency TEXT notnull=1 default='UAH' pk=0
+ - 7: payment_method TEXT notnull=0 default=None pk=0
+ - 8: source TEXT notnull=0 default=None pk=0
+ - 9: created_by TEXT notnull=0 default=None pk=0
+ - 10: comment TEXT notnull=0 default=None pk=0
+ - 11: created_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+ - 12: cashbox_code TEXT notnull=0 default=None pk=0
+ - 13: cashbox_operation_id INTEGER notnull=0 default=None pk=0
+ - 14: cashier_batch_id TEXT notnull=0 default=None pk=0
+ - 15: operator_id TEXT notnull=0 default=None pk=0
+ - 16: service_item_code TEXT notnull=0 default=None pk=0
+ - 17: base_service_code TEXT notnull=0 default=None pk=0
+ - 18: service_type TEXT notnull=0 default=None pk=0
+ - 19: commercial_contract_id INTEGER notnull=0 default=None pk=0
+ - 20: commercial_unit_id INTEGER notnull=0 default=None pk=0
+ - 21: cashier_receipt_id INTEGER notnull=0 default=None pk=0
+ - 22: cashier_entry_status TEXT notnull=0 default=None pk=0
+ - 23: payment_notice_id INTEGER notnull=0 default=None pk=0
+ - 24: bank_transaction_id INTEGER notnull=0 default=None pk=0
+ - 25: payment_channel TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_payments_bank_v2 unique=0 origin=c
+    * bank_transaction_id
+ - idx_payments_notice_v2 unique=0 origin=c
+    * payment_notice_id
+ - idx_payments_cashier_receipt unique=0 origin=c
+    * cashier_receipt_id
+ - idx_payments_commercial_contract unique=0 origin=c
+    * commercial_contract_id
+    * commercial_unit_id
+ - idx_payments_service_type unique=0 origin=c
+    * service_type
+ - idx_payments_base_service unique=0 origin=c
+    * base_service_code
+ - idx_payments_service_item unique=0 origin=c
+    * service_item_code
+ - idx_payments_operator unique=0 origin=c
+    * operator_id
+ - idx_payments_cashier_batch unique=0 origin=c
+    * cashier_batch_id
+ - idx_payments_cashbox_operation unique=0 origin=c
+    * cashbox_operation_id
+ - idx_payments_cashbox_code unique=0 origin=c
+    * cashbox_code
+ - idx_payments_date unique=0 origin=c
+    * payment_date
+ - idx_payments_vehicle unique=0 origin=c
+    * vehicle_id
+ - idx_payments_apartment unique=0 origin=c
+    * apartment_number
+ - idx_payments_period unique=0 origin=c
+    * period_code
+
+FOREIGN KEYS:
+ - vehicle_id -> vehicles.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: persons | rows=343
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=0 default=None pk=0
+ - 2: full_name TEXT notnull=0 default=None pk=0
+ - 3: phone_raw TEXT notnull=0 default=None pk=0
+ - 4: ownership_type TEXT notnull=0 default=None pk=0
+ - 5: person_role TEXT notnull=0 default=None pk=0
+ - 6: source TEXT notnull=0 default=None pk=0
+ - 7: notes TEXT notnull=0 default=None pk=0
+ - 8: created_at TEXT notnull=0 default=None pk=0
+ - 9: created_by TEXT notnull=0 default=None pk=0
+ - 10: updated_at TEXT notnull=0 default=None pk=0
+ - 11: updated_by TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: raw_messages | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: source_id INTEGER notnull=0 default=None pk=0
+ - 2: message_datetime TEXT notnull=0 default=None pk=0
+ - 3: sender_name TEXT notnull=0 default=None pk=0
+ - 4: sender_username TEXT notnull=0 default=None pk=0
+ - 5: sender_user_id TEXT notnull=0 default=None pk=0
+ - 6: message_text TEXT notnull=0 default=None pk=0
+ - 7: has_photo INTEGER notnull=0 default=0 pk=0
+ - 8: file_path TEXT notnull=0 default=None pk=0
+ - 9: imported_at TEXT notnull=0 default=None pk=0
+ - 10: processed_status TEXT notnull=0 default='new' pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - source_id -> message_sources.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: remote_requests | rows=1
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: resident_account_id INTEGER notnull=1 default=None pk=0
+ - 2: telegram_user_id TEXT notnull=1 default=None pk=0
+ - 3: apartment_id INTEGER notnull=1 default=None pk=0
+ - 4: apartment_number TEXT notnull=1 default=None pk=0
+ - 5: request_kind TEXT notnull=1 default='FIRST' pk=0
+ - 6: quantity INTEGER notnull=1 default=1 pk=0
+ - 7: resident_comment TEXT notnull=0 default=None pk=0
+ - 8: status TEXT notnull=1 default='NEW' pk=0
+ - 9: operator_id TEXT notnull=0 default=None pk=0
+ - 10: operator_note TEXT notnull=0 default=None pk=0
+ - 11: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 12: updated_at TEXT notnull=0 default=None pk=0
+ - 13: reviewed_at TEXT notnull=0 default=None pk=0
+ - 14: issued_at TEXT notnull=0 default=None pk=0
+ - 15: closed_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_remote_requests_apartment unique=0 origin=c
+    * apartment_id
+    * created_at
+ - idx_remote_requests_status unique=0 origin=c
+    * status
+    * created_at
+ - idx_remote_requests_resident unique=0 origin=c
+    * resident_account_id
+    * status
+    * created_at
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+ - resident_account_id -> resident_accounts.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: resident_accounts | rows=2
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: telegram_user_id INTEGER notnull=0 default=None pk=0
+ - 2: telegram_username TEXT notnull=0 default=None pk=0
+ - 3: telegram_first_name TEXT notnull=0 default=None pk=0
+ - 4: telegram_last_name TEXT notnull=0 default=None pk=0
+ - 5: apartment_id INTEGER notnull=0 default=None pk=0
+ - 6: apartment_number TEXT notnull=0 default=None pk=0
+ - 7: role TEXT notnull=0 default='resident' pk=0
+ - 8: status TEXT notnull=0 default='new' pk=0
+ - 9: language_code TEXT notnull=0 default='ru' pk=0
+ - 10: created_at TEXT notnull=0 default=None pk=0
+ - 11: updated_at TEXT notnull=0 default=None pk=0
+ - 12: verified_at TEXT notnull=0 default=None pk=0
+ - 13: last_seen_at TEXT notnull=0 default=None pk=0
+ - 14: notes TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_resident_accounts_role unique=0 origin=c
+    * role
+ - idx_resident_accounts_status unique=0 origin=c
+    * status
+ - idx_resident_accounts_apartment unique=0 origin=c
+    * apartment_number
+ - idx_resident_accounts_telegram_user unique=0 origin=c
+    * telegram_user_id
+ - sqlite_autoindex_resident_accounts_1 unique=1 origin=u
+    * telegram_user_id
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: schema_info | rows=1
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: schema_version TEXT notnull=1 default=None pk=0
+ - 2: created_at TEXT notnull=1 default=None pk=0
+ - 3: comment TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: service_catalog | rows=12
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: service_code TEXT notnull=1 default=None pk=0
+ - 2: service_group TEXT notnull=1 default=None pk=0
+ - 3: service_name TEXT notnull=1 default=None pk=0
+ - 4: unit TEXT notnull=1 default=None pk=0
+ - 5: is_active INTEGER notnull=1 default=1 pk=0
+ - 6: comment TEXT notnull=0 default=None pk=0
+ - 7: created_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+ - 8: updated_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+ - 9: service_type TEXT notnull=0 default=None pk=0
+ - 10: category TEXT notnull=0 default=None pk=0
+ - 11: is_monthly INTEGER notnull=1 default=0 pk=0
+ - 12: is_fundraising INTEGER notnull=1 default=0 pk=0
+ - 13: is_commercial INTEGER notnull=1 default=0 pk=0
+ - 14: is_access_control INTEGER notnull=1 default=0 pk=0
+ - 15: is_cash_collectable INTEGER notnull=1 default=1 pk=0
+
+INDEXES:
+ - idx_service_catalog_group unique=0 origin=c
+    * service_group
+ - idx_service_catalog_active unique=0 origin=c
+    * is_active
+ - idx_service_catalog_type unique=0 origin=c
+    * service_type
+ - idx_service_catalog_code unique=0 origin=c
+    * service_code
+ - sqlite_autoindex_service_catalog_1 unique=1 origin=u
+    * service_code
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: service_items | rows=11
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: service_item_code TEXT notnull=1 default=None pk=0
+ - 2: service_code TEXT notnull=1 default=None pk=0
+ - 3: service_item_name TEXT notnull=1 default=None pk=0
+ - 4: service_type TEXT notnull=1 default=None pk=0
+ - 5: period_code TEXT notnull=0 default=None pk=0
+ - 6: sequence_no INTEGER notnull=0 default=None pk=0
+ - 7: amount_default REAL notnull=0 default=None pk=0
+ - 8: currency TEXT notnull=1 default='UAH' pk=0
+ - 9: date_from TEXT notnull=0 default=None pk=0
+ - 10: date_to TEXT notnull=0 default=None pk=0
+ - 11: status TEXT notnull=1 default='active' pk=0
+ - 12: is_active INTEGER notnull=1 default=1 pk=0
+ - 13: description TEXT notnull=0 default=None pk=0
+ - 14: comment TEXT notnull=0 default=None pk=0
+ - 15: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 16: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_service_items_active unique=0 origin=c
+    * is_active
+ - idx_service_items_type unique=0 origin=c
+    * service_type
+ - idx_service_items_period unique=0 origin=c
+    * period_code
+ - idx_service_items_service unique=0 origin=c
+    * service_code
+ - idx_service_items_code unique=0 origin=c
+    * service_item_code
+ - sqlite_autoindex_service_items_1 unique=1 origin=u
+    * service_item_code
+
+FOREIGN KEYS:
+ - service_code -> service_catalog.service_code on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: service_tariffs | rows=3
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: service_code TEXT notnull=1 default=None pk=0
+ - 2: amount REAL notnull=1 default=None pk=0
+ - 3: currency TEXT notnull=1 default='UAH' pk=0
+ - 4: valid_from TEXT notnull=1 default=None pk=0
+ - 5: valid_to TEXT notnull=0 default=None pk=0
+ - 6: is_active INTEGER notnull=1 default=1 pk=0
+ - 7: comment TEXT notnull=0 default=None pk=0
+ - 8: created_at TEXT notnull=0 default=CURRENT_TIMESTAMP pk=0
+
+INDEXES:
+ - idx_service_tariffs_code_dates unique=0 origin=c
+    * service_code
+    * valid_from
+    * valid_to
+
+FOREIGN KEYS:
+ - service_code -> service_catalog.service_code on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: tbot_parking_import | rows=125
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: ownership_type TEXT notnull=0 default=None pk=0
+ - 2: ownership_type_raw TEXT notnull=0 default=None pk=0
+ - 3: full_name TEXT notnull=0 default=None pk=0
+ - 4: phone_raw TEXT notnull=0 default=None pk=0
+ - 5: apartment_number TEXT notnull=0 default=None pk=0
+ - 6: car_model TEXT notnull=0 default=None pk=0
+ - 7: car_color TEXT notnull=0 default=None pk=0
+ - 8: license_plate TEXT notnull=0 default=None pk=0
+ - 9: status_raw TEXT notnull=0 default=None pk=0
+ - 10: source TEXT notnull=0 default=None pk=0
+ - 11: imported_at TEXT notnull=0 default=None pk=0
+ - 12: imported_by TEXT notnull=0 default=None pk=0
+ - 13: notes TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: unit_aliases | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=1 default=None pk=0
+ - 2: alias_text TEXT notnull=1 default=None pk=0
+ - 3: alias_normalized TEXT notnull=1 default=None pk=0
+ - 4: alias_kind TEXT notnull=1 default='SEARCH' pk=0
+ - 5: is_active INTEGER notnull=1 default=1 pk=0
+ - 6: note TEXT notnull=0 default=None pk=0
+ - 7: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 8: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_unit_aliases_apartment unique=0 origin=c
+    * apartment_id
+ - idx_unit_aliases_unique_active unique=1 origin=c
+    * alias_normalized
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: unit_contacts | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=1 default=None pk=0
+ - 2: contact_name TEXT notnull=0 default=None pk=0
+ - 3: contact_phone TEXT notnull=0 default=None pk=0
+ - 4: contact_role TEXT notnull=1 default='PRIMARY' pk=0
+ - 5: is_primary INTEGER notnull=1 default=1 pk=0
+ - 6: record_status TEXT notnull=1 default='DRAFT' pk=0
+ - 7: note TEXT notnull=0 default=None pk=0
+ - 8: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 9: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_unit_contacts_apartment unique=0 origin=c
+    * apartment_id
+ - idx_unit_contacts_primary unique=1 origin=c
+    * apartment_id
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: unit_group_aliases | rows=13
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: group_id INTEGER notnull=1 default=None pk=0
+ - 2: alias_text TEXT notnull=1 default=None pk=0
+ - 3: alias_normalized TEXT notnull=1 default=None pk=0
+ - 4: alias_kind TEXT notnull=1 default=None pk=0
+ - 5: is_active INTEGER notnull=1 default=1 pk=0
+ - 6: source_note TEXT notnull=0 default=None pk=0
+ - 7: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 8: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_unit_group_aliases_group unique=0 origin=c
+    * group_id
+ - sqlite_autoindex_unit_group_aliases_1 unique=1 origin=u
+    * alias_normalized
+    * is_active
+
+FOREIGN KEYS:
+ - group_id -> unit_groups.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: unit_group_members | rows=8
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: group_id INTEGER notnull=1 default=None pk=0
+ - 2: apartment_id INTEGER notnull=1 default=None pk=0
+ - 3: member_order INTEGER notnull=1 default=1 pk=0
+ - 4: member_role TEXT notnull=1 default='MEMBER' pk=0
+ - 5: source_note TEXT notnull=0 default=None pk=0
+ - 6: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 7: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_unit_group_members_apartment unique=0 origin=c
+    * apartment_id
+ - sqlite_autoindex_unit_group_members_1 unique=1 origin=u
+    * group_id
+    * apartment_id
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+ - group_id -> unit_groups.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: unit_groups | rows=4
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: group_code TEXT notnull=1 default=None pk=0
+ - 2: group_type TEXT notnull=1 default='COMPOSITE_LOOKUP' pk=0
+ - 3: display_name TEXT notnull=0 default=None pk=0
+ - 4: legal_status TEXT notnull=1 default='UNKNOWN' pk=0
+ - 5: record_status TEXT notnull=1 default='LEGACY_LOOKUP' pk=0
+ - 6: source_note TEXT notnull=0 default=None pk=0
+ - 7: internal_note TEXT notnull=0 default=None pk=0
+ - 8: created_at TEXT notnull=1 default=CURRENT_TIMESTAMP pk=0
+ - 9: updated_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_unit_groups_status unique=0 origin=c
+    * record_status
+    * legal_status
+ - sqlite_autoindex_unit_groups_1 unique=1 origin=u
+    * group_code
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: vehicles | rows=130
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=0 default=None pk=0
+ - 2: license_plate TEXT notnull=0 default=None pk=0
+ - 3: car_model TEXT notnull=0 default=None pk=0
+ - 4: car_color TEXT notnull=0 default=None pk=0
+ - 5: parking_time TEXT notnull=0 default=None pk=0
+ - 6: status TEXT notnull=0 default=None pk=0
+ - 7: source TEXT notnull=0 default=None pk=0
+ - 8: notes TEXT notnull=0 default=None pk=0
+ - 9: created_at TEXT notnull=0 default=None pk=0
+ - 10: created_by TEXT notnull=0 default=None pk=0
+ - 11: updated_at TEXT notnull=0 default=None pk=0
+ - 12: updated_by TEXT notnull=0 default=None pk=0
+ - 13: license_plate_normalized TEXT notnull=0 default=None pk=0
+ - 14: plate_format_status TEXT notnull=0 default=None pk=0
+ - 15: car_model_normalized TEXT notnull=0 default=None pk=0
+ - 16: car_color_normalized TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: verification_candidates | rows=46
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: task_id INTEGER notnull=0 default=None pk=0
+ - 2: candidate_type TEXT notnull=0 default=None pk=0
+ - 3: candidate_value TEXT notnull=0 default=None pk=0
+ - 4: candidate_normalized TEXT notnull=0 default=None pk=0
+ - 5: confidence_label TEXT notnull=0 default=None pk=0
+ - 6: confidence_score INTEGER notnull=0 default=None pk=0
+ - 7: source_names TEXT notnull=0 default=None pk=0
+ - 8: match_types TEXT notnull=0 default=None pk=0
+ - 9: reason TEXT notnull=0 default=None pk=0
+ - 10: status TEXT notnull=0 default='new' pk=0
+ - 11: created_at TEXT notnull=0 default=None pk=0
+ - 12: created_by TEXT notnull=0 default=None pk=0
+ - 13: decided_at TEXT notnull=0 default=None pk=0
+ - 14: decided_by TEXT notnull=0 default=None pk=0
+ - 15: decision TEXT notnull=0 default=None pk=0
+ - 16: decision_comment TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_verification_candidates_status unique=0 origin=c
+    * status
+ - idx_verification_candidates_task unique=0 origin=c
+    * task_id
+
+FOREIGN KEYS:
+ - task_id -> verification_tasks.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: verification_evidence | rows=80
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: task_id INTEGER notnull=0 default=None pk=0
+ - 2: source_name TEXT notnull=0 default=None pk=0
+ - 3: source_db TEXT notnull=0 default=None pk=0
+ - 4: source_table TEXT notnull=0 default=None pk=0
+ - 5: source_record_id TEXT notnull=0 default=None pk=0
+ - 6: evidence_type TEXT notnull=0 default=None pk=0
+ - 7: evidence_value TEXT notnull=0 default=None pk=0
+ - 8: normalized_value TEXT notnull=0 default=None pk=0
+ - 9: match_type TEXT notnull=0 default=None pk=0
+ - 10: comment TEXT notnull=0 default=None pk=0
+ - 11: created_at TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_verification_evidence_task unique=0 origin=c
+    * task_id
+
+FOREIGN KEYS:
+ - task_id -> verification_tasks.id on_update=NO ACTION on_delete=NO ACTION
+
+====================================================================================================
+TABLE: verification_log | rows=0
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_number TEXT notnull=0 default=None pk=0
+ - 2: field_name TEXT notnull=0 default=None pk=0
+ - 3: paper_value TEXT notnull=0 default=None pk=0
+ - 4: bot_value TEXT notnull=0 default=None pk=0
+ - 5: final_value TEXT notnull=0 default=None pk=0
+ - 6: status TEXT notnull=0 default=None pk=0
+ - 7: verified_by TEXT notnull=0 default=None pk=0
+ - 8: verified_at TEXT notnull=0 default=None pk=0
+ - 9: comment TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - none
+
+FOREIGN KEYS:
+ - none
+
+====================================================================================================
+TABLE: verification_tasks | rows=37
+====================================================================================================
+
+COLUMNS:
+ - 0: id INTEGER notnull=0 default=None pk=1
+ - 1: apartment_id INTEGER notnull=0 default=None pk=0
+ - 2: apartment_number TEXT notnull=0 default=None pk=0
+ - 3: task_group TEXT notnull=0 default=None pk=0
+ - 4: task_type TEXT notnull=0 default=None pk=0
+ - 5: priority INTEGER notnull=0 default=100 pk=0
+ - 6: status TEXT notnull=0 default='new' pk=0
+ - 7: source_name TEXT notnull=0 default=None pk=0
+ - 8: source_record_id TEXT notnull=0 default=None pk=0
+ - 9: object_table TEXT notnull=0 default=None pk=0
+ - 10: object_id INTEGER notnull=0 default=None pk=0
+ - 11: field_name TEXT notnull=0 default=None pk=0
+ - 12: main_value TEXT notnull=0 default=None pk=0
+ - 13: candidate_value TEXT notnull=0 default=None pk=0
+ - 14: normalized_main_value TEXT notnull=0 default=None pk=0
+ - 15: normalized_candidate_value TEXT notnull=0 default=None pk=0
+ - 16: suggestion TEXT notnull=0 default=None pk=0
+ - 17: comment TEXT notnull=0 default=None pk=0
+ - 18: created_at TEXT notnull=0 default=None pk=0
+ - 19: created_by TEXT notnull=0 default=None pk=0
+ - 20: resolved_at TEXT notnull=0 default=None pk=0
+ - 21: resolved_by TEXT notnull=0 default=None pk=0
+ - 22: resolution TEXT notnull=0 default=None pk=0
+ - 23: resolution_comment TEXT notnull=0 default=None pk=0
+
+INDEXES:
+ - idx_verification_tasks_type unique=0 origin=c
+    * task_type
+ - idx_verification_tasks_apartment unique=0 origin=c
+    * apartment_number
+ - idx_verification_tasks_status unique=0 origin=c
+    * status
+
+FOREIGN KEYS:
+ - apartment_id -> apartments.id on_update=NO ACTION on_delete=NO ACTION

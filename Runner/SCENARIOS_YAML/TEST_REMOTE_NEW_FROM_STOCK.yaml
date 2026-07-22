@@ -1,0 +1,133 @@
+scenario: TEST_REMOTE_NEW_FROM_STOCK
+version: 1.0
+status: draft
+
+description: >
+  New remote/pult order from available stock.
+  Debt is checked before request creation.
+  Operator/cashier/admin visibility happens before payment.
+  Stock reserve and issue-point transfer are separate workflow states.
+
+database:
+  mode: working_copy
+  source: osbb_test
+  keep_full_db_on_success: false
+  keep_full_db_on_failure: true
+
+actors:
+  resident:
+    apartment: 174
+  operator: default_test_operator
+  cashier: default_test_cashier
+  admin: default_test_admin
+  warehouse: default_test_warehouse
+
+preconditions:
+  apartment:
+    number: 174
+    debt: false
+    bound_resident: true
+  stock:
+    remote_new:
+      available_at_start: 2
+
+steps:
+  - id: debt_check
+    actor: system
+    action: check_debt
+    params:
+      apartment: 174
+    expect:
+      debt: false
+      request_created: false
+
+  - id: create_request
+    actor: resident
+    action: order_new_remote
+    params:
+      apartment: 174
+      quantity: 2
+    expect:
+      request_created: true
+      quantity: 2
+      status_any_of: [created, intention, open]
+
+  - id: notify_responsible_roles
+    actor: system
+    action: emit_request_created_event
+    expect:
+      visible_to: [operator, cashier, admin]
+
+  - id: reserve_stock
+    actor: warehouse
+    action: reserve_stock
+    params:
+      item: remote_new
+      quantity: 2
+    expect:
+      reserved_quantity: 2
+
+  - id: accept_payment
+    actor: cashier
+    action: accept_payment
+    params:
+      method: cash
+      quantity: 2
+    expect:
+      payment_created: true
+      payment_status: paid
+
+  - id: transfer_to_issue_point
+    actor: warehouse
+    action: transfer_reserved_to_issue_point
+    params:
+      item: remote_new
+      quantity: 2
+    expect:
+      issue_point_quantity: 2
+      status_any_of: [ready_to_issue, transferred]
+
+  - id: issue_remote
+    actor: operator
+    action: issue_remote
+    params:
+      quantity: 2
+    expect:
+      issued_quantity: 2
+      audit_log: true
+
+  - id: close_request
+    actor: system
+    action: close_request
+    expect:
+      status_any_of: [issued, completed, closed]
+
+db_observe:
+  - service_orders
+  - service_order_steps
+  - service_order_interests
+  - payments
+  - cashbox_operations
+  - notifications
+  - operator_audit_log
+  - warehouse_stock
+  - warehouse_reservations
+  - remote_order_issued_assets
+
+db_expect:
+  created_or_changed:
+    service_request_or_order: 1
+    notifications_or_visibility: true
+    warehouse_reservation_quantity: 2
+    payment: true
+    issued_quantity: 2
+    closed_request: true
+  forbidden:
+    production_db_changes: true
+    payment_without_request: true
+    request_before_debt_check: true
+
+reports:
+  markdown: true
+  json: true
+  db_diff_json: true

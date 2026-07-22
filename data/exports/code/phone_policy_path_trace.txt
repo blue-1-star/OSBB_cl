@@ -1,0 +1,284 @@
+====================================================================================================
+OSBB phone policy path trace - READ ONLY
+====================================================================================================
+Generated: 2026-06-29 22:47:04
+Root: G:\Programming\Py\OSBB
+
+====================================================================================================
+1. SOURCE FILE KEYWORD SUMMARY
+====================================================================================================
+
+Bots/handlers/service_orders_workspace.py
+ - create_phone_barrier_access_interest  : YES
+ - ensure_service_order_allowed          : no
+ - ServiceAccessDenied                   : YES
+ - result_to_short_text                  : YES
+ - parking_debt_check_mode               : YES
+ - CHECK_LINKED_PARKING_ACCOUNT          : no
+ - MANUAL_REVIEW                         : YES
+ - PHONE_ACCESS_CONNECT                  : YES
+ - BARRIER_PHONE_CONNECT                 : no
+ - 01_BarrierPhoneConnect                : no
+
+phone_barrier_access_service.py
+ - create_phone_barrier_access_interest  : YES
+ - ensure_service_order_allowed          : no
+ - ServiceAccessDenied                   : no
+ - result_to_short_text                  : no
+ - parking_debt_check_mode               : YES
+ - CHECK_LINKED_PARKING_ACCOUNT          : no
+ - MANUAL_REVIEW                         : YES
+ - PHONE_ACCESS_CONNECT                  : no
+ - BARRIER_PHONE_CONNECT                 : no
+ - 01_BarrierPhoneConnect                : no
+
+phone_barrier_access_core.py
+ - create_phone_barrier_access_interest  : no
+ - ensure_service_order_allowed          : no
+ - ServiceAccessDenied                   : no
+ - result_to_short_text                  : no
+ - parking_debt_check_mode               : YES
+ - CHECK_LINKED_PARKING_ACCOUNT          : YES
+ - MANUAL_REVIEW                         : YES
+ - PHONE_ACCESS_CONNECT                  : no
+ - BARRIER_PHONE_CONNECT                 : no
+ - 01_BarrierPhoneConnect                : no
+
+service_access_policy.py
+ - create_phone_barrier_access_interest  : no
+ - ensure_service_order_allowed          : YES
+ - ServiceAccessDenied                   : YES
+ - result_to_short_text                  : YES
+ - parking_debt_check_mode               : no
+ - CHECK_LINKED_PARKING_ACCOUNT          : no
+ - MANUAL_REVIEW                         : no
+ - PHONE_ACCESS_CONNECT                  : no
+ - BARRIER_PHONE_CONNECT                 : no
+ - 01_BarrierPhoneConnect                : no
+
+service_orders_core.py
+ - create_phone_barrier_access_interest  : no
+ - ensure_service_order_allowed          : YES
+ - ServiceAccessDenied                   : YES
+ - result_to_short_text                  : no
+ - parking_debt_check_mode               : no
+ - CHECK_LINKED_PARKING_ACCOUNT          : no
+ - MANUAL_REVIEW                         : no
+ - PHONE_ACCESS_CONNECT                  : no
+ - BARRIER_PHONE_CONNECT                 : no
+ - 01_BarrierPhoneConnect                : no
+
+service_preorders_core.py
+ - create_phone_barrier_access_interest  : no
+ - ensure_service_order_allowed          : no
+ - ServiceAccessDenied                   : no
+ - result_to_short_text                  : no
+ - parking_debt_check_mode               : no
+ - CHECK_LINKED_PARKING_ACCOUNT          : no
+ - MANUAL_REVIEW                         : no
+ - PHONE_ACCESS_CONNECT                  : no
+ - BARRIER_PHONE_CONNECT                 : no
+ - 01_BarrierPhoneConnect                : no
+
+====================================================================================================
+2. TELEGRAM / WORKSPACE CALL SITES
+====================================================================================================
+
+create_phone_barrier_access_interest call contexts:
+--------------------------------------------------------------------------------
+  976:         phone = _normalise_phone(state.get("requested_phone"))
+  977:         if not _valid_phone(phone):
+  978:             raise ValueError(tr(state.get("lang") or "ru", "wrong_phone"))
+  979:         gate = _phone_profile_gate(
+  980:             {"account": state["account"], "unit": state["unit"]}
+  981:         )
+  982:         if not gate.get("allowed"):
+  983:             raise ValueError(_phone_profile_gate_text(gate))
+> 984:         return create_phone_barrier_access_interest(
+  985:             resident_account_id=int(state["account"]["id"]),
+  986:             telegram_user_id=user_id,
+  987:             apartment_id=int(state["unit"]["id"]),
+  988:             apartment_number=text(state["unit"].get("apartment_number")),
+  989:             service_item_code=state["offer"]["service_item_code"],
+  990:             phone=phone,
+  991:             access_point_codes=state.get("phone_access_points") or [],
+  992:             parking_debt_check_mode=text(gate.get("parking_debt_check_mode")) or "MANUAL_REVIEW",
+
+ensure_service_order_allowed call contexts in workspace:
+ - no hits for \bensure_service_order_allowed\s*\(
+
+ServiceAccessDenied handling contexts in workspace:
+--------------------------------------------------------------------------------
+  62:     receive_supplier_batch,
+  63:     reconcile_paid_service_interests,
+  64:     supplier_demand,
+  65:     unpaid_interest_totals,
+  66: )
+  67: try:
+> 68:     from service_access_policy import ServiceAccessDenied, result_to_short_text
+  69: except Exception:
+  70:     ServiceAccessDenied = None
+  71:     result_to_short_text = None
+  72: from phone_barrier_access_core import BARRIER_FAR_01, BARRIER_NEAR_02
+  73: from phone_barrier_access_service import (
+  74:     activate_phone_barrier_access_order,
+--------------------------------------------------------------------------------
+  64:     supplier_demand,
+  65:     unpaid_interest_totals,
+  66: )
+  67: try:
+  68:     from service_access_policy import ServiceAccessDenied, result_to_short_text
+  69: except Exception:
+> 70:     ServiceAccessDenied = None
+  71:     result_to_short_text = None
+  72: from phone_barrier_access_core import BARRIER_FAR_01, BARRIER_NEAR_02
+  73: from phone_barrier_access_service import (
+  74:     activate_phone_barrier_access_order,
+  75:     create_phone_barrier_access_interest,
+  76:     phone_access_summary_for_interest,
+--------------------------------------------------------------------------------
+  1204:     if mode == "resident_preview":
+  1205:         if message_text == tr(lang, "create_interest"):
+  1206:             try:
+  1207:                 interest = _create_interest_from_state(state, user_id)
+  1208:             except Exception as exc:
+  1209:                 # OSBB_SERVICE_POLICY_UX_V1
+> 1210:                 if ServiceAccessDenied is not None and isinstance(exc, ServiceAccessDenied):
+  1211:                     await update.message.reply_text(
+  1212:                         result_to_short_text(exc.result) if result_to_short_text else f"⚠️ {exc}"
+  1213:                     )
+  1214:                     return True
+  1215:                 await update.message.reply_text(f"⚠️ {exc}")
+  1216:                 return True
+--------------------------------------------------------------------------------
+  1644:             elif action == "return_remote":
+  1645:                 _return_own_remote(order, user_id)
+  1646:             elif action == "issue_new":
+  1647:                 issue_new_remotes_from_batch(service_order_id=int(order["id"]), actor_id=user_id)
+  1648:         except Exception as exc:
+  1649:             # OSBB_SERVICE_POLICY_UX_V1
+> 1650:             if ServiceAccessDenied is not None and isinstance(exc, ServiceAccessDenied):
+  1651:                 await update.message.reply_text(
+  1652:                     result_to_short_text(exc.result) if result_to_short_text else f"⚠️ {exc}"
+  1653:                 )
+  1654:                 return True
+  1655:             await update.message.reply_text(f"⚠️ {exc}"); return True
+  1656:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+--------------------------------------------------------------------------------
+  1670:             await update.message.reply_text(tr(lang, "wrong_phone")); return True
+  1671:         order = service_order_summary(int(state["order_id"]))
+  1672:         try:
+  1673:             _activate_phone(order, phone, user_id)
+  1674:         except Exception as exc:
+  1675:             # OSBB_PHONE_ACCESS_POLICY_UX_BRIDGE_V1
+> 1676:             if ServiceAccessDenied is not None and isinstance(exc, ServiceAccessDenied):
+  1677:                 await update.message.reply_text(
+  1678:                     result_to_short_text(exc.result) if result_to_short_text else f"⚠️ {exc}"
+  1679:                 )
+  1680:                 return True
+  1681:             await update.message.reply_text(f"⚠️ {exc}"); return True
+  1682:         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+
+====================================================================================================
+3. FUNCTIONS CONTAINING PHONE INTEREST CREATION
+====================================================================================================
+
+Function _create_interest_from_state lines 974-1002
+ - contains ensure_service_order_allowed: NO
+ - contains ServiceAccessDenied: NO
+ - contains parking_debt_check_mode: YES
+
+974: def _create_interest_from_state(state: dict, user_id: int) -> dict:
+975:     if _is_phone_offer(state.get("offer")):
+976:         phone = _normalise_phone(state.get("requested_phone"))
+977:         if not _valid_phone(phone):
+978:             raise ValueError(tr(state.get("lang") or "ru", "wrong_phone"))
+979:         gate = _phone_profile_gate(
+980:             {"account": state["account"], "unit": state["unit"]}
+981:         )
+982:         if not gate.get("allowed"):
+983:             raise ValueError(_phone_profile_gate_text(gate))
+984:         return create_phone_barrier_access_interest(
+985:             resident_account_id=int(state["account"]["id"]),
+986:             telegram_user_id=user_id,
+987:             apartment_id=int(state["unit"]["id"]),
+988:             apartment_number=text(state["unit"].get("apartment_number")),
+989:             service_item_code=state["offer"]["service_item_code"],
+990:             phone=phone,
+991:             access_point_codes=state.get("phone_access_points") or [],
+992:             parking_debt_check_mode=text(gate.get("parking_debt_check_mode")) or "MANUAL_REVIEW",
+993:             parking_debt_check_note=text(gate.get("parking_debt_check_note")),
+994:         )
+995:     return create_service_interest(
+996:         resident_account_id=int(state["account"]["id"]),
+997:         telegram_user_id=user_id,
+998:         apartment_id=int(state["unit"]["id"]),
+999:         apartment_number=text(state["unit"].get("apartment_number")),
+1000:         service_item_code=state["offer"]["service_item_code"],
+1001:         quantity=int(state.get("quantity") or 1),
+1002:     )
+
+====================================================================================================
+4. PHONE SERVICE FUNCTION POLICY CHECK
+====================================================================================================
+
+create_phone_barrier_access_interest function:
+
+====================================================================================================
+5. SERVICE ORDERS CORE POLICY ANCHOR
+====================================================================================================
+
+ensure_service_order_allowed contexts in service_orders_core:
+--------------------------------------------------------------------------------
+  528:         cur = conn.cursor()
+  529:         item = _service_item(cur, service_item_code)
+  530:         workflow = get_service_workflow(cur, service_item_code)
+  531: 
+  532:         # OSBB_SERVICE_ACCESS_POLICY_V1
+  533:         # Critical security/business rule.
+  534:         # Service orders must NEVER bypass this check.
+  535:         # Read-only access/debt policy check before creating a service order.
+> 536:         # BLOCK/ERROR raises ServiceAccessDenied inside ensure_service_order_allowed().
+  537:         # WARN/ALLOW returns a policy result and order creation continues.
+  538:         if ensure_service_order_allowed is None:
+  539:             raise RuntimeError(
+  540:                 "Critical component 'service_access_policy' is unavailable. "
+  541:                 "Service order creation cannot continue."
+  542:             )
+  543: 
+  544:         policy_result = ensure_service_order_allowed(
+--------------------------------------------------------------------------------
+  536:         # BLOCK/ERROR raises ServiceAccessDenied inside ensure_service_order_allowed().
+  537:         # WARN/ALLOW returns a policy result and order creation continues.
+  538:         if ensure_service_order_allowed is None:
+  539:             raise RuntimeError(
+  540:                 "Critical component 'service_access_policy' is unavailable. "
+  541:                 "Service order creation cannot continue."
+  542:             )
+  543: 
+> 544:         policy_result = ensure_service_order_allowed(
+  545:             conn=conn,
+  546:             apartment_number=apartment_number,
+  547:             service_item_code=service_item_code,
+  548:         )
+  549: 
+  550:         request_allowed = int(workflow.get("resident_request_enabled") or 0) == 1
+  551:         if actor_id is None and not request_allowed:
+  552:             raise PermissionError("Эта услуга пока недоступна для самостоятельной заявки жителя.")
+
+====================================================================================================
+6. DIAGNOSIS
+====================================================================================================
+WARN phone-access interest creation is not protected inside phone_barrier_access_service.py.
+     If Telegram calls create_phone_barrier_access_interest() directly, Business Policy can be bypassed before payment/order creation.
+WARN workspace does not call ensure_service_order_allowed directly.
+RECOMMENDATION: add policy check before create_service_interest() inside create_phone_barrier_access_interest(),
+                or add it in the exact Telegram handler branch immediately before that function is called.
+
+Expected minimal patch point for fastest launch:
+ - phone_barrier_access_service.create_phone_barrier_access_interest()
+ - after phone/points normalization and before create_service_interest()
+ - call ensure_service_order_allowed(conn=conn, apartment_number=apartment_number, service_item_code=service_item_code)
+ - let ServiceAccessDenied bubble to existing Telegram UX handler if present
+
+READ ONLY COMPLETED
