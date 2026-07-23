@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from handlers import cashier_operator as v1
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -195,15 +196,23 @@ def search_payments_human(query: str, limit: int = 30) -> list[sqlite3.Row]:
             clauses.append(expr); params.append(value)
 
         like = f"%{q}%"
-        for col in ['apartment_number','service_item_code','base_service_code','comment','created_by','operator_id','period_code']:
+        # Убраны из широкого текстового поиска: comment, created_by,
+        # operator_id, period_code — их нет среди заявленных типов поиска
+        # ("квартиру; авто; ФИО; дату; сумму; код услуги; номер чека"),
+        # и именно они были источником шума (например, operator_id вроде
+        # "210312208" совпадал почти с любой введённой цифрой).
+        for col in ['apartment_number', 'service_item_code', 'base_service_code']:
             if col in pcols:
                 add(f"CAST(p.{col} AS TEXT) LIKE ?", like)
+
+        exact_amount = None
         if 'amount' in pcols:
             try:
-                amount = float(q.replace(',', '.'))
-                add('ABS(COALESCE(p.amount,0)-?) < 0.001', amount)
+                exact_amount = float(q.replace(',', '.'))
+                add('ABS(COALESCE(p.amount,0)-?) < 0.001', exact_amount)
             except Exception:
                 pass
+
         # Date fragments: 10.07.2026, 2026-07-10, or 10.07
         date_candidates = [q]
         try:
@@ -243,16 +252,25 @@ def search_payments_human(query: str, limit: int = 30) -> list[sqlite3.Row]:
 
         if not clauses:
             return []
+
+        # Точное совпадение по сумме — первым в сортировке, чтобы не
+        # тонуть среди остальных совпадений при коротких запросах.
+        if exact_amount is not None:
+            order_sql = "ORDER BY (CASE WHEN ABS(COALESCE(p.amount,0)-?) < 0.001 THEN 0 ELSE 1 END), p.id DESC"
+            order_params = [exact_amount]
+        else:
+            order_sql = "ORDER BY p.id DESC"
+            order_params = []
+
         sql = f"""
             SELECT DISTINCT p.*, r.receipt_number
             FROM payments p
             {' '.join(extra_joins)}
             WHERE {' OR '.join(clauses)}
-            ORDER BY p.id DESC
+            {order_sql}
             LIMIT ?
         """
-        params.append(int(limit))
-        return con.execute(sql, params).fetchall()
+        return con.execute(sql, params + order_params + [int(limit)]).fetchall()
     finally:
         con.close()
 
@@ -457,6 +475,20 @@ def apply_cleanup_batch(
     con = connect()
     try:
         ensure_cleanup_log(con)
+
+        # НОВОЕ: запоминаем затронутые кассы ДО удаления —
+        # после удаления cashbox_operations узнать это будет уже нельзя.
+        cashbox_op_ids = plan.get("cashbox_operations") or []
+        affected_cashbox_codes = set()
+        if cashbox_op_ids:
+            marks = ",".join(["?"] * len(cashbox_op_ids))
+            for row in con.execute(
+                f"SELECT DISTINCT cashbox_code FROM cashbox_operations WHERE id IN ({marks})",
+                cashbox_op_ids,
+            ):
+                if row[0]:
+                    affected_cashbox_codes.add(row[0])
+
         delete_order = [
             "payment_allocations",
             "service_order_charge_links",
@@ -477,6 +509,12 @@ def apply_cleanup_batch(
                 continue
             marks = ",".join(["?"] * len(ids))
             con.execute(f"DELETE FROM {table} WHERE id IN ({marks})", ids)
+
+        # НОВОЕ: пересчёт и перезапись баланса каждой затронутой кассы —
+        # тот же механизм, что используется при обычной регистрации платежа.
+        cur = con.cursor()
+        for code in affected_cashbox_codes:
+            v1.recalc_and_store_cashbox_balance(cur, code)
 
         receipt_ids = plan.get("cashier_receipts") or []
         for index, payment_id in enumerate(sorted(set(payment_ids))):
@@ -539,6 +577,7 @@ async def handle_cashier_admin_text(
 ) -> bool:
     text = (update.message.text or "").strip()
     state = user_states.get(user_id, {})
+    if not isinstance(state, dict): state = {}
 
     if text == BTN_BILLING_SUBJECTS:
         await show_subjects(update, user_states, user_id)

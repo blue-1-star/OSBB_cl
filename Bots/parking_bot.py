@@ -27,6 +27,8 @@ from handlers.client_portal_v3 import (
 from handlers.cashier_operator_v2 import handle_cashier_operator_v2_text
 from tools.cashier_admin.cashier_admin_ui import handle_cashier_admin_text
 
+from handlers.tariff_editor import handle_tariff_editor_text
+
 from tools.cashier_v2_telegram.cashier_v2_ui import (
     BTN_CASHIER_V2,
     BTN_PAYMENTS,
@@ -197,6 +199,7 @@ ADMIN_MENU = [
     ["🔎 Субъекты расчётов"],
     ["🧾 Админ платежей"],
     ["💰 Касса"],
+    ["💵 Тарифы"],
 ]
 
 USERS_MENU = [
@@ -1461,6 +1464,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # O — основная касса охраны; K1..K6 — отдельные точки консьержей.
     # Обработчик вызывается до старого router состояний.
     # Cashier admin / billing subjects / commercial companies
+    
+    if await handle_tariff_editor_text(update, context, user_states, user_id):
+        return
+    
     if await handle_cashier_admin_text(
         update,
         context,
@@ -1468,6 +1475,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id,
         is_super_admin=(user_id in SUPER_ADMIN_IDS),
     ):
+        return
+
+    # Тарифы (доступ — только администратору)
+    if await handle_tariff_editor_text(update, context, user_states, user_id):
         return
 
     # OSBB cashier v2 Telegram adapter

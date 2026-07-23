@@ -1,1 +1,30 @@
-# TODO: перенести реальный список зависимостей из старого OSBB
+# requirements.txt — OSBB_cl
+#
+# Версии сверены с реальным pip freeze активированного venv (не системного
+# Python — та первая попытка случайно спросила не то окружение).
+
+# --- Бот ---
+python-telegram-bot==22.7
+Telethon==1.43.2
+
+# --- Excel / Word / PDF отчёты (billing_statement_excel.py, Word_table_to_Excel.py и т.п.) ---
+openpyxl==3.1.5
+python-docx==1.2.0
+reportlab==4.4.3
+
+# --- HTTP / окружение ---
+requests==2.34.2
+python-dotenv==1.1.1
+
+# --- Общие ---
+python-dateutil==2.9.0.post0
+pytz==2025.2
+tzdata==2025.2
+
+# --- Вероятно нужен (supervisor_dashboard.py похож на streamlit-приложение) ---
+# streamlit==1.59.1
+
+# --- Не включено намеренно — похоже на личные инструменты, не часть OSBB ---
+# GitPython==3.1.50   (git-автоматизация)
+# pytube==15.0.0 / yt-dlp==2025.9.5   (скачивание видео)
+# uvicorn / starlette   (веб-сервер — не встречал в коде OSBB, не подтверждено)
