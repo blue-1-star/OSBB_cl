@@ -231,6 +231,34 @@ def resolve_physical_unit(unit_ref: str) -> tuple[str, list[dict], str]:
         conn.close()
 
 
+def get_current_tariff_amount(cur: sqlite3.Cursor, service_code: str, on_date: str | None = None) -> float | None:
+    """
+    Резервный источник суммы, когда service_items.amount_default пуст (NULL).
+    Берёт действующий на дату тариф из service_tariffs — таблицы с реальной
+    историей действия тарифов, которую сейчас использует не касса, а что-то
+    другое в проекте. service_items остаётся приоритетным источником (если
+    туда когда-нибудь занесут значение — оно победит), это лишь подстраховка.
+    """
+    if not table_exists(cur, "service_tariffs"):
+        return None
+    on_date = on_date or today()
+    cur.execute(
+        """
+        SELECT amount
+        FROM service_tariffs
+        WHERE service_code = ?
+          AND COALESCE(is_active, 1) = 1
+          AND valid_from <= ?
+          AND (valid_to IS NULL OR valid_to >= ?)
+        ORDER BY valid_from DESC
+        LIMIT 1
+        """,
+        (service_code, on_date, on_date),
+    )
+    row = cur.fetchone()
+    return row["amount"] if row else None
+
+
 def service_options(period_code: str | None = None) -> list[dict]:
     """
     Сначала варианты из service_items для периода, затем общие service_catalog.
@@ -271,12 +299,15 @@ def service_options(period_code: str | None = None) -> list[dict]:
                 if not key[0] or key in seen:
                     continue
                 seen.add(key)
+                amount = item.get("amount_default")
+                if amount is None:
+                    amount = get_current_tariff_amount(cur, key[0])
                 result.append({
                     "service_code": key[0],
                     "service_item_code": key[1],
                     "service_name": text(item.get("service_item_name")) or key[0],
                     "service_type": text(item.get("service_type")) or "GENERAL",
-                    "amount_default": item.get("amount_default"),
+                    "amount_default": amount,
                 })
 
         cols = table_columns(cur, "service_catalog")
@@ -305,7 +336,7 @@ def service_options(period_code: str | None = None) -> list[dict]:
                     "service_item_code": None,
                     "service_name": text(item.get("service_name")) or key[0],
                     "service_type": text(item.get("service_type")) or "GENERAL",
-                    "amount_default": None,
+                    "amount_default": get_current_tariff_amount(cur, key[0]),
                 })
         return result
     finally:

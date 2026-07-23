@@ -43,7 +43,7 @@ class ProjectPaths:
         self.LOGS_DIR = self.DATA_DIR / "logs"
         self.BACKUPS_DIR = self.DB_DIR / "backups"
 
-        self.DB_FILE = self.DB_DIR / "osbb.db"  # бывший osbb_test.db — переименование файла, импортов не касается
+        self.DB_FILE = self.DB_DIR / "osbb_test.db"  # это и есть боевая база, несмотря на имя — переименовывать не будем, только путаница
 
         # ==================================================
         # СОВМЕСТИМОСТЬ СО СТАРЫМ ИНТЕРФЕЙСОМ config.py
