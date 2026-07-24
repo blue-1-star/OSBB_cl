@@ -274,6 +274,175 @@ def search_payments_human(query: str, limit: int = 30) -> list[sqlite3.Row]:
     finally:
         con.close()
 
+
+FILTER_TYPES = [
+    ("apartment", "🏠 Квартира"),
+    ("firm", "🏢 Фирма"),
+    ("vehicle", "🚗 Авто"),
+    ("fio", "👤 ФИО"),
+    ("amount", "💰 Сумма"),
+    ("date", "📅 Дата"),
+    ("receipt", "🧾 Номер чека"),
+    ("service", "🔧 Код услуги"),
+]
+FILTER_LABELS = dict(FILTER_TYPES)
+FILTER_PROMPTS = {
+    "apartment": "Введите номер квартиры (точное совпадение):",
+    "firm": "Введите название фирмы или его часть:",
+    "vehicle": "Введите цифры или полный номер авто:",
+    "fio": "Введите ФИО или его часть:",
+    "amount": "Введите сумму (точное совпадение):",
+    "date": "Введите дату или её часть (например 2026-07 или 23.07):",
+    "receipt": "Введите номер чека или его часть:",
+    "service": "Введите код услуги или его часть:",
+}
+
+
+def filter_choice_kb() -> ReplyKeyboardMarkup:
+    rows = [[label] for _, label in FILTER_TYPES]
+    rows.append([BTN_BACK])
+    return kb(rows)
+
+
+def firm_name_exists(value: str) -> bool:
+    """Проверяет, есть ли вообще такая фирма в commercial_contracts —
+    независимо от того, есть ли по ней платежи. Нужно для точного
+    сообщения оператору ("фирма есть, платежей нет" vs "такой нет")."""
+    value_lower = str(value or '').strip().lower()
+    if not value_lower:
+        return False
+    con = connect()
+    try:
+        if not table_exists(con, 'commercial_contracts'):
+            return False
+        names = con.execute("SELECT counterparty_name FROM commercial_contracts").fetchall()
+        return any(n['counterparty_name'] and value_lower in n['counterparty_name'].lower() for n in names)
+    finally:
+        con.close()
+
+
+def search_payments_by_filter(filter_key: str, value: str, limit: int = 30):
+    """Точный, однозначный поиск по ОДНОМУ явно выбранному признаку —
+    в отличие от search_payments_human (широкий эвристический поиск,
+    там короткие числа вроде "1" тонут среди десятков совпадений)."""
+    value = str(value or '').strip()
+    if not value:
+        return []
+    con = connect()
+    try:
+        pcols = columns(con, 'payments')
+        clauses, params, extra_joins = [], [], []
+
+        # Всегда подключаем номер чека — payment_card() его ожидает
+        # независимо от того, по какому признаку искали.
+        if table_exists(con, 'cashier_receipts'):
+            extra_joins.append('LEFT JOIN cashier_receipts r ON r.id=p.cashier_receipt_id')
+
+        if filter_key == 'apartment':
+            if 'apartment_number' in pcols:
+                clauses.append('CAST(p.apartment_number AS TEXT) = ?')
+                params.append(value)
+
+        elif filter_key == 'amount':
+            try:
+                amt = float(value.replace(',', '.'))
+            except ValueError:
+                return None
+            clauses.append('ABS(COALESCE(p.amount,0)-?) < 0.001')
+            params.append(amt)
+
+        elif filter_key == 'vehicle':
+            if table_exists(con, 'vehicles') and table_exists(con, 'apartments'):
+                extra_joins.append('LEFT JOIN apartments a ON CAST(a.apartment_number AS TEXT)=CAST(p.apartment_number AS TEXT)')
+                extra_joins.append('LEFT JOIN vehicles v ON v.apartment_id=a.id')
+                vcols = columns(con, 'vehicles')
+                frag = ''.join(ch for ch in value.upper() if ch.isalnum())
+                ors = []
+                for c in ['license_plate', 'license_plate_normalized']:
+                    if c in vcols:
+                        ors.append(f"UPPER(REPLACE(REPLACE(COALESCE(v.{c},''),' ',''),'-','')) LIKE ?")
+                        params.append(f'%{frag}%')
+                if ors:
+                    clauses.append('(' + ' OR '.join(ors) + ')')
+
+        elif filter_key == 'fio':
+            # SQLite LIKE регистронезависим только для латиницы — для
+            # кириллицы "иванов" не совпадёт с "Иванов". Сравниваем в
+            # Python (там .lower() работает корректно для любого языка).
+            if table_exists(con, 'resident_accounts'):
+                racols = columns(con, 'resident_accounts')
+                if 'apartment_number' in racols:
+                    name_cols = [c for c in ['full_name', 'first_name', 'last_name', 'username'] if c in racols]
+                    if name_cols:
+                        select_cols = ', '.join(name_cols)
+                        ra_rows = con.execute(f"SELECT apartment_number, {select_cols} FROM resident_accounts").fetchall()
+                        value_lower = value.lower()
+                        matching_numbers = [
+                            str(r['apartment_number']) for r in ra_rows
+                            if r['apartment_number'] is not None and any(
+                                (r[c] or '').lower().find(value_lower) != -1 for c in name_cols
+                            )
+                        ]
+                        if matching_numbers:
+                            placeholders = ','.join('?' * len(matching_numbers))
+                            clauses.append(f"CAST(p.apartment_number AS TEXT) IN ({placeholders})")
+                            params.extend(matching_numbers)
+
+        elif filter_key == 'firm':
+            # Коммерческие юниты: commercial_contracts.unit_id -> apartments.id,
+            # payments.apartment_number сравнивается с apartments.apartment_number.
+            # Та же причина сравнивать в Python, что и для ФИО — кириллица.
+            if table_exists(con, 'commercial_contracts') and table_exists(con, 'apartments'):
+                cc_rows = con.execute("""
+                    SELECT cc.counterparty_name, a.apartment_number
+                    FROM commercial_contracts cc
+                    JOIN apartments a ON a.id = cc.unit_id
+                """).fetchall()
+                value_lower = value.lower()
+                matching_numbers = [
+                    str(r['apartment_number']) for r in cc_rows
+                    if r['counterparty_name'] and value_lower in r['counterparty_name'].lower()
+                ]
+                if matching_numbers:
+                    placeholders = ','.join('?' * len(matching_numbers))
+                    clauses.append(f"CAST(p.apartment_number AS TEXT) IN ({placeholders})")
+                    params.extend(matching_numbers)
+
+        elif filter_key == 'date':
+            like = f"%{value}%"
+            for col in ['payment_date', 'created_at']:
+                if col in pcols:
+                    clauses.append(f"CAST(p.{col} AS TEXT) LIKE ?")
+                    params.append(like)
+
+        elif filter_key == 'receipt':
+            if table_exists(con, 'cashier_receipts') and 'receipt_number' in columns(con, 'cashier_receipts'):
+                clauses.append("COALESCE(r.receipt_number,'') LIKE ?")
+                params.append(f'%{value}%')
+
+        elif filter_key == 'service':
+            like = f"%{value}%"
+            for col in ['service_item_code', 'base_service_code']:
+                if col in pcols:
+                    clauses.append(f"CAST(p.{col} AS TEXT) LIKE ?")
+                    params.append(like)
+
+        if not clauses:
+            return []
+
+        sql = f"""
+            SELECT DISTINCT p.*, r.receipt_number
+            FROM payments p
+            {' '.join(extra_joins)}
+            WHERE {' OR '.join(clauses)}
+            ORDER BY p.id DESC
+            LIMIT ?
+        """
+        return con.execute(sql, params + [int(limit)]).fetchall()
+    finally:
+        con.close()
+
+
 def get_payment(payment_id: int) -> sqlite3.Row | None:
     con = connect()
     try:
@@ -595,6 +764,16 @@ async def handle_cashier_admin_text(
     if text in {BTN_BACK, BTN_CANCEL}:
         if state.get("screen") in {"commercial_query", "commercial_select", "commercial_card"}:
             await show_subjects(update, user_states, user_id)
+        elif state.get("screen") == "payment_find_waiting_value" or (
+            state.get("screen") == "payment_card" and state.get("return_to") == "payment_find_choose_type"
+        ):
+            # На шаг назад — к выбору типа фильтра, а не сразу в "Админ
+            # платежей": иначе при ошибке в типе, желании попробовать
+            # другой признак, или после просмотра карточки единственного
+            # найденного платежа — пришлось бы каждый раз заново идти
+            # через "Найти платёж".
+            user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_find_choose_type"}
+            await update.message.reply_text("Выберите, по чему искать:", reply_markup=filter_choice_kb())
         else:
             await show_payment_admin(update, user_states, user_id)
         return True
@@ -677,20 +856,40 @@ async def handle_cashier_admin_text(
         return True
 
     if text == BTN_FIND_PAYMENT:
-        user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_find"}
+        user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_find_choose_type"}
         await update.message.reply_text(
-            "Введите любой понятный признак:\n\n• квартиру;\n• цифры или полный номер авто;\n• ФИО;\n• дату;\n• сумму;\n• код услуги;\n• номер чека.", reply_markup=kb([[BTN_BACK, BTN_MAIN]])
+            "Выберите, по чему искать:", reply_markup=filter_choice_kb()
         )
         return True
 
-    if state.get("screen") == "payment_find":
-        rows = search_payments_human(text)
+    if state.get("screen") == "payment_find_choose_type":
+        filter_key = None
+        for key, label in FILTER_TYPES:
+            if text == label:
+                filter_key = key
+                break
+        if filter_key is None:
+            await update.message.reply_text("Выберите один из вариантов на клавиатуре.")
+            return True
+        user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_find_waiting_value", "filter_key": filter_key}
+        await update.message.reply_text(FILTER_PROMPTS[filter_key], reply_markup=kb([[BTN_BACK, BTN_MAIN]]))
+        return True
+
+    if state.get("screen") == "payment_find_waiting_value":
+        filter_key = state.get("filter_key")
+        rows = search_payments_by_filter(filter_key, text)
+        if rows is None:
+            await update.message.reply_text("Это не похоже на число. Введите сумму ещё раз (например 220 или 220.50):")
+            return True
         if not rows:
-            await update.message.reply_text("⚠ Платежи не найдены. Попробуйте другой признак.")
+            if filter_key == 'firm' and firm_name_exists(text):
+                await update.message.reply_text(f"Фирма найдена, но платежей по ней в базе нет. Попробуйте другое значение или проверьте, что платёж вообще был внесён.")
+            else:
+                await update.message.reply_text(f"⚠ По этому признаку ({FILTER_LABELS[filter_key]}) ничего не найдено. Попробуйте другое значение.")
             return True
         if len(rows) == 1:
             row = rows[0]; pid = int(row['id'])
-            user_states[user_id] = {"mode":"cashier_admin","screen":"payment_card","payment_id":pid}
+            user_states[user_id] = {"mode":"cashier_admin","screen":"payment_card","payment_id":pid,"return_to":"payment_find_choose_type"}
             await update.message.reply_text(payment_card(row), reply_markup=kb([[BTN_DELETE_SELECTED],[BTN_BACK,BTN_MAIN]]))
             return True
         user_states[user_id] = {"mode":"cashier_admin","screen":"payment_list","payment_rows":rows,"selected_payment_ids":set()}

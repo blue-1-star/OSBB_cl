@@ -26,6 +26,7 @@ from tools.cashier_v2_telegram.cashier_search import (
 )
 from tools.cashier_v2_telegram.cashier_card import payment_card, period_display, success_card
 from Bots.handlers.vehicle_card_editor import create_draft_vehicle, create_registry_vehicle
+from query_lib.queries import vehicles_by_apartment
 
 BTN_PAYMENTS = "💳 Платежи"
 BTN_CASHIER_V2 = "💰 Касса v2"
@@ -33,6 +34,7 @@ BTN_CASH = "💵 Наличные"
 BTN_SUMMARY = "📊 Сводка кассы"
 BTN_LAST_RECEIPTS = "📜 Последние чеки"
 BTN_SETTINGS = "⚙️ Настройки кассы"
+BTN_VEHICLES_BY_APARTMENT = "🚗 Авто квартиры"
 
 BTN_NIGHT = "🌙 Night"
 BTN_DAY = "☀️ Day"
@@ -108,6 +110,7 @@ def menu_kb() -> ReplyKeyboardMarkup:
         [BTN_COMMERCIAL_SUBJECT],
         [BTN_OTHER_PAYMENT],
         [BTN_LAST_RECEIPTS, BTN_SUMMARY],
+        [BTN_VEHICLES_BY_APARTMENT],
         [BTN_SETTINGS],
         [BTN_BACK, BTN_MAIN],
     ])
@@ -198,18 +201,101 @@ def summary_text() -> str:
         return f"⚠ Не удалось получить сводку: {exc}"
 
 
+def _solve_vehicle_puzzle(amount: float, vehicle_tariffs: list[tuple[str, float]]):
+    """Пытается объяснить сумму платежа тарифами известных авто квартиры —
+    включая оплату за несколько месяцев сразу (сумма = тариф x N).
+    Возвращает (solved, label). Если решений несколько (сумма совпадает
+    сразу с несколькими машинами по отдельности) — не называем конкретную,
+    честно показываем количество, а не гадаем."""
+    from itertools import combinations
+    n = len(vehicle_tariffs)
+    if n == 0 or not amount or amount <= 0:
+        return False, None
+
+    single_matches = []
+    for plate, tariff in vehicle_tariffs:
+        if tariff and amount % tariff == 0:
+            single_matches.append((plate, int(amount // tariff)))
+
+    if len(single_matches) == 1:
+        plate, months = single_matches[0]
+        return True, plate if months == 1 else f"{plate} x{months}"
+    if len(single_matches) > 1:
+        return True, f"{n}авто"
+
+    for size in range(2, n + 1):
+        for combo in combinations(vehicle_tariffs, size):
+            subset_sum = sum(t for _, t in combo)
+            if subset_sum > 0 and amount % subset_sum == 0:
+                return True, f"{n}авто"
+
+    return False, None
+
+
 def last_receipts_text(limit: int = 10) -> str:
     con = core.get_conn()
     try:
-        rows = con.execute("SELECT * FROM cashier_receipts ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        cur = con.cursor()
+        rows = con.execute("""
+            SELECT r.id, r.apartment_number, r.period_code, r.amount,
+                   direct_v.license_plate_normalized AS direct_plate
+            FROM cashier_receipts r
+            LEFT JOIN payments p ON p.cashier_receipt_id = r.id
+            LEFT JOIN vehicles direct_v ON direct_v.id = p.vehicle_id
+            ORDER BY r.id DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
         if not rows:
             return "📜 Последние чеки\n\nЗаписей нет."
-        lines = ["📜 Последние чеки", ""]
+
+        # Тарифы известных режимов — один раз, не на каждую строку.
+        tariff_by_mode = {}
+        for mode, code in (("Day", "PARKING_DAY"), ("Night", "PARKING_NIGHT")):
+            tariff_by_mode[mode] = core.get_current_tariff_amount(cur, code)
+
+        # Авто по квартирам, встретившимся в выборке — одним запросом.
+        # vehicles хранит apartment_id (ссылку), а не сам номер квартиры —
+        # номер берём через JOIN на apartments, как и везде в проекте.
+        apartments_in_view = sorted({r['apartment_number'] for r in rows if r['apartment_number']})
+        vehicles_by_apartment: dict[str, list[tuple[str, float]]] = {}
+        if apartments_in_view:
+            marks = ",".join("?" * len(apartments_in_view))
+            for vr in con.execute(f"""
+                SELECT a.apartment_number AS apartment_number,
+                       v.license_plate_normalized AS license_plate_normalized,
+                       v.parking_time AS parking_time
+                FROM vehicles v
+                JOIN apartments a ON a.id = v.apartment_id
+                WHERE CAST(a.apartment_number AS TEXT) IN ({marks})
+            """, apartments_in_view):
+                tariff = tariff_by_mode.get(vr['parking_time'])
+                if tariff:
+                    vehicles_by_apartment.setdefault(str(vr['apartment_number']), []).append(
+                        (vr['license_plate_normalized'], tariff)
+                    )
+
+        # Моноширинный блок (```...```) — иначе Telegram рисует обычный
+        # текст непропорциональным шрифтом, и колонки "плавают", даже
+        # если дополнены пробелами до одинакового числа символов.
+        lines = ["📜 Последние чеки", "```"]
         for r in rows:
+            apt = r['apartment_number'] if r['apartment_number'] else '—'
+            if r['direct_plate']:
+                plate_display = r['direct_plate']
+            else:
+                candidates = vehicles_by_apartment.get(str(apt), [])
+                solved, label = _solve_vehicle_puzzle(float(r['amount'] or 0), candidates)
+                if solved:
+                    plate_display = label
+                elif candidates:
+                    plate_display = f"{len(candidates)}авто?"  # известны авто, но сумма не бьётся
+                else:
+                    plate_display = '—'
             lines.append(
-                f"#{r['id']} {r['receipt_number']} | кв.{r['apartment_number']} | "
-                f"{period_display(r['period_code'])} | {float(r['amount'] or 0):.2f} UAH"
+                f"#{r['id']:<3} кв.{apt:<5.5} {plate_display:<13.13} "
+                f"{r['period_code']} {float(r['amount'] or 0):>8.2f}"
             )
+        lines.append("```")
         return '\n'.join(lines)
     finally:
         con.close()
@@ -364,7 +450,30 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
     if text == BTN_SUMMARY:
         await update.message.reply_text(summary_text(), reply_markup=menu_kb()); return True
     if text == BTN_LAST_RECEIPTS:
-        await update.message.reply_text(last_receipts_text(), reply_markup=menu_kb()); return True
+        await update.message.reply_text(last_receipts_text(), reply_markup=menu_kb(), parse_mode='Markdown'); return True
+    if text == BTN_VEHICLES_BY_APARTMENT:
+        user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'vehicles_by_apartment_waiting'}
+        await update.message.reply_text(
+            "🚗 Авто квартиры\n\nВведите номер квартиры:",
+            reply_markup=kb([[BTN_BACK, BTN_MAIN]]),
+        )
+        return True
+
+    if state.get('screen') == 'vehicles_by_apartment_waiting':
+        apartment_number = text.strip()
+        rows = vehicles_by_apartment(apartment_number)
+        if not rows:
+            body = f"🚗 Квартира {apartment_number}\n\nАвто не найдено."
+        else:
+            lines = [f"🚗 Квартира {apartment_number} — авто: {len(rows)}", ""]
+            for r in rows:
+                model = f" ({r['марка']})" if r['марка'] else ""
+                mode = f", режим: {r['режим']}" if r['режим'] else ""
+                lines.append(f"кв.{apartment_number} — {r['номер']}{model}{mode}")
+            body = "\n".join(lines)
+        await update.message.reply_text(body, reply_markup=menu_kb())
+        user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'menu'}
+        return True
     if text == BTN_SETTINGS:
         await update.message.reply_text("⚙️ Настройки кассы\n\nНастройка актуального сбора сохранена для следующего шага.", reply_markup=menu_kb()); return True
 
