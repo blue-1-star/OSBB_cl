@@ -26,7 +26,7 @@ from tools.cashier_v2_telegram.cashier_search import (
 )
 from tools.cashier_v2_telegram.cashier_card import payment_card, period_display, success_card
 from Bots.handlers.vehicle_card_editor import create_draft_vehicle, create_registry_vehicle
-from query_lib.queries import vehicles_by_apartment
+from query_lib.queries import vehicles_by_apartment, log_verification_task
 
 BTN_PAYMENTS = "💳 Платежи"
 BTN_CASHIER_V2 = "💰 Касса v2"
@@ -48,6 +48,34 @@ BTN_COMMERCIAL = "🏢 Коммерческие"
 
 BTN_ACCEPT = "✅ Принять как есть"
 BTN_EDIT = "✏️ Изменить"
+BTN_FLAG_FOR_REVIEW = "❗ На проверку"
+
+ISSUE_TYPE_OPTIONS = [
+    ("VEHICLE_UNLINKED", "🚗 Авто/квартира не та"),
+    ("MISSING_VEHICLE", "🆕 Авто нет в базе (по ведомости есть)"),
+    ("MISSING_PARKING_MODE", "🅿️ Режим парковки не задан"),
+    ("AMOUNT_MISMATCH", "💰 Сумма не сходится с тарифом"),
+    ("OTHER", "❓ Другое"),
+]
+ISSUE_TYPE_LABELS = dict(ISSUE_TYPE_OPTIONS)
+
+
+def issue_type_kb() -> ReplyKeyboardMarkup:
+    rows = [[label] for _, label in ISSUE_TYPE_OPTIONS]
+    rows.append([BTN_BACK_TO_CARD, BTN_CANCEL])
+    return kb(rows)
+
+
+def _extract_apartment_number(draft: dict) -> str | None:
+    apartment_raw = (draft.get('payer') or {}).get('apartment')
+    if isinstance(apartment_raw, dict):
+        return str(
+            apartment_raw.get('apartment_number')
+            or apartment_raw.get('number')
+            or apartment_raw.get('id')
+            or ''
+        ) or None
+    return str(apartment_raw) if apartment_raw is not None else None
 BTN_EDIT_PERIOD = "📅 Период"
 BTN_EDIT_AMOUNT = "💰 Сумму"
 BTN_EDIT_COMMENT = "📝 Комментарий"
@@ -137,8 +165,8 @@ def card_kb(draft: dict | None = None) -> ReplyKeyboardMarkup:
     except Exception:
         valid = False
     if valid:
-        return kb([[BTN_ACCEPT], [BTN_EDIT], [BTN_CANCEL]])
-    return kb([[BTN_EDIT_AMOUNT], [BTN_EDIT], [BTN_CANCEL]])
+        return kb([[BTN_ACCEPT], [BTN_EDIT], [BTN_FLAG_FOR_REVIEW], [BTN_CANCEL]])
+    return kb([[BTN_EDIT_AMOUNT], [BTN_EDIT], [BTN_FLAG_FOR_REVIEW], [BTN_CANCEL]])
 
 
 def edit_kb() -> ReplyKeyboardMarkup:
@@ -256,8 +284,12 @@ def last_receipts_text(limit: int = 10) -> str:
         # Авто по квартирам, встретившимся в выборке — одним запросом.
         # vehicles хранит apartment_id (ссылку), а не сам номер квартиры —
         # номер берём через JOIN на apartments, как и везде в проекте.
+        # Два списка: с известным тарифом (для решения пазла) и вообще
+        # все — номер машины сам по себе факт, известный независимо от
+        # того, задан ли у неё режим парковки (день/ночь).
         apartments_in_view = sorted({r['apartment_number'] for r in rows if r['apartment_number']})
-        vehicles_by_apartment: dict[str, list[tuple[str, float]]] = {}
+        priced_by_apartment: dict[str, list[tuple[str, float]]] = {}
+        all_plates_by_apartment: dict[str, list[str]] = {}
         if apartments_in_view:
             marks = ",".join("?" * len(apartments_in_view))
             for vr in con.execute(f"""
@@ -268,11 +300,12 @@ def last_receipts_text(limit: int = 10) -> str:
                 JOIN apartments a ON a.id = v.apartment_id
                 WHERE CAST(a.apartment_number AS TEXT) IN ({marks})
             """, apartments_in_view):
+                apt_key = str(vr['apartment_number'])
+                plate = vr['license_plate_normalized']
+                all_plates_by_apartment.setdefault(apt_key, []).append(plate)
                 tariff = tariff_by_mode.get(vr['parking_time'])
                 if tariff:
-                    vehicles_by_apartment.setdefault(str(vr['apartment_number']), []).append(
-                        (vr['license_plate_normalized'], tariff)
-                    )
+                    priced_by_apartment.setdefault(apt_key, []).append((plate, tariff))
 
         # Моноширинный блок (```...```) — иначе Telegram рисует обычный
         # текст непропорциональным шрифтом, и колонки "плавают", даже
@@ -283,14 +316,21 @@ def last_receipts_text(limit: int = 10) -> str:
             if r['direct_plate']:
                 plate_display = r['direct_plate']
             else:
-                candidates = vehicles_by_apartment.get(str(apt), [])
-                solved, label = _solve_vehicle_puzzle(float(r['amount'] or 0), candidates)
+                priced = priced_by_apartment.get(str(apt), [])
+                solved, label = _solve_vehicle_puzzle(float(r['amount'] or 0), priced)
                 if solved:
                     plate_display = label
-                elif candidates:
-                    plate_display = f"{len(candidates)}авто?"  # известны авто, но сумма не бьётся
                 else:
-                    plate_display = '—'
+                    # Пазл не сошёлся (или режим парковки неизвестен —
+                    # не с чем сравнивать), но номер машины — факт сам
+                    # по себе, его прятать за прочерком неправильно.
+                    all_plates = all_plates_by_apartment.get(str(apt), [])
+                    if len(all_plates) == 1:
+                        plate_display = all_plates[0] + '?'
+                    elif len(all_plates) > 1:
+                        plate_display = f"{len(all_plates)}авто?"
+                    else:
+                        plate_display = '—'
             lines.append(
                 f"#{r['id']:<3} кв.{apt:<5.5} {plate_display:<13.13} "
                 f"{r['period_code']} {float(r['amount'] or 0):>8.2f}"
@@ -850,7 +890,68 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
         if text == BTN_EDIT:
             user_states[user_id] = {'mode':'cashier_v2','screen':'edit_menu','draft':draft}
             await update.message.reply_text("Что изменить?", reply_markup=edit_kb()); return True
+        if text == BTN_FLAG_FOR_REVIEW:
+            user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'flag_issue_type', 'draft': draft}
+            await update.message.reply_text("Что именно требует проверки?", reply_markup=issue_type_kb())
+            return True
         await update.message.reply_text("Подтвердите или измените карточку.", reply_markup=card_kb(draft)); return True
+
+    if state.get('screen') == 'flag_issue_type':
+        draft = state['draft']
+        if text == BTN_BACK_TO_CARD:
+            await show_card(update, user_states, user_id, draft); return True
+        if text == BTN_CANCEL:
+            await show_card(update, user_states, user_id, draft); return True
+        issue_type = None
+        for code, label in ISSUE_TYPE_OPTIONS:
+            if text == label:
+                issue_type = code
+                break
+        if issue_type is None:
+            await update.message.reply_text("Выберите один из вариантов на клавиатуре.", reply_markup=issue_type_kb())
+            return True
+        user_states[user_id] = {
+            'mode': 'cashier_v2', 'screen': 'flag_issue_note',
+            'draft': draft, 'issue_type': issue_type,
+        }
+        await update.message.reply_text(
+            "Уточните одной фразой (например: «ожидали AA1234BB, а по факту другой номер»), "
+            "или отправьте «-», чтобы пропустить:",
+            reply_markup=kb([[BTN_BACK_TO_CARD, BTN_CANCEL]]),
+        )
+        return True
+
+    if state.get('screen') == 'flag_issue_note':
+        draft = state['draft']
+        issue_type = state['issue_type']
+        if text == BTN_BACK_TO_CARD:
+            await show_card(update, user_states, user_id, draft); return True
+        if text == BTN_CANCEL:
+            await show_card(update, user_states, user_id, draft); return True
+        note = "" if text.strip() == "-" else text.strip()
+
+        apartment_number = _extract_apartment_number(draft)
+        try:
+            amount_value = float(draft.get('amount') or 0)
+        except Exception:
+            amount_value = 0.0
+        description = (
+            f"[{ISSUE_TYPE_LABELS[issue_type]}] сумма {amount_value:.2f}, "
+            f"период {draft.get('period_code')}"
+            + (f" — {note}" if note else "")
+        )
+        task_id = log_verification_task(
+            apartment_number=apartment_number,
+            issue_type=issue_type,
+            description=description,
+            raised_by=str(user_id),
+            assigned_role=None,  # виден админу; при необходимости уточним роль позже
+        )
+        await update.message.reply_text(
+            f"❗ Записано в журнал согласования (#{task_id}). Ввод платежа продолжается.",
+        )
+        await show_card(update, user_states, user_id, draft)
+        return True
 
     if state.get('screen') == 'edit_menu':
         draft = state['draft']

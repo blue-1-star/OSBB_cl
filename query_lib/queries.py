@@ -337,7 +337,87 @@ def set_tariff(
         (service_code, amount, currency, valid_from, comment or "", now),
     )
 
+
     conn.commit()
     new_id = cur.lastrowid
     conn.close()
     return new_id
+
+def now_db() -> str:
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def ensure_verification_journal(con) -> None:
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS verification_journal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            apartment_number TEXT,
+            issue_type TEXT NOT NULL,
+            description TEXT,
+            related_payment_id INTEGER,
+            related_receipt_id INTEGER,
+            raised_by TEXT,
+            assigned_role TEXT,
+            status TEXT NOT NULL DEFAULT 'OPEN',
+            resolved_at TEXT,
+            resolved_by TEXT,
+            resolution_note TEXT
+        )
+    """)
+    con.commit()
+
+
+def log_verification_task(
+    apartment_number=None, issue_type="OTHER", description="",
+    related_payment_id=None, related_receipt_id=None,
+    raised_by=None, assigned_role=None,
+):
+    conn = get_conn()
+    ensure_verification_journal(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO verification_journal (
+            created_at, apartment_number, issue_type, description,
+            related_payment_id, related_receipt_id, raised_by,
+            assigned_role, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+    """, (now_db(), apartment_number, issue_type, description,
+          related_payment_id, related_receipt_id, raised_by, assigned_role))
+    conn.commit()
+    task_id = cur.lastrowid
+    conn.close()
+    return task_id
+
+
+def list_open_verification_tasks(assigned_role=None, limit=30):
+    conn = get_conn()
+    ensure_verification_journal(conn)
+    cur = conn.cursor()
+    if assigned_role:
+        cur.execute("""
+            SELECT * FROM verification_journal
+            WHERE status = 'OPEN' AND (assigned_role = ? OR assigned_role IS NULL)
+            ORDER BY created_at DESC LIMIT ?
+        """, (assigned_role, limit))
+    else:
+        cur.execute("SELECT * FROM verification_journal WHERE status='OPEN' ORDER BY created_at DESC LIMIT ?", (limit,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def resolve_verification_task(task_id, resolved_by, resolution_note=""):
+    conn = get_conn()
+    ensure_verification_journal(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE verification_journal
+        SET status='RESOLVED', resolved_at=?, resolved_by=?, resolution_note=?
+        WHERE id=? AND status='OPEN'
+    """, (now_db(), resolved_by, resolution_note, task_id))
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0

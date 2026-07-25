@@ -42,19 +42,36 @@ class ProjectPaths:
         self.EXPORTS_DIR = self.DATA_DIR / "exports"
         self.LOGS_DIR = self.DATA_DIR / "logs"
         self.BACKUPS_DIR = self.DB_DIR / "backups"
+        self.TELEGRAM_RAW_DIR = self.RAW_DIR / "telegram"
 
         self.DB_FILE = self.DB_DIR / "osbb_test.db"  # это и есть боевая база, несмотря на имя — переименовывать не будем, только путаница
 
         # ==================================================
         # СОВМЕСТИМОСТЬ СО СТАРЫМ ИНТЕРФЕЙСОМ config.py
         # ==================================================
-        # Старый код (ещё не адаптированный) ожидает paths.OSBB_TEST_DB_FILE /
-        # paths.OSBB_DB_FILE и глобальную USE_TEST_DB. В OSBB_cl база одна —
-        # но вместо правки каждого файла-потребителя (десятки мест) даём
-        # мягкие алиасы на ту же самую БД. Тот же принцип, что и db_adapter.py:
-        # не переписывать вызывающих, а подставить совместимую прослойку.
-        self.OSBB_TEST_DB_FILE = self.DB_FILE
+        # Старый код по всему дереву (не только db_access.py/access_control.py)
+        # может обращаться к paths.OSBB_* напрямую — это был полный список
+        # атрибутов в исходном config.py проекта. Правим все разом одним
+        # блоком, а не по одному при каждом новом крэше на очередном файле.
+        # Тот же принцип, что и db_adapter.py: не переписывать вызывающих,
+        # а подставить совместимую прослойку.
+        self.OSBB_ROOT = self.PROJECT_ROOT
+        self.OSBB_DATA_DIR = self.DATA_DIR
+        self.OSBB_RAW_DIR = self.RAW_DIR
+        self.OSBB_TYPED_DIR = self.TYPED_DIR
+        self.OSBB_DB_DIR = self.DB_DIR
+        self.OSBB_EXPORTS_DIR = self.EXPORTS_DIR
+        self.OSBB_LOGS_DIR = self.LOGS_DIR
+        self.OSBB_BACKUPS_DIR = self.BACKUPS_DIR
         self.OSBB_DB_FILE = self.DB_FILE
+        self.OSBB_TEST_DB_FILE = self.DB_FILE
+        self.OSBB_HOUSE_REGISTRY_FILE = self.DATA_DIR / "24А ПОЛНЫЙ СПИСОК Сервис Житлобуд1 - Copy.xlsx"
+        self.OSBB_PAPER_PARKING_FILE = self.TYPED_DIR / "OSBB_Base_Cleaned_06_06.xlsx"
+        self.OSBB_TBOT_PARKING_FILE = self.TYPED_DIR / "parking_tbot2.xlsx"
+        self.OSBB_AUDIT_REPORT_FILE = self.TYPED_DIR / "DATABASE_AUDIT_REPORT_06_06.txt"
+        self.OSBB_QUARANTINE_DB_FILE = self.DB_DIR / "osbb_quarantine.db"
+        self.OSBB_TELEGRAM_DB_FILE = self.DB_DIR / "osbb_telegram.db"
+        self.OSBB_TELEGRAM_RAW_DIR = self.TELEGRAM_RAW_DIR
 
         # ==================================================
         # ДОКУМЕНТАЦИЯ
@@ -70,6 +87,8 @@ class ProjectPaths:
             self.DB_DIR,
             self.EXPORTS_DIR,
             self.LOGS_DIR,
+            self.BACKUPS_DIR,
+            self.TELEGRAM_RAW_DIR,
             self.DOCS_DIR,
         ]
         for d in dirs:
