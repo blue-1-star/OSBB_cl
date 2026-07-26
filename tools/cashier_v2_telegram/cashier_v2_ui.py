@@ -38,6 +38,8 @@ BTN_VEHICLES_BY_APARTMENT = "🚗 Авто квартиры"
 
 BTN_NIGHT = "🌙 Night"
 BTN_DAY = "☀️ Day"
+BTN_PARKING_UNSPECIFIED = "🅿️ Режим не определён"
+BTN_UNKNOWN_MODE = "❓ Не знаю (не гадать)"
 BTN_MISC = "📦 Другое"
 BTN_ACTUAL = "📌 Актуальный сбор"
 BTN_REMOTES = "🔑 Пульты"
@@ -145,7 +147,7 @@ def menu_kb() -> ReplyKeyboardMarkup:
 
 
 def type_kb() -> ReplyKeyboardMarkup:
-    return kb([[BTN_NIGHT, BTN_DAY], [BTN_MISC], [BTN_BACK, BTN_MAIN]])
+    return kb([[BTN_NIGHT, BTN_DAY], [BTN_PARKING_UNSPECIFIED], [BTN_MISC], [BTN_BACK, BTN_MAIN]])
 
 
 def misc_kb() -> ReplyKeyboardMarkup:
@@ -607,14 +609,17 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             'apartment_number': apartment_number,
             'subject_mode':'resident',
         }
-        await update.message.reply_text("Выберите режим парковки:", reply_markup=kb([[BTN_NIGHT, BTN_DAY],[BTN_BACK,BTN_MAIN]]))
+        await update.message.reply_text("Выберите режим парковки:", reply_markup=kb([[BTN_NIGHT, BTN_DAY],[BTN_UNKNOWN_MODE],[BTN_BACK,BTN_MAIN]]))
         return True
 
     if state.get('screen') == 'cashier_vehicle_parking':
-        if text not in {BTN_NIGHT, BTN_DAY}:
-            await update.message.reply_text("Выберите Night или Day.", reply_markup=kb([[BTN_NIGHT,BTN_DAY],[BTN_BACK,BTN_MAIN]]))
+        if text not in {BTN_NIGHT, BTN_DAY, BTN_UNKNOWN_MODE}:
+            await update.message.reply_text("Выберите Night, Day или «Не знаю».", reply_markup=kb([[BTN_NIGHT,BTN_DAY],[BTN_UNKNOWN_MODE],[BTN_BACK,BTN_MAIN]]))
             return True
-        parking_time = 'Night' if text == BTN_NIGHT else 'Day'
+        if text == BTN_UNKNOWN_MODE:
+            parking_time = None  # честно неизвестно — не гадаем, не пишем Day/Night наугад
+        else:
+            parking_time = 'Night' if text == BTN_NIGHT else 'Day'
         plate = str(state.get('vehicle_fragment') or '').strip()
         apartment_number = state.get('apartment_number')
         if apartment_number:
@@ -654,12 +659,25 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             'apartment_number': apartment_number or '',
             'label': f"🚗 {vehicle['license_plate']} / кв. {apartment_number or '—'} / {parking_time}",
         }
-        service = choose_service(parking_time.lower(), default_period())
-        if not service:
-            await update.message.reply_text(f"⚠ Для режима {parking_time} не найдена активная услуга.", reply_markup=menu_kb())
+        if parking_time:
+            service = choose_service(parking_time.lower(), default_period())
+            if not service:
+                await update.message.reply_text(f"⚠ Для режима {parking_time} не найдена активная услуга.", reply_markup=menu_kb())
+                return True
+            draft = draft_from_payer(payer, parking_time.lower(), service)
+            await show_card(update, user_states, user_id, draft)
             return True
-        draft = draft_from_payer(payer, parking_time.lower(), service)
-        await show_card(update, user_states, user_id, draft)
+
+        # Режим парковки неизвестен — не гадаем ни услугу, ни сумму сами.
+        # Авто в реестре уже создано с parking_time=NULL (честно). Для
+        # самого платежа переиспользуем уже готовый, проверенный путь
+        # ручного выбора услуги (тот же, что и для существующих авто
+        # без известного режима — Night/Day/«Другое»).
+        user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'cash_type_after_payer', 'payer': payer}
+        await update.message.reply_text(
+            "Автомобиль создан. Режим парковки не указан — выберите услугу вручную:",
+            reply_markup=type_kb(),
+        )
         return True
 
     if state.get('screen') == 'payer_query_first':
@@ -767,10 +785,19 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             service = choose_service('day', default_period())
             if service:
                 await show_card(update, user_states, user_id, draft_from_payer(payer, 'day', service)); return True
+        if text == BTN_PARKING_UNSPECIFIED:
+            service = choose_service('unspecified', default_period())
+            if service:
+                await show_card(update, user_states, user_id, draft_from_payer(payer, 'unspecified', service)); return True
+            await update.message.reply_text(
+                "⚠ Услуга «режим не определён» не найдена в справочнике (service_catalog). "
+                "Нужно добавить PARKING_UNSPECIFIED.",
+                reply_markup=type_kb(),
+            ); return True
         if text == BTN_MISC:
             user_states[user_id] = {'mode':'cashier_v2','screen':'misc','payer':payer}
             await update.message.reply_text("Выберите группу услуги:", reply_markup=misc_kb()); return True
-        await update.message.reply_text("Выберите Night, Day или Другое.", reply_markup=type_kb()); return True
+        await update.message.reply_text("Выберите Night, Day, «Режим не определён» или Другое.", reply_markup=type_kb()); return True
 
     if state.get('screen') == 'cash_type':
         if text == BTN_NIGHT:
@@ -783,10 +810,19 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             if not service:
                 await update.message.reply_text("⚠ Услуга Day не найдена в справочнике.", reply_markup=type_kb()); return True
             await ask_payer(update, user_states, user_id, 'day', service); return True
+        if text == BTN_PARKING_UNSPECIFIED:
+            service = choose_service('unspecified', default_period())
+            if not service:
+                await update.message.reply_text(
+                    "⚠ Услуга «режим не определён» не найдена в справочнике (service_catalog). "
+                    "Нужно добавить PARKING_UNSPECIFIED.",
+                    reply_markup=type_kb(),
+                ); return True
+            await ask_payer(update, user_states, user_id, 'unspecified', service); return True
         if text == BTN_MISC:
             user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'misc', 'payer': state.get('payer')}
             await update.message.reply_text("📦 Другое\n\nВыберите группу:", reply_markup=misc_kb()); return True
-        await update.message.reply_text("Выберите Night, Day или Другое.", reply_markup=type_kb()); return True
+        await update.message.reply_text("Выберите Night, Day, «Режим не определён» или Другое.", reply_markup=type_kb()); return True
 
     if state.get('screen') == 'misc':
         mapping = {BTN_ACTUAL:'actual', BTN_REMOTES:'remote', BTN_PHONE:'phone', BTN_COMMON:'common', BTN_PARKING:'parking', BTN_COMMERCIAL:'commercial'}

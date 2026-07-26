@@ -421,3 +421,132 @@ def resolve_verification_task(task_id, resolved_by, resolution_note=""):
     conn.commit()
     conn.close()
     return changed > 0
+
+def add_service_catalog_entry(
+    service_code: str,
+    service_group: str,
+    service_name: str,
+    unit: str,
+    service_type: str = None,
+    category: str = None,
+    is_monthly: int = 1,
+    is_fundraising: int = 0,
+    is_commercial: int = 0,
+    is_access_control: int = 0,
+    is_cash_collectable: int = 1,
+    access_policy_enabled: int = 0,
+    access_policy_scope: str = 'NONE',
+    access_policy_mode: str = 'NONE',
+    manual_review_required: int = 0,
+):
+    """
+    Идемпотентно добавляет запись в service_catalog. Если service_code
+    уже есть — ничего не меняет, просто возвращает существующий id
+    (created=False). Значения по умолчанию соответствуют обычной
+    кассовой ежемесячной услуге (как PARKING_DAY/PARKING_NIGHT) —
+    поменяйте is_monthly/is_cash_collectable и т.п., если услуга
+    другого рода.
+
+    Возвращает (id, created) — created=True, если строка реально
+    только что вставлена, False — если уже существовала.
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM service_catalog WHERE service_code = ?", (service_code,))
+    existing = cur.fetchone()
+    if existing:
+        conn.close()
+        return existing["id"], False
+
+    cur.execute(
+        """
+        INSERT INTO service_catalog (
+            service_code, service_group, service_name, unit,
+            is_active, service_type, category,
+            is_monthly, is_fundraising, is_commercial, is_access_control,
+            is_cash_collectable, access_policy_enabled,
+            access_policy_scope, access_policy_mode,
+            manual_review_required
+        ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            service_code, service_group, service_name, unit,
+            service_type, category,
+            is_monthly, is_fundraising, is_commercial, is_access_control,
+            is_cash_collectable, access_policy_enabled,
+            access_policy_scope, access_policy_mode,
+            manual_review_required,
+        ),
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id, True
+
+def _fold_uk_ru(text: str) -> str:
+    """
+    Сворачивает вариативные украинские/русские буквы к одной форме —
+    для сравнения ФИО, независимо от того, каким языком записано.
+    Стріха / Стриха и т.п. считаются одним и тем же. Только для
+    ПОИСКА — не для хранения/отображения, оригинал в базе не трогается.
+    """
+    if not text:
+        return ""
+    text = text.lower()
+    replacements = {
+        "і": "и", "ї": "и", "є": "е", "ґ": "г", "ы": "и", "э": "е",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    return text
+
+
+def find_by_fio(fragment: str, limit: int = 30):
+    """
+    Поиск жителя по фрагменту ФИО в РЕАЛЬНЫХ данных дома — таблица
+    persons (заполнена из бумажной анкеты/паркинг-бота через
+    import_house_registry.py, 343 строки на весь дом). Учитывает
+    украинское/русское написание (Стріха/Стриха — одно и то же).
+
+    (Не resident_accounts.telegram_first_name/last_name — там только
+    самоописание тех, кто писал боту, почти пусто.)
+
+    Возвращает список словарей:
+        {'фио', 'квартира', 'роль', 'телефон', 'авто': [{'номер','марка','режим'}, ...]}
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        rows = cur.execute("""
+            SELECT p.id, p.full_name, p.phone_raw, p.ownership_type, p.person_role,
+                   a.apartment_number, a.id AS apartment_id
+            FROM persons p
+            JOIN apartments a ON a.id = p.apartment_id
+        """).fetchall()
+
+        needle = _fold_uk_ru(fragment)
+        if not needle:
+            return []
+
+        matched = [dict(r) for r in rows if r["full_name"] and needle in _fold_uk_ru(r["full_name"])]
+
+        result = []
+        for m in matched[:limit]:
+            vehicles = cur.execute("""
+                SELECT
+                    license_plate_normalized AS номер,
+                    car_model AS марка,
+                    parking_time AS режим
+                FROM vehicles
+                WHERE apartment_id = ?
+            """, (m["apartment_id"],)).fetchall()
+            result.append({
+                "фио": m["full_name"],
+                "квартира": m["apartment_number"],
+                "роль": m["person_role"],
+                "телефон": m["phone_raw"],
+                "авто": [dict(v) for v in vehicles],
+            })
+        return result
+    finally:
+        conn.close()

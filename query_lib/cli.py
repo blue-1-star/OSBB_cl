@@ -7,8 +7,15 @@
   python -m query_lib.cli cars --min 2
   python -m query_lib.cli missing-mode
   python -m query_lib.cli debtors
+  python -m query_lib.cli non-standard
+  python -m query_lib.cli apartment 111
   python -m query_lib.cli last
+  python -m query_lib.cli last 10
   python -m query_lib.cli tariff-set PARKING_DAY
+  python -m query_lib.cli verify-log OTHER 31 "текст находки"
+  python -m query_lib.cli verify-list
+  python -m query_lib.cli service-add КОД ГРУППА "Название" единица --category PARKING --needs-review
+  python -m query_lib.cli fio Стриха
 """
 
 import sys
@@ -26,6 +33,10 @@ from query_lib.queries import (
     vehicles_by_apartment,
     last_payments,
     set_tariff,
+    log_verification_task,
+    list_open_verification_tasks,
+    add_service_catalog_entry,
+    find_by_fio,
 )
 
 
@@ -109,7 +120,7 @@ def main():
 
     elif cmd == "apartment":
         if len(args) < 2:
-            print("Укажите номер квартиры: python -m OSBB_util.query_lib.cli apartment 111")
+            print("Укажите номер квартиры: python -m query_lib.cli apartment 111")
             return
         apt = args[1]
         rows = vehicles_by_apartment(apt)
@@ -153,6 +164,75 @@ def main():
             print(f"Добавлен тариф id={new_id}: {service_code} = {amount if amount is not None else '(взято из предыдущего периода)'}, действует с {valid_from or '(сегодня)'}")
         except ValueError as e:
             print(f"Ошибка: {e}")
+
+    elif cmd == "verify-log":
+        if len(args) < 3:
+            print("Использование: verify-log ISSUE_TYPE НОМЕР_КВАРТИРЫ текст...")
+            print("issue_type: VEHICLE_UNLINKED | MISSING_VEHICLE | CHECK_PLATE | MISSING_PARKING_MODE | AMOUNT_MISMATCH | OTHER")
+            return
+        issue_type = args[1]
+        apartment_number = args[2]
+        description = " ".join(args[3:]) if len(args) > 3 else ""
+        task_id = log_verification_task(
+            apartment_number=apartment_number,
+            issue_type=issue_type,
+            description=description,
+            raised_by="cli",
+        )
+        print(f"Записано в журнал согласования: id={task_id}")
+
+    elif cmd == "verify-list":
+        rows = list_open_verification_tasks()
+        print_table(rows)
+
+    elif cmd == "service-add":
+        if len(args) < 5:
+            print("Использование: service-add КОД ГРУППА \"НАЗВАНИЕ\" ЕДИНИЦА [--category КАТЕГОРИЯ] [--type ТИП] [--needs-review]")
+            print("Пример: service-add PARKING_UNSPECIFIED MONTHLY \"Парковка (режим не определён)\" service --category PARKING --type MONTHLY --needs-review")
+            return
+        service_code, service_group, service_name, unit = args[1], args[2], args[3], args[4]
+        rest = args[5:]
+        category = None
+        service_type = None
+        needs_review = 0
+        i = 0
+        while i < len(rest):
+            if rest[i] == "--category" and i + 1 < len(rest):
+                category = rest[i + 1]; i += 2
+            elif rest[i] == "--type" and i + 1 < len(rest):
+                service_type = rest[i + 1]; i += 2
+            elif rest[i] == "--needs-review":
+                needs_review = 1; i += 1
+            else:
+                i += 1
+        new_id, created = add_service_catalog_entry(
+            service_code, service_group, service_name, unit,
+            service_type=service_type, category=category,
+            manual_review_required=needs_review,
+        )
+        if created:
+            print(f"Создана услуга: id={new_id}, code={service_code}")
+        else:
+            print(f"Услуга {service_code} уже существует (id={new_id}), ничего не изменено.")
+
+    elif cmd == "fio":
+        if len(args) < 2:
+            print("Использование: fio ФРАГМЕНТ_ИМЕНИ")
+            print("Учитывает украинское и русское написание (Стріха / Стриха — одно и то же).")
+            return
+        fragment = " ".join(args[1:])
+        rows = find_by_fio(fragment)
+        if not rows:
+            print("Ничего не найдено.")
+            return
+        for r in rows:
+            print(f"{r['фио']} | кв.{r['квартира']}")
+            if not r['авто']:
+                print("    авто нет")
+            for v in r['авто']:
+                model = f" ({v['марка']})" if v['марка'] else ""
+                mode = f", режим: {v['режим']}" if v['режим'] else ""
+                print(f"    {v['номер']}{model}{mode}")
 
     else:
         print(f"Неизвестная команда: {cmd}")
