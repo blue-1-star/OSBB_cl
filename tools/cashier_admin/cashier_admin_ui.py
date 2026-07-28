@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 from handlers import cashier_operator as v1
+from query_lib.queries import log_verification_task
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -23,6 +24,38 @@ BTN_PAYMENT_ADMIN = "🧾 Админ платежей"
 BTN_LAST_PAYMENTS = "📜 Последние платежи"
 BTN_FIND_PAYMENT = "🔎 Найти платёж"
 BTN_DELETE_SELECTED = "🩺 Удалить со шлейфом"
+BTN_FLAG_PAYMENT = "❗ Пометить проблему"
+BTN_CANCEL_FLAG = "❌ Отмена"
+
+ISSUE_TYPE_OPTIONS = [
+    ("VEHICLE_UNLINKED", "🚗 Авто/квартира не та"),
+    ("MISSING_VEHICLE", "🆕 Авто нет в базе (по ведомости есть)"),
+    ("CHECK_PLATE", "🔢 Номер неполный/некорректный"),
+    ("MISSING_PARKING_MODE", "🅿️ Режим парковки неопределён/расходится"),
+    ("AMOUNT_MISMATCH", "💰 Сумма не сходится с тарифом"),
+    ("OTHER", "❓ Другое"),
+]
+ISSUE_TYPE_LABELS = dict(ISSUE_TYPE_OPTIONS)
+
+CONCERNS_FIELD_OPTIONS = [
+    ("vehicle_plate", "🔢 Номер авто"),
+    ("parking_mode", "🅿️ Режим парковки"),
+    ("apartment_number", "🏠 Квартира"),
+    ("full_name", "👤 ФИО"),
+    ("phone", "📞 Телефон"),
+    ("amount", "💰 Сумма"),
+    ("other", "❓ Другое"),
+]
+CONCERNS_FIELD_LABELS = dict(CONCERNS_FIELD_OPTIONS)
+
+ISSUE_TYPE_NOTE_PROMPTS = {
+    "VEHICLE_UNLINKED": "Какой номер/квартира правильные, если знаете? Или «-», чтобы пропустить:",
+    "MISSING_VEHICLE": "Если знаете номер авто из ведомости — укажите его сейчас. Или «-», чтобы пропустить:",
+    "CHECK_PLATE": "Как должен выглядеть номер целиком, если помните? Или «-», чтобы пропустить:",
+    "MISSING_PARKING_MODE": "Знаете фактический режим (день/ночь)? Укажите, если да. Или «-», чтобы пропустить:",
+    "AMOUNT_MISMATCH": "Какая сумма ожидалась по тарифу, если знаете? Или «-», чтобы пропустить:",
+    "OTHER": "Уточните одной фразой, или отправьте «-», чтобы пропустить:",
+}
 BTN_DELETE_BATCH = "🩺 Удалить выбранные"
 BTN_OPEN_SELECTED = "👁 Открыть выбранный"
 BTN_REASON_OPERATOR = "Ошибка оператора"
@@ -366,27 +399,32 @@ def search_payments_by_filter(filter_key: str, value: str, limit: int = 30):
                     clauses.append('(' + ' OR '.join(ors) + ')')
 
         elif filter_key == 'fio':
-            # SQLite LIKE регистронезависим только для латиницы — для
-            # кириллицы "иванов" не совпадёт с "Иванов". Сравниваем в
-            # Python (там .lower() работает корректно для любого языка).
-            if table_exists(con, 'resident_accounts'):
-                racols = columns(con, 'resident_accounts')
-                if 'apartment_number' in racols:
-                    name_cols = [c for c in ['full_name', 'first_name', 'last_name', 'username'] if c in racols]
-                    if name_cols:
-                        select_cols = ', '.join(name_cols)
-                        ra_rows = con.execute(f"SELECT apartment_number, {select_cols} FROM resident_accounts").fetchall()
-                        value_lower = value.lower()
-                        matching_numbers = [
-                            str(r['apartment_number']) for r in ra_rows
-                            if r['apartment_number'] is not None and any(
-                                (r[c] or '').lower().find(value_lower) != -1 for c in name_cols
-                            )
-                        ]
-                        if matching_numbers:
-                            placeholders = ','.join('?' * len(matching_numbers))
-                            clauses.append(f"CAST(p.apartment_number AS TEXT) IN ({placeholders})")
-                            params.extend(matching_numbers)
+            # Реальные ФИО жильцов лежат в persons (заполнена из бумажной
+            # анкеты через import_house_registry.py), НЕ в resident_accounts
+            # (там почти пусто — только самоописание тех, кто писал боту).
+            # Плюс украинское/русское написание считаем одним и тем же
+            # (Стріха/Стриха), не только регистр.
+            if table_exists(con, 'persons') and table_exists(con, 'apartments'):
+                def _fold(s):
+                    s = (s or '').lower()
+                    for src, dst in {'і': 'и', 'ї': 'и', 'є': 'е', 'ґ': 'г', 'ы': 'и', 'э': 'е'}.items():
+                        s = s.replace(src, dst)
+                    return s
+
+                p_rows = con.execute("""
+                    SELECT a.apartment_number, p.full_name
+                    FROM persons p
+                    JOIN apartments a ON a.id = p.apartment_id
+                """).fetchall()
+                needle = _fold(value)
+                matching_numbers = [
+                    str(r['apartment_number']) for r in p_rows
+                    if r['apartment_number'] is not None and needle in _fold(r['full_name'])
+                ]
+                if matching_numbers:
+                    placeholders = ','.join('?' * len(matching_numbers))
+                    clauses.append(f"CAST(p.apartment_number AS TEXT) IN ({placeholders})")
+                    params.extend(matching_numbers)
 
         elif filter_key == 'firm':
             # Коммерческие юниты: commercial_contracts.unit_id -> apartments.id,
@@ -890,7 +928,7 @@ async def handle_cashier_admin_text(
         if len(rows) == 1:
             row = rows[0]; pid = int(row['id'])
             user_states[user_id] = {"mode":"cashier_admin","screen":"payment_card","payment_id":pid,"return_to":"payment_find_choose_type"}
-            await update.message.reply_text(payment_card(row), reply_markup=kb([[BTN_DELETE_SELECTED],[BTN_BACK,BTN_MAIN]]))
+            await update.message.reply_text(payment_card(row), reply_markup=kb([[BTN_DELETE_SELECTED],[BTN_FLAG_PAYMENT],[BTN_BACK,BTN_MAIN]]))
             return True
         user_states[user_id] = {"mode":"cashier_admin","screen":"payment_list","payment_rows":rows,"selected_payment_ids":set()}
         await update.message.reply_text(f"Найдено платежей: {len(rows)}\n\nОтметьте нужные:", reply_markup=payment_list_kb(rows))
@@ -931,7 +969,7 @@ async def handle_cashier_admin_text(
         }
         await update.message.reply_text(
             payment_card(row),
-            reply_markup=kb([[BTN_DELETE_SELECTED], [BTN_BACK, BTN_MAIN]]),
+            reply_markup=kb([[BTN_DELETE_SELECTED], [BTN_FLAG_PAYMENT], [BTN_BACK, BTN_MAIN]]),
         )
         return True
 
@@ -972,6 +1010,89 @@ async def handle_cashier_admin_text(
         await update.message.reply_text(
             chain_summary(plan) + "\n\nВыберите причину:", reply_markup=reason_menu()
         )
+        return True
+
+    if text == BTN_FLAG_PAYMENT and state.get("payment_id"):
+        pid = int(state["payment_id"])
+        user_states[user_id] = {"mode": "cashier_admin", "screen": "flag_admin_type", "payment_id": pid}
+        rows = [[label] for _, label in ISSUE_TYPE_OPTIONS]
+        rows.append([BTN_CANCEL_FLAG])
+        await update.message.reply_text("Что именно требует проверки?", reply_markup=kb(rows))
+        return True
+
+    if state.get("screen") == "flag_admin_type":
+        pid = state["payment_id"]
+        if text == BTN_CANCEL_FLAG:
+            row = get_payment(pid)
+            await update.message.reply_text(payment_card(row), reply_markup=kb([[BTN_DELETE_SELECTED], [BTN_FLAG_PAYMENT], [BTN_BACK, BTN_MAIN]]))
+            user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_card", "payment_id": pid}
+            return True
+        issue_type = None
+        for code, label in ISSUE_TYPE_OPTIONS:
+            if text == label:
+                issue_type = code
+                break
+        if issue_type is None:
+            rows = [[label] for _, label in ISSUE_TYPE_OPTIONS]
+            rows.append([BTN_CANCEL_FLAG])
+            await update.message.reply_text("Выберите один из вариантов на клавиатуре.", reply_markup=kb(rows))
+            return True
+        user_states[user_id] = {"mode": "cashier_admin", "screen": "flag_admin_concerns", "payment_id": pid, "issue_type": issue_type}
+        rows = [[label] for _, label in CONCERNS_FIELD_OPTIONS]
+        rows.append([BTN_CANCEL_FLAG])
+        await update.message.reply_text("Какого поля это касается?", reply_markup=kb(rows))
+        return True
+
+    if state.get("screen") == "flag_admin_concerns":
+        pid = state["payment_id"]
+        issue_type = state["issue_type"]
+        if text == BTN_CANCEL_FLAG:
+            row = get_payment(pid)
+            await update.message.reply_text(payment_card(row), reply_markup=kb([[BTN_DELETE_SELECTED], [BTN_FLAG_PAYMENT], [BTN_BACK, BTN_MAIN]]))
+            user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_card", "payment_id": pid}
+            return True
+        concerns_field = None
+        for code, label in CONCERNS_FIELD_OPTIONS:
+            if text == label:
+                concerns_field = code
+                break
+        if concerns_field is None:
+            rows = [[label] for _, label in CONCERNS_FIELD_OPTIONS]
+            rows.append([BTN_CANCEL_FLAG])
+            await update.message.reply_text("Выберите один из вариантов на клавиатуре.", reply_markup=kb(rows))
+            return True
+        user_states[user_id] = {
+            "mode": "cashier_admin", "screen": "flag_admin_note",
+            "payment_id": pid, "issue_type": issue_type, "concerns_field": concerns_field,
+        }
+        note_prompt = ISSUE_TYPE_NOTE_PROMPTS.get(issue_type, ISSUE_TYPE_NOTE_PROMPTS["OTHER"])
+        await update.message.reply_text(note_prompt, reply_markup=kb([[BTN_CANCEL_FLAG]]))
+        return True
+
+    if state.get("screen") == "flag_admin_note":
+        pid = state["payment_id"]
+        issue_type = state["issue_type"]
+        concerns_field = state["concerns_field"]
+        row = get_payment(pid)
+        if text != BTN_CANCEL_FLAG:
+            note = "" if text.strip() == "-" else text.strip()
+            description = (
+                f"[{ISSUE_TYPE_LABELS[issue_type]} / {CONCERNS_FIELD_LABELS[concerns_field]}]"
+                + (f" — {note}" if note else "")
+            )
+            task_id = log_verification_task(
+                apartment_number=str(row["apartment_number"]) if row and row["apartment_number"] else None,
+                issue_type=issue_type,
+                description=description,
+                related_payment_id=pid,
+                related_receipt_id=int(row["cashier_receipt_id"]) if row and row["cashier_receipt_id"] else None,
+                raised_by=str(user_id),
+                assigned_role=None,
+                concerns_field=concerns_field,
+            )
+            await update.message.reply_text(f"❗ Записано в журнал согласования (#{task_id}), привязано к платежу #{pid}.")
+        await update.message.reply_text(payment_card(row), reply_markup=kb([[BTN_DELETE_SELECTED], [BTN_FLAG_PAYMENT], [BTN_BACK, BTN_MAIN]]))
+        user_states[user_id] = {"mode": "cashier_admin", "screen": "payment_card", "payment_id": pid}
         return True
 
     if state.get("screen") == "cleanup_reason":

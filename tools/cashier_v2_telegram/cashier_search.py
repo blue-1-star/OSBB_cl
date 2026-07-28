@@ -7,7 +7,7 @@ import sqlite3
 from typing import Any
 
 import cashier_v2_core as core
-
+from query_lib.queries import find_by_fio
 
 def _cols(con: sqlite3.Connection, table: str) -> set[str]:
     try:
@@ -119,7 +119,32 @@ def search_payers(query: str, limit: int = 12) -> list[dict[str, Any]]:
                         'label': f"🚗 {plate} / кв. {apartment.get('apartment_number') or '—'} / {parking}",
                     })
 
-        # Deduplicate. Vehicle rows are more specific than apartment rows.
+        # ФИО (persons) — часто единственное, что известно из банковской
+        # выписки: там есть имя плательщика и сумма, номера квартиры или
+        # авто может не быть вообще. Используем уже готовую find_by_fio()
+        # только для того, чтобы найти НОМЕР квартиры по имени — сами
+        # авто дотягиваем тем же vehicles_for_apartment(), что и выше,
+        # чтобы форма результата была единообразной по всей функции.
+        try:
+            fio_matches = find_by_fio(q)
+        except Exception:
+            fio_matches = []
+        for match in fio_matches:
+            for apartment in apartment_by_number(con, match['квартира']):
+                vehicles = vehicles_for_apartment(con, int(apartment['id']))
+                results.append({
+                    'kind': 'person',
+                    'apartment': apartment,
+                    'apartment_id': int(apartment['id']),
+                    'apartment_number': str(apartment.get('apartment_number') or match['квартира']),
+                    'vehicles': vehicles,
+                    'label': f"👤 {match['фио']} / кв. {match['квартира']}",
+                })
+
+        # Deduplicate. Vehicle rows are more specific than apartment rows;
+        # person rows are kept separate from apartment rows on purpose —
+        # a name match and a bare apartment-number match are different
+        # findings even when they point at the same apartment.
         seen: set[tuple] = set()
         out: list[dict[str, Any]] = []
         for item in results:
@@ -131,7 +156,6 @@ def search_payers(query: str, limit: int = 12) -> list[dict[str, Any]]:
         return out[:limit]
     finally:
         con.close()
-
 
 
 def search_commercial_subjects(query: str, limit: int = 20) -> list[dict[str, Any]]:

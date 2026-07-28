@@ -360,6 +360,7 @@ def ensure_verification_journal(con) -> None:
             related_receipt_id INTEGER,
             raised_by TEXT,
             assigned_role TEXT,
+            concerns_field TEXT,
             status TEXT NOT NULL DEFAULT 'OPEN',
             resolved_at TEXT,
             resolved_by TEXT,
@@ -370,10 +371,24 @@ def ensure_verification_journal(con) -> None:
 
 
 def log_verification_task(
-    apartment_number=None, issue_type="OTHER", description="",
-    related_payment_id=None, related_receipt_id=None,
-    raised_by=None, assigned_role=None,
-):
+    apartment_number: str = None,
+    issue_type: str = "OTHER",
+    description: str = "",
+    related_payment_id: int = None,
+    related_receipt_id: int = None,
+    raised_by: str = None,
+    assigned_role: str = None,
+    concerns_field: str = None,
+) -> int:
+    """Заносит вопрос в журнал согласования, не трогая сам платёж.
+    issue_type: 'VEHICLE_UNLINKED' | 'MISSING_VEHICLE' | 'CHECK_PLATE' |
+                'MISSING_PARKING_MODE' | 'AMOUNT_MISMATCH' | 'OTHER'
+    concerns_field: 'vehicle_plate' | 'parking_mode' | 'apartment_number' |
+                    'full_name' | 'phone' | 'amount' | 'other' — короткая,
+                    структурированная пометка "чего касается", отдельно от
+                    свободного текста description.
+    assigned_role: 'GUARD' | 'CASHIER' | None (None = виден только админу,
+                   как и любая запись, но не всплывает у остальных)."""
     conn = get_conn()
     ensure_verification_journal(conn)
     cur = conn.cursor()
@@ -381,10 +396,13 @@ def log_verification_task(
         INSERT INTO verification_journal (
             created_at, apartment_number, issue_type, description,
             related_payment_id, related_receipt_id, raised_by,
-            assigned_role, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
-    """, (now_db(), apartment_number, issue_type, description,
-          related_payment_id, related_receipt_id, raised_by, assigned_role))
+            assigned_role, concerns_field, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+    """, (
+        now_db(), apartment_number, issue_type, description,
+        related_payment_id, related_receipt_id, raised_by, assigned_role,
+        concerns_field,
+    ))
     conn.commit()
     task_id = cur.lastrowid
     conn.close()

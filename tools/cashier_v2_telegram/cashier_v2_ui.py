@@ -51,6 +51,30 @@ BTN_COMMERCIAL = "🏢 Коммерческие"
 
 BTN_ACCEPT = "✅ Принять как есть"
 BTN_ACCEPT_BANK = "💳 Провести как банк"
+BTN_FLAG_AFTER_SUCCESS = "❗ Пометить проблему"
+
+CONCERNS_FIELD_OPTIONS = [
+    ("vehicle_plate", "🔢 Номер авто"),
+    ("parking_mode", "🅿️ Режим парковки"),
+    ("apartment_number", "🏠 Квартира"),
+    ("full_name", "👤 ФИО"),
+    ("phone", "📞 Телефон"),
+    ("amount", "💰 Сумма"),
+    ("other", "❓ Другое"),
+]
+CONCERNS_FIELD_LABELS = dict(CONCERNS_FIELD_OPTIONS)
+# Для большинства категорий "какого поля касается" и так очевидно из
+# самого типа проблемы — спрашивать отдельно излишне ("масло масляное").
+# Спрашиваем только там, где реально неоднозначно (VEHICLE_UNLINKED —
+# может быть и авто, и квартира, и ФИО).
+DEFAULT_CONCERNS_FIELD = {
+    "VEHICLE_UNLINKED": None,
+    "MISSING_VEHICLE": "vehicle_plate",
+    "CHECK_PLATE": "vehicle_plate",
+    "MISSING_PARKING_MODE": "parking_mode",
+    "AMOUNT_MISMATCH": "amount",
+    "OTHER": "other",
+}
 BTN_EDIT = "✏️ Изменить"
 BTN_FLAG_FOR_REVIEW = "❗ На проверку"
 
@@ -58,7 +82,7 @@ ISSUE_TYPE_OPTIONS = [
     ("VEHICLE_UNLINKED", "🚗 Авто/квартира не та"),
     ("MISSING_VEHICLE", "🆕 Авто нет в базе (по ведомости есть)"),
     ("CHECK_PLATE", "🔢 Номер неполный/некорректный"),
-    ("MISSING_PARKING_MODE", "🅿️ Режим парковки не задан"),
+    ("MISSING_PARKING_MODE", "🅿️ Режим парковки неопределён/расходится"),
     ("AMOUNT_MISMATCH", "💰 Сумма не сходится с тарифом"),
     ("OTHER", "❓ Другое"),
 ]
@@ -108,6 +132,7 @@ BTN_SKIP_APARTMENT = "➡️ Пропустить квартиру"
 
 DEFAULT_CASHBOX_CODE = "O"
 DEFAULT_SOURCE_TEXT = "Прямая наличная оплата через Telegram"
+DEFAULT_BANK_SOURCE_TEXT = "Банковский платёж, зарегистрирован оператором вручную"
 
 
 def kb(rows: list[list[str]]) -> ReplyKeyboardMarkup:
@@ -310,13 +335,16 @@ def last_receipts_text(limit: int = 10) -> str:
     con = core.get_conn()
     try:
         cur = con.cursor()
+        # ВАЖНО: строим от payments, не от cashier_receipts — у банковских
+        # платежей (💳 Провести как банк) чек не создаётся вообще, и они
+        # были структурно невидимы в списке, пока он отталкивался от
+        # cashier_receipts. payments содержит и наличные, и банковские.
         rows = con.execute("""
-            SELECT r.id, r.apartment_number, r.period_code, r.amount,
+            SELECT p.id, p.apartment_number, p.period_code, p.amount, p.cashbox_code,
                    direct_v.license_plate_normalized AS direct_plate
-            FROM cashier_receipts r
-            LEFT JOIN payments p ON p.cashier_receipt_id = r.id
+            FROM payments p
             LEFT JOIN vehicles direct_v ON direct_v.id = p.vehicle_id
-            ORDER BY r.id DESC
+            ORDER BY p.id DESC
             LIMIT ?
         """, (limit,)).fetchall()
         if not rows:
@@ -377,8 +405,9 @@ def last_receipts_text(limit: int = 10) -> str:
                         plate_display = f"{len(all_plates)}авто?"
                     else:
                         plate_display = '—'
+            channel = '🏦' if (r['cashbox_code'] or '').upper() == 'BANK' else '💵'
             lines.append(
-                f"#{r['id']:<3} кв.{apt:<5.5} {plate_display:<13.13} "
+                f"#{r['id']:<3} {channel} кв.{apt:<5.5} {plate_display:<13.13} "
                 f"{r['period_code']} {float(r['amount'] or 0):>8.2f}"
             )
         lines.append("```")
@@ -1067,7 +1096,7 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                     'commercial' if (draft.get('payer') or {}).get('commercial_unit_id') else 'resident'
                 ),
             }
-            await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_BACK, BTN_MAIN]])); return True
+            await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_FLAG_AFTER_SUCCESS],[BTN_BACK, BTN_MAIN]])); return True
         if text == BTN_ACCEPT_BANK:
             try:
                 amount_value = float(draft.get('amount'))
@@ -1093,7 +1122,7 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                     period_code=draft.get('period_code'),
                     service=draft['service'],
                     amount=amount_value,
-                    payer_text=draft.get('comment') or DEFAULT_SOURCE_TEXT,
+                    payer_text=draft.get('comment') or DEFAULT_BANK_SOURCE_TEXT,
                     operator_id=int(user_id),
                     auto_allocate_charge_id=draft.get('charge_id'),
                     commercial_contract_id=draft['payer'].get('commercial_contract_id'),
@@ -1118,7 +1147,7 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             await update.message.reply_text(
                 f"💳 Банковский платёж принят (черновой, TMP-номер)\n\n{success_card(result, draft)}\n\n"
                 f"⚠ Реквизиты выписки не указаны — потребуется сверка позже.",
-                reply_markup=kb([[BTN_NEXT], [BTN_BACK, BTN_MAIN]]),
+                reply_markup=kb([[BTN_NEXT], [BTN_FLAG_AFTER_SUCCESS], [BTN_BACK, BTN_MAIN]]),
             ); return True
         if text == BTN_EDIT_AMOUNT:
             user_states[user_id] = {'mode':'cashier_v2','screen':'edit_amount','draft':draft}
@@ -1187,6 +1216,118 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             f"❗ Записано в журнал согласования (#{task_id}). Ввод платежа продолжается.",
         )
         await show_card(update, user_states, user_id, draft)
+        return True
+
+    if state.get('screen') == 'success':
+        result = state.get('result') or {}
+        draft = state.get('draft') or {}
+        if text == BTN_FLAG_AFTER_SUCCESS:
+            user_states[user_id] = {
+                'mode': 'cashier_v2', 'screen': 'success_flag_type',
+                'result': result, 'draft': draft,
+            }
+            await update.message.reply_text("Что именно требует проверки?", reply_markup=issue_type_kb())
+            return True
+        return False  # BTN_NEXT/BTN_BACK/BTN_MAIN — обрабатываются выше по стеку
+
+    if state.get('screen') == 'success_flag_type':
+        result = state['result']
+        draft = state['draft']
+        if text in {BTN_BACK, BTN_CANCEL}:
+            await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_FLAG_AFTER_SUCCESS],[BTN_BACK, BTN_MAIN]]))
+            user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'success', 'result': result, 'draft': draft}
+            return True
+        issue_type = None
+        for code, label in ISSUE_TYPE_OPTIONS:
+            if text == label:
+                issue_type = code
+                break
+        if issue_type is None:
+            await update.message.reply_text("Выберите один из вариантов на клавиатуре.", reply_markup=issue_type_kb())
+            return True
+
+        default_field = DEFAULT_CONCERNS_FIELD.get(issue_type)
+        if default_field is not None:
+            # Поле и так очевидно из типа проблемы — не переспрашиваем,
+            # сразу к уточнению.
+            user_states[user_id] = {
+                'mode': 'cashier_v2', 'screen': 'success_flag_note',
+                'result': result, 'draft': draft,
+                'issue_type': issue_type, 'concerns_field': default_field,
+            }
+            note_prompt = ISSUE_TYPE_NOTE_PROMPTS.get(issue_type, ISSUE_TYPE_NOTE_PROMPTS['OTHER'])
+            await update.message.reply_text(note_prompt, reply_markup=kb([[BTN_BACK, BTN_CANCEL]]))
+            return True
+
+        user_states[user_id] = {
+            'mode': 'cashier_v2', 'screen': 'success_flag_concerns',
+            'result': result, 'draft': draft, 'issue_type': issue_type,
+        }
+        rows = [[label] for _, label in CONCERNS_FIELD_OPTIONS]
+        rows.append([BTN_BACK, BTN_CANCEL])
+        await update.message.reply_text("Какого поля это касается?", reply_markup=kb(rows))
+        return True
+
+    if state.get('screen') == 'success_flag_concerns':
+        result = state['result']
+        draft = state['draft']
+        if text in {BTN_BACK, BTN_CANCEL}:
+            await update.message.reply_text("Что именно требует проверки?", reply_markup=issue_type_kb())
+            user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'success_flag_type', 'result': result, 'draft': draft}
+            return True
+        concerns_field = None
+        for code, label in CONCERNS_FIELD_OPTIONS:
+            if text == label:
+                concerns_field = code
+                break
+        if concerns_field is None:
+            rows = [[label] for _, label in CONCERNS_FIELD_OPTIONS]
+            rows.append([BTN_BACK, BTN_CANCEL])
+            await update.message.reply_text("Выберите один из вариантов на клавиатуре.", reply_markup=kb(rows))
+            return True
+        user_states[user_id] = {
+            'mode': 'cashier_v2', 'screen': 'success_flag_note',
+            'result': result, 'draft': draft,
+            'issue_type': state['issue_type'], 'concerns_field': concerns_field,
+        }
+        note_prompt = ISSUE_TYPE_NOTE_PROMPTS.get(state['issue_type'], ISSUE_TYPE_NOTE_PROMPTS['OTHER'])
+        await update.message.reply_text(note_prompt, reply_markup=kb([[BTN_BACK, BTN_CANCEL]]))
+        return True
+
+    if state.get('screen') == 'success_flag_note':
+        result = state['result']
+        draft = state['draft']
+        issue_type = state['issue_type']
+        concerns_field = state['concerns_field']
+        if text in {BTN_BACK, BTN_CANCEL}:
+            rows = [[label] for _, label in CONCERNS_FIELD_OPTIONS]
+            rows.append([BTN_BACK, BTN_CANCEL])
+            await update.message.reply_text("Какого поля это касается?", reply_markup=kb(rows))
+            user_states[user_id] = {
+                'mode': 'cashier_v2', 'screen': 'success_flag_concerns',
+                'result': result, 'draft': draft, 'issue_type': issue_type,
+            }
+            return True
+
+        note = "" if text.strip() == "-" else text.strip()
+        apartment_number = _extract_apartment_number(draft)
+        description = (
+            f"[{ISSUE_TYPE_LABELS[issue_type]} / {CONCERNS_FIELD_LABELS[concerns_field]}]"
+            + (f" — {note}" if note else "")
+        )
+        task_id = log_verification_task(
+            apartment_number=apartment_number,
+            issue_type=issue_type,
+            description=description,
+            related_payment_id=result.get('payment_id'),
+            related_receipt_id=result.get('receipt_id'),
+            raised_by=str(user_id),
+            assigned_role=None,
+            concerns_field=concerns_field,
+        )
+        await update.message.reply_text(f"❗ Записано в журнал согласования (#{task_id}), привязано к платежу #{result.get('payment_id')}.")
+        await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_FLAG_AFTER_SUCCESS],[BTN_BACK, BTN_MAIN]]))
+        user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'success', 'result': result, 'draft': draft}
         return True
 
     if state.get('screen') == 'edit_menu':
