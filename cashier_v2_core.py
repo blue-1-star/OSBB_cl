@@ -810,6 +810,8 @@ def create_bank_payment(
     ref = text(transaction_ref)
     if not ref:
         raise ValueError("Для банковской операции обязателен идентификатор из выписки.")
+    apartment_id = int(apartment["id"]) if apartment and apartment.get("id") is not None else None
+    apartment_number = text(apartment.get("apartment_number")) if apartment else None
     if bank_ref_exists(cur, ref):
         raise ValueError("Банковская операция с таким идентификатором уже есть.")
 

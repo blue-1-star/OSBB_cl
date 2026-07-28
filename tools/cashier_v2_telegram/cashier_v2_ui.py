@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
+from uuid import uuid4
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -49,17 +50,27 @@ BTN_PARKING = "🅿️ Паркоместа"
 BTN_COMMERCIAL = "🏢 Коммерческие"
 
 BTN_ACCEPT = "✅ Принять как есть"
+BTN_ACCEPT_BANK = "💳 Провести как банк"
 BTN_EDIT = "✏️ Изменить"
 BTN_FLAG_FOR_REVIEW = "❗ На проверку"
 
 ISSUE_TYPE_OPTIONS = [
     ("VEHICLE_UNLINKED", "🚗 Авто/квартира не та"),
     ("MISSING_VEHICLE", "🆕 Авто нет в базе (по ведомости есть)"),
+    ("CHECK_PLATE", "🔢 Номер неполный/некорректный"),
     ("MISSING_PARKING_MODE", "🅿️ Режим парковки не задан"),
     ("AMOUNT_MISMATCH", "💰 Сумма не сходится с тарифом"),
     ("OTHER", "❓ Другое"),
 ]
 ISSUE_TYPE_LABELS = dict(ISSUE_TYPE_OPTIONS)
+ISSUE_TYPE_NOTE_PROMPTS = {
+    "VEHICLE_UNLINKED": "Какой номер/квартира правильные, если знаете? Или «-», чтобы пропустить:",
+    "MISSING_VEHICLE": "Если знаете номер авто из ведомости — укажите его сейчас, чтобы не искать заново. Или «-», чтобы пропустить:",
+    "CHECK_PLATE": "Как должен выглядеть номер целиком, если помните? Или «-», чтобы пропустить:",
+    "MISSING_PARKING_MODE": "Знаете фактический режим (день/ночь)? Укажите, если да. Или «-», чтобы пропустить:",
+    "AMOUNT_MISMATCH": "Какая сумма ожидалась по тарифу, если знаете? Или «-», чтобы пропустить:",
+    "OTHER": "Уточните одной фразой (например: «ожидали AA1234BB, а по факту другой номер»), или отправьте «-», чтобы пропустить:",
+}
 
 
 def issue_type_kb() -> ReplyKeyboardMarkup:
@@ -167,7 +178,7 @@ def card_kb(draft: dict | None = None) -> ReplyKeyboardMarkup:
     except Exception:
         valid = False
     if valid:
-        return kb([[BTN_ACCEPT], [BTN_EDIT], [BTN_FLAG_FOR_REVIEW], [BTN_CANCEL]])
+        return kb([[BTN_ACCEPT], [BTN_ACCEPT_BANK], [BTN_EDIT], [BTN_FLAG_FOR_REVIEW], [BTN_CANCEL]])
     return kb([[BTN_EDIT_AMOUNT], [BTN_EDIT], [BTN_FLAG_FOR_REVIEW], [BTN_CANCEL]])
 
 
@@ -229,6 +240,39 @@ def summary_text() -> str:
         ])
     except Exception as exc:
         return f"⚠ Не удалось получить сводку: {exc}"
+
+
+def _solve_and_attribute(amount: float, vehicle_tariffs: list[tuple[dict, float]]):
+    """
+    Как _solve_vehicle_puzzle, но не просто "решено да/нет" для отображения,
+    а с точной раскладкой — какому конкретно авто сколько начислить, чтобы
+    можно было создать по одному честному платежу на каждое, без выдуманного
+    "комбинированного" кода услуги.
+
+    Пробует сначала более крупные подмножества авто (естественный случай —
+    заплатили сразу за все), потом меньшие. Использует решение, только если
+    оно единственно на своём уровне — при неоднозначности не гадает,
+    возвращает None.
+    """
+    from itertools import combinations
+    n = len(vehicle_tariffs)
+    if n == 0 or not amount or amount <= 0:
+        return None
+
+    for size in range(n, 0, -1):
+        candidates = []
+        for combo in combinations(vehicle_tariffs, size):
+            subset_sum = sum(t for _, t in combo)
+            if subset_sum > 0 and amount % subset_sum == 0:
+                months = int(amount // subset_sum)
+                candidates.append((combo, months))
+        if len(candidates) == 1:
+            combo, months = candidates[0]
+            return [(v, t, months) for v, t in combo]
+        if len(candidates) > 1:
+            return None
+
+    return None
 
 
 def _solve_vehicle_puzzle(amount: float, vehicle_tariffs: list[tuple[str, float]]):
@@ -751,6 +795,25 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
         if len(items) == 1:
             await prepare_parking_card(update, user_states, user_id, items[0]); return True
 
+        # Если у квартиры несколько авто с известными тарифами — сначала
+        # пробуем узнать сумму и разложить её автоматически (оплата сразу
+        # за несколько авто — частый случай, вручную выбирать не нужно,
+        # если раскладка однозначна). Ручной выбор — только если авто
+        # не найдены как единая квартира, или раскладка неоднозначна.
+        if apartment_context and len(apartment_context['vehicles']) > 1:
+            user_states[user_id] = {
+                'mode': 'cashier_v2',
+                'screen': 'apartment_smart_amount',
+                'apartment_context': apartment_context,
+                'fallback_items': items,
+            }
+            await update.message.reply_text(
+                f"Квартира {apartment_context['apartment_number']}, авто: {len(apartment_context['vehicles'])}.\n"
+                f"Введите сумму — если она покрывает несколько авто сразу, распознаю сама:",
+                reply_markup=kb([[BTN_BACK, BTN_MAIN]]),
+            )
+            return True
+
         user_states[user_id] = {
             'mode': 'cashier_v2',
             'screen': 'payer_select_first',
@@ -774,6 +837,91 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
         except Exception:
             await update.message.reply_text("Выберите вариант кнопкой.", reply_markup=payer_kb(state.get('payer_options') or [])); return True
         await prepare_parking_card(update, user_states, user_id, payer); return True
+
+    if state.get('screen') == 'apartment_smart_amount':
+        if text in {BTN_BACK, BTN_MAIN}:
+            return False  # пусть общий обработчик уведёт в кассу/главное меню
+
+        try:
+            amount_value = float(text.replace(',', '.'))
+        except Exception:
+            await update.message.reply_text("Введите сумму числом (например 700 или 700.50):")
+            return True
+        if amount_value <= 0:
+            await update.message.reply_text("Сумма должна быть больше нуля.")
+            return True
+
+        apartment_context = state['apartment_context']
+        period = default_period()
+
+        # Собираем (авто, тариф) только для тех, у кого известен режим.
+        vehicle_tariffs = []
+        for v in apartment_context['vehicles']:
+            mode = v.get('parking_time')
+            if mode not in {'Day', 'Night'}:
+                continue
+            service = choose_service('day' if mode == 'Day' else 'night', period)
+            if service and service.get('amount_default'):
+                vehicle_tariffs.append((v, float(service['amount_default']), mode, service))
+
+        solved = _solve_and_attribute(amount_value, [(v, t) for v, t, _, _ in vehicle_tariffs])
+
+        if solved is None:
+            # Не разложилось однозначно — не гадаем, отдаём на ручной выбор,
+            # как и раньше, до этой правки.
+            items = state['fallback_items']
+            user_states[user_id] = {
+                'mode': 'cashier_v2',
+                'screen': 'payer_select_first',
+                'payer_options': items,
+                'subject_mode': 'resident',
+                'apartment_context': apartment_context,
+            }
+            await update.message.reply_text(
+                f"Сумма {amount_value:.2f} не раскладывается однозначно по известным тарифам. "
+                f"Выберите автомобиль вручную:",
+                reply_markup=payer_kb(items),
+            )
+            return True
+
+        # Однозначно решено — создаём по одному честному платежу на каждое
+        # авто из решения, одной транзакцией (либо всё, либо ничего).
+        lookup = {id(v): (t, mode, service) for v, t, mode, service in vehicle_tariffs}
+        con = core.get_conn()
+        created = []
+        try:
+            cur = con.cursor()
+            for v, tariff, months in solved:
+                _, mode, service = lookup[id(v)]
+                result = core.create_cash_receipt(
+                    cur,
+                    apartment=v.get('apartment') or apartment_context['apartment'],
+                    cashbox_code=DEFAULT_CASHBOX_CODE,
+                    receipt_date=core.today(),
+                    period_code=period,
+                    service=service,
+                    amount=tariff * months,
+                    source_text=DEFAULT_SOURCE_TEXT,
+                    operator_id=int(user_id),
+                    vehicle_id=v.get('vehicle_id'),
+                )
+                created.append((v, tariff, months, result))
+            con.commit()
+        except Exception as exc:
+            con.rollback()
+            await update.message.reply_text(f"⚠ Ошибка сохранения:\n{type(exc).__name__}: {exc}")
+            return True
+        finally:
+            con.close()
+
+        lines = [f"✅ Оплата принята — {len(created)} авто квартиры {apartment_context['apartment_number']}:", ""]
+        for v, tariff, months, result in created:
+            label = v.get('label') or v.get('plate') or '—'
+            months_note = f" x{months}" if months > 1 else ""
+            lines.append(f"  {label}: {tariff * months:.2f} грн{months_note}")
+        user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'menu'}
+        await update.message.reply_text("\n".join(lines), reply_markup=menu_kb())
+        return True
 
     if state.get('screen') == 'cash_type_after_payer':
         payer = state.get('payer')
@@ -920,6 +1068,58 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                 ),
             }
             await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_BACK, BTN_MAIN]])); return True
+        if text == BTN_ACCEPT_BANK:
+            try:
+                amount_value = float(draft.get('amount'))
+            except Exception:
+                amount_value = 0.0
+            if amount_value <= 0:
+                await update.message.reply_text(
+                    "⚠ Нельзя сохранить оплату с нулевой суммой. Укажите сумму.",
+                    reply_markup=card_kb(draft),
+                ); return True
+            # Минимальная версия: временный идентификатор выписки —
+            # деталь (реальный transaction_ref/дата операции) добавляется
+            # позже отдельным шагом сверки, не блокирует сам приём.
+            temp_ref = f"TMP-{core.today()}-{uuid4().hex[:6].upper()}"
+            con = core.get_conn()
+            try:
+                cur = con.cursor()
+                result = core.create_bank_payment(
+                    cur,
+                    apartment=draft['payer']['apartment'],
+                    transaction_ref=temp_ref,
+                    transaction_date=core.today(),
+                    period_code=draft.get('period_code'),
+                    service=draft['service'],
+                    amount=amount_value,
+                    payer_text=draft.get('comment') or DEFAULT_SOURCE_TEXT,
+                    operator_id=int(user_id),
+                    auto_allocate_charge_id=draft.get('charge_id'),
+                    commercial_contract_id=draft['payer'].get('commercial_contract_id'),
+                    commercial_unit_id=draft['payer'].get('commercial_unit_id'),
+                    commercial_contract_item_id=draft['payer'].get('commercial_contract_item_id'),
+                )
+                con.commit()
+            except Exception as exc:
+                con.rollback()
+                await update.message.reply_text(f"⚠ Ошибка сохранения:\n{type(exc).__name__}: {exc}", reply_markup=card_kb(draft)); return True
+            finally:
+                con.close()
+            user_states[user_id] = {
+                'mode': 'cashier_v2',
+                'screen': 'success',
+                'draft': draft,
+                'result': result,
+                'subject_mode': state.get('subject_mode') or (
+                    'commercial' if (draft.get('payer') or {}).get('commercial_unit_id') else 'resident'
+                ),
+            }
+            await update.message.reply_text(
+                f"💳 Банковский платёж принят (черновой, TMP-номер)\n\n{success_card(result, draft)}\n\n"
+                f"⚠ Реквизиты выписки не указаны — потребуется сверка позже.",
+                reply_markup=kb([[BTN_NEXT], [BTN_BACK, BTN_MAIN]]),
+            ); return True
         if text == BTN_EDIT_AMOUNT:
             user_states[user_id] = {'mode':'cashier_v2','screen':'edit_amount','draft':draft}
             await update.message.reply_text("Введите сумму больше нуля:"); return True
@@ -950,9 +1150,9 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             'mode': 'cashier_v2', 'screen': 'flag_issue_note',
             'draft': draft, 'issue_type': issue_type,
         }
+        note_prompt = ISSUE_TYPE_NOTE_PROMPTS.get(issue_type, ISSUE_TYPE_NOTE_PROMPTS['OTHER'])
         await update.message.reply_text(
-            "Уточните одной фразой (например: «ожидали AA1234BB, а по факту другой номер»), "
-            "или отправьте «-», чтобы пропустить:",
+            note_prompt,
             reply_markup=kb([[BTN_BACK_TO_CARD, BTN_CANCEL]]),
         )
         return True

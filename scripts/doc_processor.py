@@ -151,14 +151,21 @@ def archive_file(filepath: Path):
     print(f"📦 Архивирован: {filepath.name} -> {zip_name} (как {arcname})")
 
 
+def get_target(filepath: Path) -> Path | None:
+    """Определяет, в какой документ нужно дозаписать файл."""
+    name = filepath.name.lower()
+    if "project_log" in name:
+        return DOCS_DIR / "Project_Log.md"
+    if "roadmap" in name:
+        return DOCS_DIR / "ROADMAP.md"
+    return None
+
+
 def process_incoming():
     """Основной процесс обработки входящих файлов."""
     print("=" * 60)
     print("📄 Документатор OSBB")
     print("=" * 60)
-
-    # Список известных имён в нижнем регистре
-    known_lower = {k.lower(): v for k, v in KNOWN_FILES.items()}
 
     incoming_files = list(INCOMING_DIR.glob("*.md"))
     if not incoming_files:
@@ -166,15 +173,13 @@ def process_incoming():
         return
 
     for filepath in incoming_files:
-        key = filepath.name.lower()
-        if key not in known_lower:
+        target = get_target(filepath)
+        if target is None:
             print(f"⚠️ Неизвестный файл: {filepath.name}")
             continue
 
-        target = known_lower[key]
         if append_to_file(filepath, target):
             archive_file(filepath)
-
 # ==========================================
 # ЗАПУСК
 # ==========================================
