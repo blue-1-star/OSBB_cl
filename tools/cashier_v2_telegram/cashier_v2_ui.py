@@ -27,7 +27,7 @@ from tools.cashier_v2_telegram.cashier_search import (
 )
 from tools.cashier_v2_telegram.cashier_card import payment_card, period_display, success_card
 from Bots.handlers.vehicle_card_editor import create_draft_vehicle, create_registry_vehicle
-from query_lib.queries import vehicles_by_apartment, log_verification_task
+from query_lib.queries import vehicles_by_apartment, log_verification_task, last_parking_pattern
 
 BTN_PAYMENTS = "💳 Платежи"
 BTN_CASHIER_V2 = "💰 Касса v2"
@@ -265,6 +265,71 @@ def summary_text() -> str:
         ])
     except Exception as exc:
         return f"⚠ Не удалось получить сводку: {exc}"
+
+
+def _pattern_preview_text(apartment_number: str, pattern: dict) -> tuple[str, float]:
+    """Текстовое превью 'как в прошлый раз' + суммарная сумма (нужна
+    только чтобы card_kb() посчитала карточку валидной для приёма)."""
+    lines = [f"📋 Как в {pattern['period']} (кв.{apartment_number}):", ""]
+    total = 0.0
+    for r in pattern['rows']:
+        plate = r.get('plate') or '—'
+        lines.append(f"  {plate} — {r['base_service_code']}: {float(r['amount']):.2f} грн")
+        total += float(r['amount'])
+        for f in r.get('carry_forward_flags') or []:
+            lines.append(f"    ⚠ перенесётся вопрос: {f['description']}")
+    lines.append(f"\nИтого: {total:.2f} грн")
+    return "\n".join(lines), total
+
+
+def _create_payments_from_pattern(
+    cur, pattern_rows: list[dict], apartment: dict, period_code: str,
+    operator_id: int, channel: str, cashbox_code: str | None = None,
+    transaction_ref: str | None = None,
+) -> list[dict]:
+    """
+    Создаёт по одному честному платежу на каждую строку паттерна
+    (channel='cash' или 'bank'). Для банка все строки одного повтора
+    получают ОДИН И ТОТ ЖЕ transaction_ref — это был один реальный
+    перевод, разнесённый на несколько строк учёта, не несколько
+    отдельных переводов (иначе сверка с выпиской не сойдётся).
+    Возвращает список result-словарей (как create_cash_receipt/
+    create_bank_payment), в том же порядке, что и pattern_rows —
+    нужно для последующего переноса carry_forward_flags на новые id.
+    """
+    results = []
+    for row in pattern_rows:
+        service = {
+            "service_code": row["base_service_code"],
+            "service_item_code": None,
+            "service_type": "GENERAL",
+        }
+        if channel == "bank":
+            result = core.create_bank_payment(
+                cur,
+                apartment=apartment,
+                transaction_ref=transaction_ref,
+                transaction_date=core.today(),
+                period_code=period_code,
+                service=service,
+                amount=float(row["amount"]),
+                payer_text=DEFAULT_BANK_SOURCE_TEXT,
+                operator_id=operator_id,
+            )
+        else:
+            result = core.create_cash_receipt(
+                cur,
+                apartment=apartment,
+                cashbox_code=cashbox_code or DEFAULT_CASHBOX_CODE,
+                receipt_date=core.today(),
+                period_code=period_code,
+                service=service,
+                amount=float(row["amount"]),
+                source_text=DEFAULT_SOURCE_TEXT,
+                operator_id=operator_id,
+            )
+        results.append(result)
+    return results
 
 
 def _solve_and_attribute(amount: float, vehicle_tariffs: list[tuple[dict, float]]):
@@ -512,7 +577,31 @@ async def prepare_parking_card(update: Update, user_states: dict[int, Any], user
         )
         return
     draft = draft_from_payer(payer, group, service)
+
+    # Эмпирика: платёж за парковку почти всегда такой же, как в прошлый
+    # раз. Если для ЭТОЙ конкретной машины есть недавняя парковочная
+    # запись — подставляем её сумму вместо пересчёта по текущему
+    # тарифу, и переносим любой ещё не решённый вопрос по ней же.
+    apartment_number = payer.get('apartment_number')
+    plate = payer.get('plate')
+    if apartment_number and plate:
+        pattern = last_parking_pattern(apartment_number)
+        if pattern:
+            for row in pattern['rows']:
+                if row.get('plate') == plate:
+                    draft['amount'] = float(row['amount'])
+                    draft['pattern_note'] = f"как в {pattern['period']}"
+                    if row.get('carry_forward_flags'):
+                        draft['carry_forward_flags'] = row['carry_forward_flags']
+                    break
+
     await show_card(update, user_states, user_id, draft)
+    if draft.get('pattern_note'):
+        note = f"ℹ️ Сумма и услуга — {draft['pattern_note']}."
+        if draft.get('carry_forward_flags'):
+            for f in draft['carry_forward_flags']:
+                note += f"\n⚠ Перенесётся нерешённый вопрос: {f['description']}"
+        await update.message.reply_text(note)
 
 
 async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_TYPE, user_states: dict[int, Any], user_id: int) -> bool:
@@ -830,6 +919,22 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
         # если раскладка однозначна). Ручной выбор — только если авто
         # не найдены как единая квартира, или раскладка неоднозначна.
         if apartment_context and len(apartment_context['vehicles']) > 1:
+            apt_number = apartment_context['apartment_number']
+            pattern = last_parking_pattern(apt_number)
+            if pattern and len(pattern['rows']) > 1:
+                preview_text, total = _pattern_preview_text(apt_number, pattern)
+                draft = {
+                    'payer': {'apartment': apartment_context['apartment']},
+                    'amount': total,  # синтетическая сумма — только чтобы карточка считалась валидной
+                    'period_code': pattern['period'],
+                    'service': None,
+                    'comment': '',
+                    'pattern_rows': pattern['rows'],
+                }
+                user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'card', 'draft': draft}
+                await update.message.reply_text(preview_text, reply_markup=card_kb(draft))
+                return True
+
             user_states[user_id] = {
                 'mode': 'cashier_v2',
                 'screen': 'apartment_smart_amount',
@@ -1053,6 +1158,40 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
     if state.get('screen') == 'card':
         draft = state['draft']
         if text == BTN_ACCEPT:
+            apartment_number = (draft.get('payer') or {}).get('apartment') if isinstance(draft.get('payer'), dict) else None
+            if isinstance(apartment_number, dict):
+                apartment_number = apartment_number.get('apartment_number')
+
+            if draft.get('pattern_rows'):
+                con = core.get_conn()
+                try:
+                    cur = con.cursor()
+                    results = _create_payments_from_pattern(
+                        cur, draft['pattern_rows'], draft['payer']['apartment'],
+                        draft.get('period_code'), int(user_id), channel='cash',
+                        cashbox_code=draft.get('cashbox_code') or DEFAULT_CASHBOX_CODE,
+                    )
+                    con.commit()
+                except Exception as exc:
+                    con.rollback()
+                    await update.message.reply_text(f"⚠ Ошибка сохранения:\n{type(exc).__name__}: {exc}", reply_markup=card_kb(draft)); return True
+                finally:
+                    con.close()
+                for row, result in zip(draft['pattern_rows'], results):
+                    for f in row.get('carry_forward_flags') or []:
+                        log_verification_task(
+                            apartment_number=apartment_number, issue_type=f['issue_type'],
+                            description=f"[перенесено с прошлого периода] {f['description']}",
+                            related_payment_id=result.get('payment_id'), related_receipt_id=result.get('receipt_id'),
+                            raised_by=str(user_id), assigned_role=None, concerns_field=f.get('concerns_field'),
+                        )
+                total = sum(float(r['amount']) for r in draft['pattern_rows'])
+                user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'menu'}
+                await update.message.reply_text(
+                    f"✅ Оплата принята — {len(results)} авто, {total:.2f} грн всего.", reply_markup=menu_kb(),
+                )
+                return True
+
             try:
                 amount_value = float(draft.get('amount'))
             except Exception:
@@ -1087,6 +1226,13 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                 await update.message.reply_text(f"⚠ Ошибка сохранения:\n{type(exc).__name__}: {exc}", reply_markup=card_kb(draft)); return True
             finally:
                 con.close()
+            for f in draft.get('carry_forward_flags') or []:
+                log_verification_task(
+                    apartment_number=apartment_number, issue_type=f['issue_type'],
+                    description=f"[перенесено с прошлого периода] {f['description']}",
+                    related_payment_id=result.get('payment_id'), related_receipt_id=result.get('receipt_id'),
+                    raised_by=str(user_id), assigned_role=None, concerns_field=f.get('concerns_field'),
+                )
             user_states[user_id] = {
                 'mode':'cashier_v2',
                 'screen':'success',
@@ -1098,6 +1244,42 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             }
             await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_FLAG_AFTER_SUCCESS],[BTN_BACK, BTN_MAIN]])); return True
         if text == BTN_ACCEPT_BANK:
+            apartment_number = (draft.get('payer') or {}).get('apartment') if isinstance(draft.get('payer'), dict) else None
+            if isinstance(apartment_number, dict):
+                apartment_number = apartment_number.get('apartment_number')
+
+            if draft.get('pattern_rows'):
+                temp_ref = f"TMP-{core.today()}-{uuid4().hex[:6].upper()}"
+                con = core.get_conn()
+                try:
+                    cur = con.cursor()
+                    results = _create_payments_from_pattern(
+                        cur, draft['pattern_rows'], draft['payer']['apartment'],
+                        draft.get('period_code'), int(user_id), channel='bank',
+                        transaction_ref=temp_ref,
+                    )
+                    con.commit()
+                except Exception as exc:
+                    con.rollback()
+                    await update.message.reply_text(f"⚠ Ошибка сохранения:\n{type(exc).__name__}: {exc}", reply_markup=card_kb(draft)); return True
+                finally:
+                    con.close()
+                for row, result in zip(draft['pattern_rows'], results):
+                    for f in row.get('carry_forward_flags') or []:
+                        log_verification_task(
+                            apartment_number=apartment_number, issue_type=f['issue_type'],
+                            description=f"[перенесено с прошлого периода] {f['description']}",
+                            related_payment_id=result.get('payment_id'), related_receipt_id=result.get('receipt_id'),
+                            raised_by=str(user_id), assigned_role=None, concerns_field=f.get('concerns_field'),
+                        )
+                total = sum(float(r['amount']) for r in draft['pattern_rows'])
+                user_states[user_id] = {'mode': 'cashier_v2', 'screen': 'menu'}
+                await update.message.reply_text(
+                    f"💳 Банковский платёж принят — {len(results)} авто, {total:.2f} грн всего (черновой, один TMP-номер на все строки).",
+                    reply_markup=menu_kb(),
+                )
+                return True
+
             try:
                 amount_value = float(draft.get('amount'))
             except Exception:
@@ -1135,6 +1317,13 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                 await update.message.reply_text(f"⚠ Ошибка сохранения:\n{type(exc).__name__}: {exc}", reply_markup=card_kb(draft)); return True
             finally:
                 con.close()
+            for f in draft.get('carry_forward_flags') or []:
+                log_verification_task(
+                    apartment_number=apartment_number, issue_type=f['issue_type'],
+                    description=f"[перенесено с прошлого периода] {f['description']}",
+                    related_payment_id=result.get('payment_id'), related_receipt_id=result.get('receipt_id'),
+                    raised_by=str(user_id), assigned_role=None, concerns_field=f.get('concerns_field'),
+                )
             user_states[user_id] = {
                 'mode': 'cashier_v2',
                 'screen': 'success',

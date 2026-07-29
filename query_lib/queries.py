@@ -568,3 +568,62 @@ def find_by_fio(fragment: str, limit: int = 30):
         return result
     finally:
         conn.close()
+
+def last_parking_pattern(apartment_number: str):
+    """
+    Последний период, за который квартира платила именно за парковку
+    (base_service_code LIKE 'PARKING_%'), со всеми строками этого
+    периода — сколько бы авто/платежей в него ни входило. Группировка
+    идёт по КВАРТИРЕ, не по конкретному авто/ФИО — находится независимо
+    от того, как искали плательщика.
+
+    Если у какой-то из прошлых строк есть ОТКРЫТАЯ (нерешённая) запись
+    в verification_journal — она возвращается вместе со строкой
+    (carry_forward_flags), чтобы при повторе паттерна перенести ту же
+    пометку "на проверку" на новый платёж, а не молча её потерять.
+    Действует принцип: сомнение в паттерне не отменяет приём денег —
+    деньги принимаются с той же честной пометкой, что и в прошлый раз.
+
+    Возвращает None, если у квартиры вообще не было парковочных
+    платежей. Иначе:
+        {'period': '2026-07', 'rows': [
+            {'payment_id', 'amount', 'base_service_code', 'plate',
+             'carry_forward_flags': [{'issue_type','description','concerns_field'}, ...]},
+            ...
+        ]}
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        row = cur.execute("""
+            SELECT period_code FROM payments
+            WHERE apartment_number = ? AND base_service_code LIKE 'PARKING_%'
+            ORDER BY id DESC LIMIT 1
+        """, (apartment_number,)).fetchone()
+        if not row:
+            return None
+        last_period = row["period_code"]
+
+        rows = cur.execute("""
+            SELECT p.id AS payment_id, p.amount, p.base_service_code,
+                   v.license_plate_normalized AS plate
+            FROM payments p
+            LEFT JOIN vehicles v ON v.id = p.vehicle_id
+            WHERE p.apartment_number = ? AND p.period_code = ? AND p.base_service_code LIKE 'PARKING_%'
+            ORDER BY p.id
+        """, (apartment_number, last_period)).fetchall()
+
+        result_rows = []
+        for r in rows:
+            r = dict(r)
+            open_flags = cur.execute("""
+                SELECT issue_type, description, concerns_field
+                FROM verification_journal
+                WHERE related_payment_id = ? AND status = 'OPEN'
+            """, (r["payment_id"],)).fetchall()
+            r["carry_forward_flags"] = [dict(f) for f in open_flags]
+            result_rows.append(r)
+
+        return {"period": last_period, "rows": result_rows}
+    finally:
+        conn.close()
