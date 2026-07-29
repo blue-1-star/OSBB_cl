@@ -327,7 +327,7 @@ def next_month(period_code: str) -> str:
     return f"{y:04d}-{m:02d}"
 
 
-def latest_paid_period(apartment_id: int, service: dict) -> str | None:
+def latest_paid_period(apartment_id: int, service: dict, vehicle_id: int | None = None) -> str | None:
     con = core.get_conn()
     try:
         if not _table(con, 'payments'):
@@ -342,6 +342,9 @@ def latest_paid_period(apartment_id: int, service: dict) -> str | None:
             apartment = apartment_by_id(con, apartment_id)
             filters.append('CAST(apartment_number AS TEXT)=?')
             params.append(str(apartment.get('apartment_number') if apartment else ''))
+        if vehicle_id is not None and 'vehicle_id' in cols:
+            filters.append('vehicle_id=?')
+            params.append(int(vehicle_id))
         if 'service_item_code' in cols and service.get('service_item_code'):
             filters.append('service_item_code=?')
             params.append(service.get('service_item_code'))
@@ -448,7 +451,8 @@ def current_tariff(service: dict, period_code: str) -> float | None:
 
 def proposed_defaults(payer: dict, service: dict, fallback_period: str) -> dict[str, Any]:
     apartment = payer['apartment']
-    latest = latest_paid_period(int(apartment['id']), service)
+    # latest = latest_paid_period(int(apartment['id']), service)
+    latest = latest_paid_period(int(apartment['id']), service, vehicle_id=payer.get('vehicle_id'))
     proposed_period = next_month(latest) if latest else fallback_period
 
     charge = core.suggested_charge(
@@ -456,6 +460,7 @@ def proposed_defaults(payer: dict, service: dict, fallback_period: str) -> dict[
         period_code=proposed_period,
         service_code=service['service_code'],
         service_item_code=service.get('service_item_code'),
+        vehicle_id=payer.get('vehicle_id'),
     )
     amount = None
     charge_id = None

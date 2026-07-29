@@ -531,10 +531,12 @@ def suggested_charge(
     period_code: str,
     service_code: str,
     service_item_code: str | None,
+    vehicle_id: int | None = None,
 ) -> dict | None:
     rows = open_charges(
         apartment_id=int(unit["id"]),
         apartment_number=text(unit.get("apartment_number")),
+        vehicle_id=vehicle_id,
         period_code=period_code,
         service_code=service_code,
         service_item_code=service_item_code,
