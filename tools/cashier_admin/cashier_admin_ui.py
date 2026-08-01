@@ -47,6 +47,14 @@ CONCERNS_FIELD_OPTIONS = [
     ("other", "❓ Другое"),
 ]
 CONCERNS_FIELD_LABELS = dict(CONCERNS_FIELD_OPTIONS)
+DEFAULT_CONCERNS_FIELD = {
+    "VEHICLE_UNLINKED": None,
+    "MISSING_VEHICLE": "vehicle_plate",
+    "CHECK_PLATE": "vehicle_plate",
+    "MISSING_PARKING_MODE": "parking_mode",
+    "AMOUNT_MISMATCH": "amount",
+    "OTHER": "other",
+}
 
 ISSUE_TYPE_NOTE_PROMPTS = {
     "VEHICLE_UNLINKED": "Какой номер/квартира правильные, если знаете? Или «-», чтобы пропустить:",
@@ -447,7 +455,14 @@ def search_payments_by_filter(filter_key: str, value: str, limit: int = 30):
                     params.extend(matching_numbers)
 
         elif filter_key == 'date':
-            like = f"%{value}%"
+            import re
+            date_value = value.strip()
+            m = re.match(r'^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$', date_value)
+            if m:
+                day, month, year = m.groups()
+                day, month = day.zfill(2), month.zfill(2)
+                date_value = f"{year}-{month}-{day}" if year else f"-{month}-{day}"
+            like = f"%{date_value}%"
             for col in ['payment_date', 'created_at']:
                 if col in pcols:
                     clauses.append(f"CAST(p.{col} AS TEXT) LIKE ?")
@@ -1037,6 +1052,17 @@ async def handle_cashier_admin_text(
             rows.append([BTN_CANCEL_FLAG])
             await update.message.reply_text("Выберите один из вариантов на клавиатуре.", reply_markup=kb(rows))
             return True
+
+        default_field = DEFAULT_CONCERNS_FIELD.get(issue_type)
+        if default_field is not None:
+            user_states[user_id] = {
+                "mode": "cashier_admin", "screen": "flag_admin_note",
+                "payment_id": pid, "issue_type": issue_type, "concerns_field": default_field,
+            }
+            note_prompt = ISSUE_TYPE_NOTE_PROMPTS.get(issue_type, ISSUE_TYPE_NOTE_PROMPTS["OTHER"])
+            await update.message.reply_text(note_prompt, reply_markup=kb([[BTN_CANCEL_FLAG]]))
+            return True
+
         user_states[user_id] = {"mode": "cashier_admin", "screen": "flag_admin_concerns", "payment_id": pid, "issue_type": issue_type}
         rows = [[label] for _, label in CONCERNS_FIELD_OPTIONS]
         rows.append([BTN_CANCEL_FLAG])

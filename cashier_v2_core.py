@@ -370,6 +370,7 @@ def open_charges(
     apartment_id: int | None = None,
     apartment_number: str | None = None,
     entrance_number: str | None = None,
+    vehicle_id: int | None = None,
     period_code: str | None = None,
     service_code: str | None = None,
     service_item_code: str | None = None,
@@ -448,6 +449,10 @@ def open_charges(
 
         if not unit_filter_added:
             return []
+
+        if vehicle_id is not None and "vehicle_id" in ccols:
+            filters.append("c.vehicle_id = ?")
+            params.append(int(vehicle_id))
 
         if period_code and "period_code" in ccols:
             filters.append("CAST(c.period_code AS TEXT) = ?")
