@@ -16,6 +16,9 @@
   python -m query_lib.cli verify-list
   python -m query_lib.cli service-add КОД ГРУППА "Название" единица --category PARKING --needs-review
   python -m query_lib.cli fio Стриха
+  python -m query_lib.cli op-types
+  python -m query_lib.cli add-op-type КОД НАПРАВЛЕНИЕ "описание"
+  python -m query_lib.cli vehicle-history AA3804KI
 """
 
 import sys
@@ -37,6 +40,13 @@ from query_lib.queries import (
     list_open_verification_tasks,
     add_service_catalog_entry,
     find_by_fio,
+    add_cashbox_operation_type,
+    list_cashbox_operation_types,
+    vehicle_payment_history,
+    next_expected_period,
+    current_due_period,
+    is_overdue,
+    get_conn,
 )
 
 
@@ -233,6 +243,69 @@ def main():
                 model = f" ({v['марка']})" if v['марка'] else ""
                 mode = f", режим: {v['режим']}" if v['режим'] else ""
                 print(f"    {v['номер']}{model}{mode}")
+
+    elif cmd == "op-types":
+        rows = list_cashbox_operation_types()
+        if not rows:
+            print("Справочник пуст (или миграция ещё не применена).")
+            return
+        for r in rows:
+            status = "" if r["is_active"] else " [неактивен]"
+            print(f"{r['operation_type']:<20} {r['expected_direction']:<4} {r['description'] or ''}{status}")
+
+    elif cmd == "add-op-type":
+        if len(args) < 4:
+            print("Использование: add-op-type КОД НАПРАВЛЕНИЕ \"описание\"")
+            print("Направление: in | out")
+            print("Пример: add-op-type utility_expense out \"Оплата коммунальных услуг дома\"")
+            return
+        op_type, direction = args[1], args[2]
+        description = " ".join(args[3:])
+        if direction not in ("in", "out"):
+            print("Направление должно быть 'in' или 'out'.")
+            return
+        created = add_cashbox_operation_type(op_type, direction, description)
+        if created:
+            print(f"Зарегистрирован новый тип: {op_type} / {direction}")
+        else:
+            print(f"Тип {op_type} уже существует, ничего не изменено.")
+
+    elif cmd == "vehicle-history":
+        if len(args) < 2:
+            print("Использование: vehicle-history НОМЕР_АВТО")
+            print("Пример: vehicle-history AA3804KI")
+            return
+        plate_clean = args[1].upper().replace(" ", "").replace("-", "")
+        conn = get_conn()
+        row = conn.execute("""
+            SELECT id, COALESCE(license_plate_normalized, license_plate) AS plate
+            FROM vehicles
+            WHERE UPPER(REPLACE(REPLACE(COALESCE(license_plate_normalized, license_plate), ' ', ''), '-', '')) = ?
+        """, (plate_clean,)).fetchone()
+        conn.close()
+
+        if not row:
+            print(f"Авто с номером {args[1]} не найдено.")
+            return
+
+        vehicle_id, plate = row[0], row[1]
+        history = vehicle_payment_history(vehicle_id)
+        print(f"🚗 {plate} (vehicle_id={vehicle_id})\n")
+
+        if not history:
+            print("Истории платежей за парковку нет.")
+            return
+
+        print("История платежей:")
+        for h in history:
+            print(f"  {h['period_code']} | {h['amount']:.2f} грн | {h['payment_date']} | "
+                  f"{h['base_service_code']} | касса {h['cashbox_code']}")
+
+        next_period, is_gap = next_expected_period(vehicle_id)
+        print(f"\nСледующий ожидаемый период: {next_period}" + (" ⚠ (это ПРОПУСК в истории, не просто 'после последнего')" if is_gap else ""))
+        if next_period:
+            overdue = is_overdue(next_period)
+            print(f"Просрочено на сегодня: {'ДА' if overdue else 'нет'} (текущая конвенция: {current_due_period()})")
 
     else:
         print(f"Неизвестная команда: {cmd}")

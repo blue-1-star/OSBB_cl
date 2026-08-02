@@ -27,7 +27,7 @@ from tools.cashier_v2_telegram.cashier_search import (
 )
 from tools.cashier_v2_telegram.cashier_card import payment_card, period_display, success_card
 from Bots.handlers.vehicle_card_editor import create_draft_vehicle, create_registry_vehicle
-from query_lib.queries import vehicles_by_apartment, log_verification_task, last_parking_pattern
+from query_lib.queries import vehicles_by_apartment, log_verification_task, last_parking_pattern, resolve_group_vehicle_assignment
 
 BTN_PAYMENTS = "💳 Платежи"
 BTN_CASHIER_V2 = "💰 Касса v2"
@@ -115,6 +115,7 @@ def _extract_apartment_number(draft: dict) -> str | None:
     return str(apartment_raw) if apartment_raw is not None else None
 BTN_EDIT_PERIOD = "📅 Период"
 BTN_EDIT_AMOUNT = "💰 Сумму"
+BTN_EDIT_CASHBOX = "🏦 Пункт приёма"
 BTN_EDIT_COMMENT = "📝 Комментарий"
 BTN_SKIP_COMMENT = "⏭ Без комментария"
 BTN_BACK_TO_CARD = "⬅️ К карточке"
@@ -208,7 +209,28 @@ def card_kb(draft: dict | None = None) -> ReplyKeyboardMarkup:
 
 
 def edit_kb() -> ReplyKeyboardMarkup:
-    return kb([[BTN_EDIT_PERIOD, BTN_EDIT_AMOUNT], [BTN_EDIT_COMMENT], [BTN_BACK_TO_CARD, BTN_CANCEL]])
+    return kb([[BTN_EDIT_PERIOD, BTN_EDIT_AMOUNT], [BTN_EDIT_CASHBOX], [BTN_EDIT_COMMENT], [BTN_BACK_TO_CARD, BTN_CANCEL]])
+
+
+def cashbox_points_kb() -> ReplyKeyboardMarkup:
+    """
+    Список пунктов приёма — строится динамически из реально заведённых
+    касс (таблица cashboxes), не из угаданного заранее набора.
+    Исключены: 'BANK' (своя отдельная кнопка "Провести как банк") и
+    'K' (агрегат для отчётности по всем консьержам разом, не настоящая
+    точка приёма — выбор её кассиром означал бы отчётную путаницу).
+    """
+    con = core.get_conn()
+    try:
+        rows = con.execute(
+            "SELECT cashbox_code FROM cashboxes WHERE cashbox_code NOT IN ('BANK', 'K') ORDER BY cashbox_code"
+        ).fetchall()
+    finally:
+        con.close()
+    codes = [r[0] for r in rows] or [DEFAULT_CASHBOX_CODE]
+    rows_kb = [[code] for code in codes]
+    rows_kb.append([BTN_BACK_TO_CARD, BTN_CANCEL])
+    return kb(rows_kb)
 
 
 def periods_kb(current: str) -> ReplyKeyboardMarkup:
@@ -607,6 +629,11 @@ async def prepare_parking_card(update: Update, user_states: dict[int, Any], user
 async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_TYPE, user_states: dict[int, Any], user_id: int) -> bool:
     text = (update.message.text or '').strip()
     state = user_states.get(user_id, {})
+    if not isinstance(state, dict):
+        # Другой экран (журнал согласования, заявки на привязку и т.п.)
+        # мог оставить в user_states строку/кортеж вместо словаря — это
+        # значит "не в режиме кассы", а не повод падать.
+        state = {}
 
     if state.get('mode') != 'cashier_v2' and text not in {BTN_PAYMENTS, BTN_CASHIER_V2, '💰 Касса'}:
         return False
@@ -1233,6 +1260,9 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                     related_payment_id=result.get('payment_id'), related_receipt_id=result.get('receipt_id'),
                     raised_by=str(user_id), assigned_role=None, concerns_field=f.get('concerns_field'),
                 )
+            group_resolved = []
+            if not draft['payer'].get('vehicle_id') and apartment_number:
+                group_resolved = resolve_group_vehicle_assignment(apartment_number, draft.get('period_code'))
             user_states[user_id] = {
                 'mode':'cashier_v2',
                 'screen':'success',
@@ -1242,7 +1272,13 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                     'commercial' if (draft.get('payer') or {}).get('commercial_unit_id') else 'resident'
                 ),
             }
-            await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_FLAG_AFTER_SUCCESS],[BTN_BACK, BTN_MAIN]])); return True
+            await update.message.reply_text(success_card(result, draft), reply_markup=kb([[BTN_NEXT],[BTN_FLAG_AFTER_SUCCESS],[BTN_BACK, BTN_MAIN]]))
+            if group_resolved:
+                lines = [f"🔗 Заодно закрыт вопрос по {len(group_resolved)} авто той же квартиры:"]
+                for g in group_resolved:
+                    lines.append(f"  {g['plate']} (платёж #{g['payment_id']})")
+                await update.message.reply_text("\n".join(lines))
+            return True
         if text == BTN_ACCEPT_BANK:
             apartment_number = (draft.get('payer') or {}).get('apartment') if isinstance(draft.get('payer'), dict) else None
             if isinstance(apartment_number, dict):
@@ -1324,6 +1360,9 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                     related_payment_id=result.get('payment_id'), related_receipt_id=result.get('receipt_id'),
                     raised_by=str(user_id), assigned_role=None, concerns_field=f.get('concerns_field'),
                 )
+            group_resolved = []
+            if not draft['payer'].get('vehicle_id') and apartment_number:
+                group_resolved = resolve_group_vehicle_assignment(apartment_number, draft.get('period_code'))
             user_states[user_id] = {
                 'mode': 'cashier_v2',
                 'screen': 'success',
@@ -1337,7 +1376,13 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
                 f"💳 Банковский платёж принят (черновой, TMP-номер)\n\n{success_card(result, draft)}\n\n"
                 f"⚠ Реквизиты выписки не указаны — потребуется сверка позже.",
                 reply_markup=kb([[BTN_NEXT], [BTN_FLAG_AFTER_SUCCESS], [BTN_BACK, BTN_MAIN]]),
-            ); return True
+            )
+            if group_resolved:
+                lines = [f"🔗 Заодно закрыт вопрос по {len(group_resolved)} авто той же квартиры:"]
+                for g in group_resolved:
+                    lines.append(f"  {g['plate']} (платёж #{g['payment_id']})")
+                await update.message.reply_text("\n".join(lines))
+            return True
         if text == BTN_EDIT_AMOUNT:
             user_states[user_id] = {'mode':'cashier_v2','screen':'edit_amount','draft':draft}
             await update.message.reply_text("Введите сумму больше нуля:"); return True
@@ -1529,6 +1574,15 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
         if text == BTN_EDIT_AMOUNT:
             user_states[user_id] = {'mode':'cashier_v2','screen':'edit_amount','draft':draft}
             await update.message.reply_text("Введите новую сумму:"); return True
+        if text == BTN_EDIT_CASHBOX:
+            user_states[user_id] = {'mode':'cashier_v2','screen':'edit_cashbox','draft':draft}
+            current = draft.get('cashbox_code') or DEFAULT_CASHBOX_CODE
+            await update.message.reply_text(
+                f"Текущий пункт приёма: {current}\n\n"
+                f"O — Охрана, C — Центральная касса, K1-K6 — консьержи по подъездам.\n"
+                f"Выберите новый:",
+                reply_markup=cashbox_points_kb(),
+            ); return True
         if text == BTN_EDIT_COMMENT:
             user_states[user_id] = {'mode':'cashier_v2','screen':'edit_comment','draft':draft}
             await update.message.reply_text("Введите комментарий или нажмите «Без комментария».", reply_markup=kb([[BTN_SKIP_COMMENT],[BTN_BACK_TO_CARD,BTN_CANCEL]])); return True
@@ -1554,6 +1608,23 @@ async def handle_cashier_v2_text(update: Update, context: ContextTypes.DEFAULT_T
             draft['period_code'] = period_storage(text); draft['charge_id'] = None
         except Exception:
             await update.message.reply_text("Не понял период. Пример: 06-2026."); return True
+        await show_card(update, user_states, user_id, draft); return True
+
+    if state.get('screen') == 'edit_cashbox':
+        draft = state['draft']
+        if text == BTN_BACK_TO_CARD:
+            await show_card(update, user_states, user_id, draft); return True
+        con = core.get_conn()
+        try:
+            known = {r[0] for r in con.execute("SELECT cashbox_code FROM cashboxes WHERE cashbox_code NOT IN ('BANK', 'K')")}
+        finally:
+            con.close()
+        if text not in known:
+            await update.message.reply_text(
+                "Такого пункта приёма нет в справочнике касс. Выберите кнопкой.",
+                reply_markup=cashbox_points_kb(),
+            ); return True
+        draft['cashbox_code'] = text
         await show_card(update, user_states, user_id, draft); return True
 
     if state.get('screen') == 'edit_amount':

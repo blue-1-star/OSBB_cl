@@ -77,8 +77,6 @@ async def handle_tariff_editor_text(
 ) -> bool:
     text = (update.message.text or "").strip()
     state = user_states.get(user_id)
-    if not isinstance(state, dict):
-        state = {}
 
     # --- вход в раздел ---
     if text == ENTRY_BUTTON:

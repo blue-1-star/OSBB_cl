@@ -500,8 +500,6 @@ async def show_access_card(update: Update, user_states: dict[int, Any], user_id:
     if row is None:
         await update.message.reply_text("⚠ Запись не найдена.")
         state = user_states.get(user_id, {})
-        if not isinstance(state, dict):
-            state = {}
         await show_role_list(update, user_states, user_id, state.get("role", "guard"))
         return
     role = str(row["role"] or "guard")
@@ -897,8 +895,6 @@ def role_from_add_button(text: str) -> str | None:
 async def handle_user_onboarding_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE, user_states: dict[int, Any], user_id: int) -> bool:
     text = (update.message.text or "").strip()
     state = user_states.get(user_id, {})
-    if not isinstance(state, dict):
-        state = {}
 
     if state.get("mode") != "user_onboarding_admin" and text != BTN_USERS_ROLES:
         return False

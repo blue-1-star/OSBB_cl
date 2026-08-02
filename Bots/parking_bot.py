@@ -41,6 +41,12 @@ BOT_DIR = Path(__file__).resolve().parent
 OSBB_ROOT = BOT_DIR.parent
 PY_ROOT = OSBB_ROOT.parent
 
+from handlers.apartment_link_review import handle_apartment_link_review_text
+
+from handlers.verification_review import handle_verification_review_text
+# from handlers.apartment_link_review import handle_apartment_link_review_text
+
+
 for p in (OSBB_ROOT, PY_ROOT):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
@@ -200,6 +206,7 @@ ADMIN_MENU = [
     ["🧾 Админ платежей"],
     ["💰 Касса"],
     ["💵 Тарифы"],
+    ["🔗 Заявки на привязку квартиры"],
 ]
 
 USERS_MENU = [
@@ -1738,6 +1745,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # OSBB user onboarding / access roles admin workspace
     if await handle_user_onboarding_admin_text(update, context, user_states, user_id):
+        return
+    if await handle_verification_review_text(update, context, user_states, user_id):
+        return
+    if await handle_apartment_link_review_text(update, context, user_states, user_id):
         return
     # =========================
     # SPECIAL MODES

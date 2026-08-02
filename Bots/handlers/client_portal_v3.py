@@ -69,9 +69,9 @@ def client_menu_keyboard(lang: str) -> list[list[str]]:
     return result
 
 
-def client_welcome_text(lang: str) -> str:
-    return v2.client_welcome_text(lang)
-
+def client_welcome_text(lang: str, user_id: int = None) -> str:
+    from handlers.client_portal import client_welcome_text as _client_welcome_text
+    return _client_welcome_text(lang, user_id)
 
 async def handle_client_portal_text(
     update,

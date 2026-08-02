@@ -627,3 +627,226 @@ def last_parking_pattern(apartment_number: str):
         return {"period": last_period, "rows": result_rows}
     finally:
         conn.close()
+
+def vehicle_payment_history(vehicle_id: int, service_prefix: str = "PARKING"):
+    """
+    Полная история платежей одного авто (по умолчанию — только за
+    парковку), в хронологическом порядке по period_code. Строительный
+    блок для будущего автоматического определения следующего периода
+    (нужна вся история, не только последняя запись — чтобы видеть
+    пропуски, а не просто "последний + 1").
+
+    Возвращает список словарей: id, payment_date, amount, period_code,
+    base_service_code, cashbox_code — по возрастанию period_code.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT id, payment_date, amount, period_code, base_service_code, cashbox_code
+            FROM payments
+            WHERE vehicle_id = ? AND base_service_code LIKE ?
+            ORDER BY period_code, id
+            """,
+            (vehicle_id, f"{service_prefix}%"),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def _add_month(period_code: str) -> str:
+    year, month = map(int, period_code.split("-"))
+    month += 1
+    if month > 12:
+        month = 1
+        year += 1
+    return f"{year:04d}-{month:02d}"
+
+
+def _expand_period_code(period_code):
+    """Разворачивает обычный 'ГГГГ-ММ' как есть; составной исторический
+    'ГГГГ-ММ_ГГГГ-ММ' (платёж сразу за два месяца, старый импорт) —
+    в оба месяца по отдельности, раз оба были оплачены. Совсем
+    нестандартный формат — пропускается (не участвует в поиске
+    пропуска, но и не ломает разбор)."""
+    import re
+    if not period_code:
+        return []
+    if "_" in period_code:
+        return [p for p in period_code.split("_") if re.match(r"^\d{4}-\d{2}$", p)]
+    if re.match(r"^\d{4}-\d{2}$", period_code):
+        return [period_code]
+    return []
+
+
+def next_expected_period(vehicle_id: int, service_prefix: str = "PARKING"):
+    """
+    "Первая незаполненная ячейка" вместо простого "последний период + 1".
+    Конвенция ОСББ: платёж — аванс за СЛЕДУЮЩИЙ месяц (решение собрания).
+
+    Проходит всю историю платежей авто (не только последнюю запись) —
+    если где-то в середине есть пропуск, возвращает именно пропущенный
+    период. Составные исторические периоды ("2026-05_2026-06" — платёж
+    сразу за два месяца) разворачиваются в оба месяца, не ломают разбор.
+
+    Возвращает (period_code, is_gap).
+    """
+    history = vehicle_payment_history(vehicle_id, service_prefix)
+    if not history:
+        return None, False
+
+    paid_periods = set()
+    for h in history:
+        paid_periods.update(_expand_period_code(h["period_code"]))
+    if not paid_periods:
+        return None, False
+
+    periods_sorted = sorted(paid_periods)
+    earliest, latest = periods_sorted[0], periods_sorted[-1]
+
+    cursor = earliest
+    while cursor <= latest:
+        if cursor not in paid_periods:
+            return cursor, True
+        cursor = _add_month(cursor)
+
+    return _add_month(latest), False
+
+def add_cashbox_operation_type(operation_type: str, expected_direction: str, description: str = None):
+    """
+    Идемпотентно регистрирует новый тип операции кассы (cashbox_operations.
+    operation_type). Не блокирует ничего в самой cashbox_operations (там
+    нет CHECK) — это справочник для порядка, не жёсткое ограничение.
+    Возвращает (created: bool).
+    """
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM cashbox_operation_types WHERE operation_type = ?", (operation_type,))
+    if cur.fetchone():
+        conn.close()
+        return False
+    cur.execute(
+        "INSERT INTO cashbox_operation_types (operation_type, expected_direction, description) VALUES (?, ?, ?)",
+        (operation_type, expected_direction, description),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def list_cashbox_operation_types():
+    """Список всех зарегистрированных типов операций кассы."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT operation_type, expected_direction, description, is_active FROM cashbox_operation_types ORDER BY operation_type"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+BILLING_CONVENTION = "advance"  # "advance" (аванс за следующий месяц) | "arrears" (по факту за этот же). Решение собрания ОСББ: "advance".
+
+def current_due_period(as_of_date=None, convention: str = None) -> str:
+    """
+    Период, который должен быть УЖЕ оплачен на указанную (или
+    сегодняшнюю) дату, согласно конвенции. Единственное место, где
+    направление конвенции реально влияет на результат — поиск
+    пропусков в истории (next_expected_period) от него не зависит,
+    только эта функция и is_overdue().
+    """
+    from datetime import date
+    convention = convention or BILLING_CONVENTION
+    d = as_of_date or date.today()
+    period = f"{d.year:04d}-{d.month:02d}"
+    if convention == "arrears":
+        return _subtract_month(period)
+    return period
+
+
+def is_overdue(next_expected: str | None, as_of_date=None, convention: str = None) -> bool:
+    """
+    True, если ожидаемый следующий период (из next_expected_period())
+    уже наступил или прошёл относительно текущей даты и конвенции —
+    то есть авто должно было заплатить, но пока не заплатило.
+    """
+    if next_expected is None:
+        return False
+    due = current_due_period(as_of_date, convention)
+    return next_expected <= due
+
+def resolve_group_vehicle_assignment(apartment_number: str, period_code: str):
+    """
+    Проверяет, не закрывает ли текущий набор платежей БЕЗ vehicle_id
+    (у квартиры, за конкретный период) полный набор тарифов всех её
+    известных авто — если количество платежей и их суммы (как
+    мультимножество) точно совпадают с тарифами, разрешает vehicle_id
+    для ВСЕХ сразу (не гадая, какая строка какому авто соответствует —
+    при совпадающих тарифах это не имеет значения, все машины покрыты).
+
+    Вызывается сразу после подтверждения любого платежа за парковку —
+    "главная дорога" разработки, не отдельный отчёт задним числом.
+    Правит синхронно payments и связанную cashbox_operations.
+
+    Возвращает список разрешённых {'payment_id', 'vehicle_id', 'plate'}
+    (пусто, если группа не сложилась полностью — ничего не меняет).
+    """
+    from collections import Counter
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        unresolved = cur.execute("""
+            SELECT id, amount, cashbox_operation_id FROM payments
+            WHERE apartment_number = ? AND period_code = ? AND vehicle_id IS NULL
+        """, (apartment_number, period_code)).fetchall()
+        if not unresolved:
+            return []
+
+        tariff_by_mode = {}
+        for mode, code in (("Day", "PARKING_DAY"), ("Night", "PARKING_NIGHT")):
+            row = cur.execute(
+                "SELECT amount FROM service_tariffs WHERE service_code=? AND is_active=1 ORDER BY valid_from DESC LIMIT 1",
+                (code,),
+            ).fetchone()
+            tariff_by_mode[mode] = row[0] if row else None
+
+        vehicles = cur.execute("""
+            SELECT v.id, COALESCE(v.license_plate_normalized, v.license_plate) AS plate, v.parking_time
+            FROM vehicles v JOIN apartments a ON a.id = v.apartment_id
+            WHERE a.apartment_number = ?
+        """, (apartment_number,)).fetchall()
+
+        # Машины, УЖЕ получившие платёж за этот период через прямую
+        # привязку — исключаем из пула, иначе задвоим уже решённый случай
+        # (например: одна машина оплачена обычным выбором, вторая ещё нет).
+        already_paid_vehicle_ids = {
+            row["vehicle_id"] for row in cur.execute(
+                "SELECT vehicle_id FROM payments WHERE apartment_number=? AND period_code=? AND vehicle_id IS NOT NULL",
+                (apartment_number, period_code),
+            ).fetchall()
+        }
+
+        vehicle_tariffs = [
+            (v["id"], v["plate"], tariff_by_mode.get(v["parking_time"]))
+            for v in vehicles
+            if v["plate"] and tariff_by_mode.get(v["parking_time"]) and v["id"] not in already_paid_vehicle_ids
+        ]
+
+        amounts = [float(p["amount"]) for p in unresolved]
+        if len(amounts) != len(vehicle_tariffs) or not vehicle_tariffs:
+            return []
+        if Counter(amounts) != Counter(t for _, _, t in vehicle_tariffs):
+            return []
+
+        vehicle_tariffs_sorted = sorted(vehicle_tariffs, key=lambda x: x[1])
+        resolved = []
+        for p, (vid, plate, tariff) in zip(unresolved, vehicle_tariffs_sorted):
+            cur.execute("UPDATE payments SET vehicle_id=? WHERE id=?", (vid, p["id"]))
+            if p["cashbox_operation_id"]:
+                cur.execute("UPDATE cashbox_operations SET vehicle_id=? WHERE id=?", (vid, p["cashbox_operation_id"]))
+            resolved.append({"payment_id": p["id"], "vehicle_id": vid, "plate": plate})
+        conn.commit()
+        return resolved
+    finally:
+        conn.close()

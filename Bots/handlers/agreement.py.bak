@@ -126,8 +126,6 @@ async def show_vehicle_edit_menu(update: Update, user_states: dict, user_id: int
 
 async def handle_vehicle_edit_flow(update: Update, user_states: dict, user_id: int, text: str):
     state = user_states.get(user_id)
-    if not isinstance(state, dict):
-        state = {}
 
     if not (isinstance(state, tuple) and str(state[0]).startswith("vehicle_edit")):
         return False
@@ -243,8 +241,6 @@ async def handle_vehicle_edit_flow(update: Update, user_states: dict, user_id: i
 
 async def handle_tariff_vehicle_action(update: Update, user_states: dict, user_id: int, text: str):
     state = user_states.get(user_id)
-    if not isinstance(state, dict):
-        state = {}
 
     if not (isinstance(state, tuple) and state[0] == "tariff_vehicle"):
         return False
@@ -391,8 +387,6 @@ async def handle_agreement_card_action(
     show_apartment_card_callback,
 ):
     state = user_states.get(user_id)
-    if not isinstance(state, dict):
-        state = {}
 
     if not (isinstance(state, tuple) and state[0] == "agreement_card"):
         user_states.pop(user_id, None)
