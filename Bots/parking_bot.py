@@ -1675,23 +1675,24 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if text == "☀️ Day":
+    _state_now = user_states.get(user_id)
+    _in_vehicle_flow = isinstance(_state_now, dict) and str(_state_now.get("mode", "")).startswith(("vehicle_create_", "vehicle_edit"))
+
+    if text == "☀️ Day" and not _in_vehicle_flow:
         rows = get_vehicles_by_status("Day", limit=50)
         await update.message.reply_text(
             format_vehicles_admin_list("Автомобили Day", rows),
             reply_markup=kb(VEHICLE_REVIEW_MENU),
         )
         return
-
-    if text == "🌙 Night":
+    if text == "🌙 Night" and not _in_vehicle_flow:
         rows = get_vehicles_by_status("Night", limit=50)
         await update.message.reply_text(
             format_vehicles_admin_list("Автомобили Night", rows),
             reply_markup=kb(VEHICLE_REVIEW_MENU),
         )
         return
-
-    if text == "🚫 Не паркуется":
+    if text == "🚫 Не паркуется" and not _in_vehicle_flow:
         rows = get_vehicles_by_status("Inactive", limit=50)
         await update.message.reply_text(
             format_vehicles_admin_list("Не паркуется", rows),

@@ -1,0 +1,300 @@
+    # =========================
+    # O — основная касса охраны; K1..K6 — отдельные точки консьержей.
+    # Обработчик вызывается до старого router состояний.
+    # Cashier admin / billing subjects / commercial companies
+    
+    if await handle_tariff_editor_text(update, context, user_states, user_id):
+        return
+    
+    if await handle_cashier_admin_text(
+        update,
+        context,
+        user_states,
+        user_id,
+        is_super_admin=(user_id in SUPER_ADMIN_IDS),
+    ):
+        return
+
+    # Тарифы (доступ — только администратору)
+    if await handle_tariff_editor_text(update, context, user_states, user_id):
+        return
+
+    # OSBB cashier v2 Telegram adapter
+    if await handle_cashier_v2_text(update, context, user_states, user_id):
+        return
+
+    # DISABLED 2026-07-09: old cashier_operator_v2 intercepted the new cashier_v2_telegram UI.
+    # if await handle_cashier_operator_v2_text(
+    #     update,
+    #     user_states,
+    #     user_id,
+    #     text,
+    #     is_admin=is_admin_user(user_id),
+    # ):
+    #     return
+
+    # =========================
+    # Навигация
+    # =========================
+
+    if text == "🏠 Главное меню":
+        if user_modes.get(user_id) == "admin" and is_admin_user(user_id):
+            await show_admin_menu(update)
+        else:
+            await show_client_menu(update, lang)
+        return
+
+    if text == "⬅️ Назад":
+        if user_modes.get(user_id) == "admin" and is_admin_user(user_id):
+            await show_admin_menu(update)
+        else:
+            await show_client_menu(update, lang)
+        return
+
+    # =========================
+    # Клиентский режим
+    # =========================
+
+    if text == "🏠 Моя квартира":
+        await show_my_apartment(update, user_id)
+        return
+
+    if text == "✏️ Изменить квартиру":
+        user_states[user_id] = "waiting_apartment"
+        await update.message.reply_text("Введите новый номер квартиры:")
+        return
+
+    if text == "🚗 Мои автомобили":
+        await show_my_vehicles(update, user_id)
+        return
+
+    if text in ["🚗 Парковка", "🚗 Parking", "🚗 Паркування"]:
+        await update.message.reply_text(
+            "🚗 Парковка\n\n"
+            "Здесь будут начисления, оплаты и задолженность.",
+            reply_markup=kb(CLIENT_MENU_RU),
+        )
+        return
+
+    if text in ["🔑 Пульты", "🔑 Remotes"]:
+        await update.message.reply_text(
+            "🔑 Пульты шлагбаума\n\n"
+            "Здесь можно будет заказать новый пульт.",
+            reply_markup=kb(CLIENT_MENU_RU),
+        )
+        return
+
+    if text == "📞 Открытие по телефону":
+        await update.message.reply_text(
+            "📞 Открытие шлагбаума по телефону\n\n"
+            "Здесь можно будет зарегистрировать телефон.",
+            reply_markup=kb(CLIENT_MENU_RU),
+        )
+        return
+
+    if text in ["🏗 Благоустройство", "🏗 Благоустрій", "🏗 Improvements"]:
+        await update.message.reply_text(
+            "🏗 Благоустройство\n\n"
+            "Здесь будут сборы и заявки по благоустройству.",
+            reply_markup=kb(CLIENT_MENU_RU),
+        )
+        return
+
+    if text in ["📢 Объявления", "📢 Оголошення", "📢 Announcements"]:
+        await update.message.reply_text(
+            "📢 Объявления\n\n"
+            "Пока объявлений нет.",
+            reply_markup=kb(CLIENT_MENU_RU),
+        )
+        return
+
+    if text in ["📞 Контакты", "📞 Контакти", "📞 Contacts"]:
+        await update.message.reply_text(
+            "📞 Контакты\n\n"
+            "Контакты ОСББ будут добавлены позже.",
+            reply_markup=kb(CLIENT_MENU_RU),
+        )
+        return
+
+    # =========================
+    # Админ-режим
+    # =========================
+
+    if text == "🏠 Квартиры":
+        user_states[user_id] = "admin_waiting_apartment_lookup"
+
+        await update.message.reply_text(
+            "Введите номер квартиры:",
+            reply_markup=kb([["⬅️ Назад"]]),
+        )
+        return
+
+    if text == "👥 Жильцы":
+        await show_current_apartment_residents(update, user_id)
+        return
+
+    if text == "🚗 Авто":
+        await show_current_apartment_vehicles(update, user_id)
+        return
+
+    if text == "📞 Телефоны":
+        apartment_number = user_admin_apartments.get(user_id)
+        suffix = f" кв.{apartment_number}" if apartment_number else ""
+        await update.message.reply_text(
+            f"📞 Телефоны{suffix}\n\n"
+            "Раздел будет добавлен позже.",
+            reply_markup=kb(APARTMENT_MENU if apartment_number else ADMIN_MENU),
+        )
+        return
+
+    if text == "🔑 Пульты":
+        apartment_number = user_admin_apartments.get(user_id)
+        suffix = f" кв.{apartment_number}" if apartment_number else ""
+        await update.message.reply_text(
+            f"🔑 Пульты{suffix}\n\n"
+            "Раздел будет добавлен позже.",
+            reply_markup=kb(APARTMENT_MENU if apartment_number else ADMIN_MENU),
+        )
+        return
+
+    if text == "👥 Пользователи":
+        await show_users_menu(update)
+        return
+
+    if text == "📋 Все пользователи":
+        await show_resident_list(update, "Все пользователи", "all")
+        return
+
+    if text == "🏠 Без квартиры":
+        await show_resident_list(update, "Без квартиры", "without_apartment")
+        return
+
+    if text == "⏳ Самоподтверждённые":
+        await show_resident_list(update, "Самоподтверждённые", "self_confirmed")
+        return
+
+    if text == "✅ Проверенные оператором":
+        await show_resident_list(update, "Проверенные оператором", "operator_verified")
+        return
+
+    if text == "🔎 Проверить пользователя":
+        await ask_user_to_verify(update)
+        return
+
+    if text == "❌ Отвязать квартиру":
+        await ask_user_to_unlink(update)
+        return
+
+    if text == "🚗 Автомобили":
+        await show_vehicle_menu(update)
+        return
+    if await handle_vehicle_full_list_text(update, user_states, user_id, text):
+        return
+    if text == "📋 Все автомобили":
+        rows = get_vehicles_by_status("all", limit=50)
+        await update.message.reply_text(
+            format_vehicles_admin_list("Все автомобили", rows),
+            reply_markup=kb(VEHICLE_REVIEW_MENU),
+        )
+        return
+
+    if text == "❓ Без статуса":
+        rows = get_vehicles_by_status("missing", limit=50)
+        await update.message.reply_text(
+            format_vehicles_admin_list("Автомобили без статуса", rows),
+            reply_markup=kb(VEHICLE_REVIEW_MENU),
+        )
+        return
+
+    if text == "☀️ Day":
+        rows = get_vehicles_by_status("Day", limit=50)
+        await update.message.reply_text(
+            format_vehicles_admin_list("Автомобили Day", rows),
+            reply_markup=kb(VEHICLE_REVIEW_MENU),
+        )
+        return
+
+    if text == "🌙 Night":
+        rows = get_vehicles_by_status("Night", limit=50)
+        await update.message.reply_text(
+            format_vehicles_admin_list("Автомобили Night", rows),
+            reply_markup=kb(VEHICLE_REVIEW_MENU),
+        )
+        return
+
+    if text == "🚫 Не паркуется":
+        rows = get_vehicles_by_status("Inactive", limit=50)
+        await update.message.reply_text(
+            format_vehicles_admin_list("Не паркуется", rows),
+            reply_markup=kb(VEHICLE_REVIEW_MENU),
+        )
+        return
+
+    if text == "📊 Статистика авто":
+        await show_vehicle_stats(update)
+        return
+
+    if await handle_agreement_menu_text(update, user_states, user_id, text):
+        return
+
+    if text == "🔑 Заявки на пульты":
+        await update.message.reply_text(
+            "🔑 Заявки на пульты\n\n"
+            "Здесь будет обработка заказов пультов.",
+            reply_markup=kb(ADMIN_MENU),
+        )
+        return
+
+    if text == "📞 Телефонный доступ":
+        await update.message.reply_text(
+            "📞 Телефонный доступ\n\n"
+            "Здесь будут заявки на открытие шлагбаума звонком.",
+            reply_markup=kb(ADMIN_MENU),
+        )
+        return
+
+    if text == "💳 Платежи":
+        await update.message.reply_text(
+            "💳 Платежи\n\n"
+            "Здесь будет учёт оплат.",
+            reply_markup=kb(ADMIN_MENU),
+        )
+        return
+
+    if text == "📊 Отчёты":
+        await update.message.reply_text(
+            "📊 Отчёты\n\n"
+            "Здесь будут отчёты по ОСББ.",
+            reply_markup=kb(ADMIN_MENU),
+        )
+        return
+
+
+    if text == "⚙️ Настройки":
+        await show_users_roles(update, user_states, user_id)
+        return
+
+    # OSBB user onboarding / access roles admin workspace
+    if await handle_user_onboarding_admin_text(update, context, user_states, user_id):
+        return
+    if await handle_verification_review_text(update, context, user_states, user_id):
+        return
+    if await handle_apartment_link_review_text(update, context, user_states, user_id):
+        return
+    # =========================
+    # SPECIAL MODES
+    # =========================
+
+    if await handle_vehicle_verification_text(
+        update,
+        user_states,
+        user_id,
+        text,
+    ):
+        return
+    
+    if await handle_vehicle_card_editor_text(update, user_states, user_id, text):
+        return
+    if await handle_audit_viewer_text(update, user_states, user_id, text):
+        return
+    # =========================
