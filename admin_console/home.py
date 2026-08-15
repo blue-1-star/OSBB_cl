@@ -36,7 +36,7 @@ st.success(f"✅ Подключено к БД. Квартир: {count}")
 
 st.markdown("## 📚 Доступные разделы")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     if st.button("🏠 Карточка квартиры", use_container_width=True):
@@ -49,6 +49,10 @@ with col2:
 with col3:
     if st.button("🏦 Правка кассы", use_container_width=True):
         st.switch_page("pages/04_cashbox_editor.py")
+
+with col4:
+    if st.button("🔎 Поиск (ФИО/авто/тел.)", use_container_width=True):
+        st.switch_page("pages/05_universal_search.py")
 
 # Информация о проекте
 with st.expander("ℹ️ О проекте"):
