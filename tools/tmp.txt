@@ -1,0 +1,1 @@
+grep -n -B 30 -A 10 "не раскладывается однозначно" "/Users/san/Developer/Projects/OSBB_cl/tools/cashier_v2_telegram/cashier_v2_ui.py"
