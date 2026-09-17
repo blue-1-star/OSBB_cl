@@ -24,15 +24,15 @@ class ProjectPaths:
         # СЕКРЕТЫ (токен телеграм-бота и т.п.) — вне репозитория
         # ==================================================
         # Windows: G:\Prog_secret
-        # Mac: отдельный физический раздел "Secret" (/Volumes/Secret),
-        #      подтверждено фактическим расположением файла на 2026-08-16 —
-        #      /Volumes/Secret/Soft/telegram_osbb.py. НЕ ~/Programming/Secrets —
+        # Mac: отдельный раздел Secret. Стабильная точка доступа —
+        #      /Secret/Soft/telegram_osbb.py; /Secret является симлинком на
+        #      фактическую точку монтирования APFS. НЕ ~/Programming/Secrets —
         #      той папки на Маке больше нет (структура ~/Programming
         #      осталась только на Windows-машине).
         if self.os_name == "Windows":
             self.SECRETS_DIR = Path("G:/Prog_secret")
         elif self.os_name == "Darwin":
-            self.SECRETS_DIR = Path("/Volumes/Secret/Soft")
+            self.SECRETS_DIR = Path("/Secret/Soft")
         else:  # прочие ОС — пока не встречались, безопасный дефолт рядом с проектом
             self.SECRETS_DIR = self.home / "Secrets"
 

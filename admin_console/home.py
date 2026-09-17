@@ -1,4 +1,3 @@
-# G:\Programming\OSBB_cl\admin_console\home.py
 """
 Главная страница OSBB Admin Console
 """

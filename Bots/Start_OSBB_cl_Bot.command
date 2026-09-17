@@ -3,13 +3,13 @@
 #
 # Mac-аналог Start_OSBB_cl_Bot.bat (Windows).
 #   Windows: G:\Programming\OSBB_cl        -> Mac: /Users/san/Developer/Projects/OSBB_cl
-#   Windows: G:\Prog_secret                -> Mac: /Volumes/Secret/Soft
-#   Windows: .venv\Scripts\python.exe      -> Mac: venv/bin/python
+#   Windows: G:\Prog_secret                -> Mac: /Secret/Soft
+#   Windows: .venv\Scripts\python.exe      -> Mac: .venv/bin/python
 #
 # Перед первым запуском (один раз): chmod +x Start_OSBB_cl_Bot.command
 
 PROJECT_ROOT="/Users/san/Developer/Projects/OSBB_cl"
-SECRETS_DIR="/Volumes/Secret/Soft"
+SECRETS_DIR="/Secret/Soft"
 
 STARTED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -22,7 +22,7 @@ echo ""
 echo "  Started at : ${STARTED_AT}"
 echo "  Mode       : Production code (clean OSBB_cl branch)"
 echo "  Bot        : Bots/parking_bot.py"
-echo "  Python     : ${PROJECT_ROOT}/venv/bin/python"
+echo "  Python     : ${PROJECT_ROOT}/.venv/bin/python"
 echo ""
 echo "============================================================"
 echo ""
@@ -42,7 +42,7 @@ cd "${PROJECT_ROOT}/Bots" || {
     exit 1
 }
 
-"${PROJECT_ROOT}/venv/bin/python" parking_bot.py
+"${PROJECT_ROOT}/.venv/bin/python" parking_bot.py
 
 echo ""
 echo "============================================================"

@@ -1,6 +1,6 @@
 #!/bin/bash
 PROJECT_ROOT="/Users/san/Developer/Projects/OSBB_cl"
-SECRETS_DIR="/Volumes/Secret/Soft"
+SECRETS_DIR="/Secret/Soft"
 
 STARTED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -13,7 +13,7 @@ echo ""
 echo "  Started at : ${STARTED_AT}"
 echo "  Mode       : Production code (clean OSBB_cl branch)"
 echo "  Bot        : Bots/parking_bot.py"
-echo "  Python     : ${PROJECT_ROOT}/venv/bin/python"
+echo "  Python     : ${PROJECT_ROOT}/.venv/bin/python"
 echo ""
 echo "============================================================"
 echo ""
@@ -33,7 +33,7 @@ cd "${PROJECT_ROOT}/Bots" || {
     exit 1
 }
 
-"${PROJECT_ROOT}/venv/bin/python" parking_bot.py
+"${PROJECT_ROOT}/.venv/bin/python" parking_bot.py
 
 echo ""
 echo "============================================================"

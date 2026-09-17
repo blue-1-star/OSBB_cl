@@ -1,0 +1,22 @@
+{
+    "debug.onTaskFirstRun": {
+        "python": "Python: Current File",
+        "powershell": "PowerShell: Current Script"
+    },
+    "python-envs.pythonProjects": [
+        {
+            "path": "",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#003366",
+        "titleBar.activeForeground": "#ffffff",
+        "activityBar.background": "#004080",
+        "activityBar.foreground": "#ffffff",
+        "statusBar.background": "#002244",
+        "statusBar.foreground": "#ffffff"
+    }
+}
