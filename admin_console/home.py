@@ -35,7 +35,7 @@ st.success(f"✅ Подключено к БД. Квартир: {count}")
 
 st.markdown("## 📚 Доступные разделы")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     if st.button("🏠 Карточка квартиры", use_container_width=True):
@@ -53,6 +53,10 @@ with col4:
     if st.button("🔎 Поиск (ФИО/авто/тел.)", use_container_width=True):
         st.switch_page("pages/05_universal_search.py")
 
+with col5:
+    if st.button("📊 Отчёты", use_container_width=True):
+        st.switch_page("pages/06_reports.py")
+
 # Информация о проекте
 with st.expander("ℹ️ О проекте"):
     st.markdown("""
@@ -64,4 +68,6 @@ with st.expander("ℹ️ О проекте"):
     - Интерфейс: Streamlit
     - Разделы с записью в БД (⚠️ действуют осторожно, с audit_log
       и пересчётом связанных балансов): «Правка кассы»
+    - «Отчёты» работают только на чтение; примечания для ручной сверки
+      добавляются в выгруженном Excel, а не в базе данных.
     """)

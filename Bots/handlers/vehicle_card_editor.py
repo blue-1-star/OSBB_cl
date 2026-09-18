@@ -167,6 +167,32 @@ def create_draft_vehicle(plate, model, parking_time, operator_id):
     try:
         ensure_vehicle_lifecycle_schema(conn)
         cols = get_vehicle_columns(conn)
+
+        # A partial plate cannot be declared UNIQUE: two different cars may
+        # genuinely share the same visible fragment.  It is nevertheless not
+        # safe to silently create an identical active draft on a retry.  Stop
+        # here and let the operator select the existing draft through search
+        # or provide more identifying data.
+        existing = conn.execute(
+            """
+            SELECT id
+              FROM vehicles
+             WHERE apartment_id IS NULL
+               AND COALESCE(license_plate_normalized, license_plate, '') = ?
+               AND COALESCE(status, '') = 'DRAFT'
+               AND COALESCE(lifecycle_status, 'ACTIVE') = 'ACTIVE'
+             ORDER BY id
+            """,
+            (plate,),
+        ).fetchall()
+        if existing:
+            ids = ", ".join(str(row["id"]) for row in existing)
+            return False, (
+                f"Уже есть активное недоавто с номером/фрагментом {plate}: #{ids}. "
+                "Не создан новый дубль. Найдите существующую запись через поиск "
+                "или уточните квартиру/полный номер."
+            )
+
         fields = ["apartment_id", "license_plate", "license_plate_normalized", "car_model", "car_model_normalized", "parking_time"]
         values = [None, plate, plate, model, model, parking_time]
         optional = {

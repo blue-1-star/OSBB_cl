@@ -1,0 +1,80 @@
+{
+  "migration": "2026-09-18_006_cleanup_debug_orphan_draft_vehicles",
+  "executed_at": "20260918-161605",
+  "database": "/Users/san/Developer/Projects/OSBB_cl/Data/db/osbb_test.db",
+  "backup": "/Users/san/Developer/Projects/OSBB_cl/Data/db/backups/2026-09-18_006_cleanup_debug_orphan_draft_vehicles_20260918-161605.db",
+  "deleted_vehicle_ids": [
+    131,
+    132,
+    133,
+    134,
+    137,
+    138,
+    139,
+    140
+  ],
+  "protected_duplicate_drafts": [
+    {
+      "id": 135,
+      "plate": "8092",
+      "parking_time": "Night",
+      "created_at": "2026-07-15 17:44:14",
+      "created_by": "210312208",
+      "notes": "Черновик автомобиля: квартира и/или полный номер требуют уточнения",
+      "references": {
+        "cashbox_operations.vehicle_id": 1,
+        "payments.vehicle_id": 1
+      }
+    },
+    {
+      "id": 136,
+      "plate": "9000",
+      "parking_time": "Night",
+      "created_at": "2026-07-16 11:11:28",
+      "created_by": "210312208",
+      "notes": "Черновик автомобиля: квартира и/или полный номер требуют уточнения",
+      "references": {
+        "cashbox_operations.vehicle_id": 1,
+        "payments.vehicle_id": 1
+      }
+    },
+    {
+      "id": 141,
+      "plate": "9000",
+      "parking_time": null,
+      "created_at": "2026-07-26 13:25:14",
+      "created_by": "210312208",
+      "notes": "Черновик автомобиля: квартира и/или полный номер требуют уточнения",
+      "references": {
+        "cashbox_operations.vehicle_id": 1,
+        "payments.vehicle_id": 1
+      }
+    }
+  ],
+  "remaining_protected_duplicate_drafts": [
+    {
+      "id": 136,
+      "plate": "9000",
+      "parking_time": "Night",
+      "created_at": "2026-07-16 11:11:28",
+      "created_by": "210312208",
+      "notes": "Черновик автомобиля: квартира и/или полный номер требуют уточнения",
+      "references": {
+        "cashbox_operations.vehicle_id": 1,
+        "payments.vehicle_id": 1
+      }
+    },
+    {
+      "id": 141,
+      "plate": "9000",
+      "parking_time": null,
+      "created_at": "2026-07-26 13:25:14",
+      "created_by": "210312208",
+      "notes": "Черновик автомобиля: квартира и/или полный номер требуют уточнения",
+      "references": {
+        "cashbox_operations.vehicle_id": 1,
+        "payments.vehicle_id": 1
+      }
+    }
+  ]
+}

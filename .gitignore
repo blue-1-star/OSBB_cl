@@ -7,3 +7,8 @@ venv/
 
 # отчёты dev_infrastructure — генерируются заново, не храним в истории
 osbb_triage_report.*
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+.DS_Store
+*.DS_Store

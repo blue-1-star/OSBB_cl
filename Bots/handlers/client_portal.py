@@ -53,11 +53,12 @@ except Exception:
 I18N = {
     "ru": {
         "welcome": "Добро пожаловать в личный кабинет ОСББ.",
-        "choose_menu": "Пожалуйста, выберите действие кнопкой на русском языке.",
+        "choose_menu": "Выберите кнопку в меню.",
         "home": "🏠 Главное меню",
         "back_portal": "⬅️ К кабинету",
         "my_home": "🏠 Моя квартира",
-        "change_home": "✏️ Изменить квартиру",
+        "claim_home": "🏠 Указать свою квартиру",
+        "change_home": "✏️ Запросить смену квартиры",
         "my_vehicles": "🚗 Мои автомобили",
         "parking": "🚗 Парковка",
         "remotes": "🔑 Пульты",
@@ -86,11 +87,13 @@ I18N = {
         "yes": "✅ Да, это моя квартира",
         "other_home": "✏️ Ввести другую квартиру",
         "link_prompt": "Введите номер квартиры.",
+        "link_repeat_prompt": "Введите номер квартиры повторно.",
+        "link_repeat_mismatch": "Номера не совпали. Введите номер квартиры ещё раз.",
         "link_not_found": "Квартира не найдена. Проверьте номер и введите ещё раз.",
         "link_group": "Этот номер входит в составную группу. Для привязки обратитесь к оператору.",
         "link_confirm": "Квартира {unit}\n\nОтправить оператору запрос на привязку к этой квартире?\n\nДо проверки данные квартиры и автомобилей не показываются.",
         "linked": "✅ Запрос #{id} на привязку к квартире {unit} принят. Оператор проверит его отдельно.",
-        "no_unit": "Квартира пока не привязана. Выберите «Изменить квартиру».",
+        "no_unit": "Квартира пока не привязана. Укажите свою квартиру.",
         "cabinet": "🏠 Личный кабинет",
         "home_label": "Квартира",
         "entrance": "Подъезд",
@@ -188,11 +191,12 @@ I18N = {
     },
     "uk": {
         "welcome": "Ласкаво просимо до особистого кабінету ОСББ.",
-        "choose_menu": "Будь ласка, оберіть дію кнопкою українською мовою.",
+        "choose_menu": "Оберіть кнопку в меню.",
         "home": "🏠 Головне меню",
         "back_portal": "⬅️ До кабінету",
         "my_home": "🏠 Моя квартира",
-        "change_home": "✏️ Змінити квартиру",
+        "claim_home": "🏠 Вказати свою квартиру",
+        "change_home": "✏️ Запросити зміну квартири",
         "my_vehicles": "🚗 Мої автомобілі",
         "parking": "🚗 Паркування",
         "remotes": "🔑 Пульти",
@@ -221,11 +225,13 @@ I18N = {
         "yes": "✅ Так, це моя квартира",
         "other_home": "✏️ Ввести іншу квартиру",
         "link_prompt": "Введіть номер квартири.",
+        "link_repeat_prompt": "Введіть номер квартири повторно.",
+        "link_repeat_mismatch": "Номери не збіглися. Введіть номер квартири ще раз.",
         "link_not_found": "Квартиру не знайдено. Перевірте номер і введіть ще раз.",
         "link_group": "Цей номер входить до складеної групи. Для прив’язки зверніться до оператора.",
         "link_confirm": "Квартира {unit}\n\nНадіслати оператору запит на прив’язку до цієї квартири?\n\nДо перевірки дані квартири та автомобілів не показуються.",
         "linked": "✅ Запит #{id} на прив’язку до квартири {unit} прийнято. Оператор перевірить його окремо.",
-        "no_unit": "Квартиру ще не прив’язано. Оберіть «Змінити квартиру».",
+        "no_unit": "Квартиру ще не прив’язано. Вкажіть свою квартиру.",
         "cabinet": "🏠 Особистий кабінет",
         "home_label": "Квартира",
         "entrance": "Під’їзд",
@@ -323,11 +329,12 @@ I18N = {
     },
     "en": {
         "welcome": "Welcome to the OSBB resident portal.",
-        "choose_menu": "Please use the buttons in the selected language.",
+        "choose_menu": "Choose a button from the menu.",
         "home": "🏠 Main menu",
         "back_portal": "⬅️ Back to portal",
         "my_home": "🏠 My apartment",
-        "change_home": "✏️ Change apartment",
+        "claim_home": "🏠 Specify my apartment",
+        "change_home": "✏️ Request apartment change",
         "my_vehicles": "🚗 My vehicles",
         "parking": "🚗 Parking",
         "remotes": "🔑 Remotes",
@@ -356,11 +363,13 @@ I18N = {
         "yes": "✅ Yes, this is my apartment",
         "other_home": "✏️ Enter another apartment",
         "link_prompt": "Enter your apartment number.",
+        "link_repeat_prompt": "Enter the apartment number again.",
+        "link_repeat_mismatch": "The apartment numbers do not match. Enter the number again.",
         "link_not_found": "Apartment not found. Check the number and try again.",
         "link_group": "This number belongs to a combined group. Please contact the operator for linking.",
         "link_confirm": "Apartment {unit}\n\nSend the operator a request to link this apartment?\n\nApartment and vehicle details are not shown before verification.",
         "linked": "✅ Request #{id} to link apartment {unit} has been received. The operator will verify it separately.",
-        "no_unit": "No apartment is linked yet. Choose “Change apartment”.",
+        "no_unit": "No apartment is linked yet. Specify your apartment.",
         "cabinet": "🏠 Resident portal",
         "home_label": "Apartment",
         "entrance": "Entrance",
@@ -1738,7 +1747,7 @@ async def show_client_portal(update: Update, user_states: dict, user_id: int, la
         # Отправляем приветствие + сообщение о том, что квартира не привязана
         await update.message.reply_text(
             f"{welcome_message}\n\n{tr(lang, 'no_unit')}",
-            reply_markup=kb([[tr(lang, "change_home")], [tr(lang, "home")]]),
+            reply_markup=kb([[tr(lang, "claim_home")], [tr(lang, "home")]]),
         )
         return
 
@@ -2145,6 +2154,7 @@ async def handle_client_portal_text(
     # Root actions. We always process client messages here before old hard-coded RU.
     root_actions = {
         tr(lang, "my_home"): "home",
+        tr(lang, "claim_home"): "change",
         tr(lang, "change_home"): "change",
         tr(lang, "my_vehicles"): "vehicles",
         tr(lang, "parking"): "parking",
@@ -2188,10 +2198,10 @@ async def handle_client_portal_text(
 
     # Link apartment.
     if current == "portal_unlinked":
-        if message_text == tr(lang, "change_home"):
+        if message_text == tr(lang, "claim_home"):
             await _ask_portal_unit(update, user_states, user_id, lang)
         else:
-            await update.message.reply_text(tr(lang, "choose_menu"), reply_markup=kb([[tr(lang, "change_home")], [tr(lang, "home")]]))
+            await update.message.reply_text(tr(lang, "choose_menu"), reply_markup=kb([[tr(lang, "claim_home")], [tr(lang, "home")]]))
         return True
 
     if current == "portal_wait_unit":
@@ -2202,6 +2212,21 @@ async def handle_client_portal_text(
         if text(unit.get("unit_type")) and text(unit.get("unit_type")) != "RESIDENTIAL":
             await update.message.reply_text(tr(lang, "link_group"))
             return True
+        state["mode"] = "portal_repeat_unit"
+        state["first_unit_id"] = int(unit["id"])
+        await update.message.reply_text(
+            tr(lang, "link_repeat_prompt"),
+            reply_markup=kb([[tr(lang, "back_portal")], [tr(lang, "home")]]),
+        )
+        return True
+
+    if current == "portal_repeat_unit":
+        unit = _find_exact_physical_unit(message_text)
+        if not unit or int(unit["id"]) != int(state.get("first_unit_id") or 0):
+            await update.message.reply_text(tr(lang, "link_repeat_mismatch"))
+            await _ask_portal_unit(update, user_states, user_id, lang)
+            return True
+        state.pop("first_unit_id", None)
         await _confirm_portal_unit(update, user_states, user_id, lang, unit)
         return True
 
