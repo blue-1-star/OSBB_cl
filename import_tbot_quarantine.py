@@ -1,6 +1,8 @@
 from pathlib import Path
 import sys
 import sqlite3
+import argparse
+import hashlib
 from datetime import datetime
 
 import pandas as pd
@@ -23,6 +25,31 @@ def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def add_column_if_missing(cur, table_name, column_name, definition):
+    columns = {row[1] for row in cur.execute(f"PRAGMA table_info({table_name})")}
+    if column_name not in columns:
+        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+
+def ensure_batch_columns(cur):
+    """Keep snapshots of every source file; never erase the previous import."""
+    add_column_if_missing(cur, "source_files", "file_sha256", "TEXT")
+    add_column_if_missing(cur, "source_files", "original_file_name", "TEXT")
+    add_column_if_missing(cur, "tbot_parking_import", "source_file_id", "INTEGER")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tbot_parking_source_file "
+        "ON tbot_parking_import(source_file_id)"
+    )
+
+
 def normalize_ownership(value):
     text = norm_text(value)
 
@@ -36,8 +63,8 @@ def normalize_ownership(value):
     return text
 
 
-def import_tbot_quarantine():
-    excel_file = paths.OSBB_TBOT_PARKING_FILE
+def import_tbot_quarantine(excel_file=None):
+    excel_file = Path(excel_file) if excel_file else paths.OSBB_TBOT_PARKING_FILE
     db_file = paths.OSBB_QUARANTINE_DB_FILE
 
     print("=" * 70)
@@ -54,9 +81,46 @@ def import_tbot_quarantine():
 
     conn = sqlite3.connect(db_file)
     cur = conn.cursor()
+    ensure_batch_columns(cur)
 
-    cur.execute("DELETE FROM tbot_parking_import")
-    cur.execute("DELETE FROM source_files WHERE source_name = ?", (SOURCE_NAME,))
+    source_hash = file_sha256(excel_file)
+    existing = cur.execute(
+        """
+        SELECT id, records_count, imported_at
+        FROM source_files
+        WHERE source_name=?
+          AND (
+                file_sha256=?
+                OR (
+                    file_sha256 IS NULL
+                    AND original_file_name IS NULL
+                    AND file_path LIKE ?
+                    AND records_count=?
+                )
+          )
+        ORDER BY id DESC LIMIT 1
+        """,
+        (SOURCE_NAME, source_hash, f"%{excel_file.name}", len(df)),
+    ).fetchone()
+    if existing:
+        conn.close()
+        print("Этот файл уже сохранён в карантине — повторный импорт не выполнен.")
+        print(f"Source file id: {existing[0]}, rows: {existing[1]}, imported: {existing[2]}")
+        return
+
+    cur.execute(
+        """
+        INSERT INTO source_files(
+            source_name, file_path, file_sha256, original_file_name,
+            records_count, imported_at, imported_by, notes
+        ) VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+        """,
+        (
+            SOURCE_NAME, str(excel_file), source_hash, excel_file.name,
+            now(), CREATED_BY, "Import snapshot; skipped rows will be recorded after parsing.",
+        ),
+    )
+    source_file_id = cur.lastrowid
 
     inserted = 0
     skipped = 0
@@ -91,9 +155,10 @@ def import_tbot_quarantine():
                 status_raw,
                 source,
                 imported_at,
-                imported_by
+                imported_by,
+                source_file_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             ownership_type,
             ownership_raw,
@@ -107,28 +172,19 @@ def import_tbot_quarantine():
             SOURCE_NAME,
             now(),
             CREATED_BY,
+            source_file_id,
         ))
 
         inserted += 1
 
-    cur.execute("""
-        INSERT INTO source_files (
-            source_name,
-            file_path,
-            records_count,
-            imported_at,
-            imported_by,
-            notes
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        SOURCE_NAME,
-        str(excel_file),
-        inserted,
-        now(),
-        CREATED_BY,
-        f"Skipped rows: {skipped}",
-    ))
+    cur.execute(
+        """
+        UPDATE source_files
+        SET records_count=?, notes=?
+        WHERE id=?
+        """,
+        (inserted, f"Skipped rows: {skipped}", source_file_id),
+    )
 
     conn.commit()
 
@@ -143,8 +199,12 @@ def import_tbot_quarantine():
     print(f"Строк в Excel               : {len(df)}")
     print(f"Импортировано в карантин    : {inserted}")
     print(f"Пропущено                  : {skipped}")
-    print(f"Всего в tbot_parking_import : {total}")
+    print(f"Строк в quarantine всего    : {total}")
+    print(f"ID снимка источника          : {source_file_id}")
 
 
 if __name__ == "__main__":
-    import_tbot_quarantine()
+    parser = argparse.ArgumentParser(description="Import one TBot parking spreadsheet as a preserved quarantine snapshot.")
+    parser.add_argument("--file", type=Path, help="Путь к parking_tbot3.xlsx или другой версии файла.")
+    args = parser.parse_args()
+    import_tbot_quarantine(args.file)

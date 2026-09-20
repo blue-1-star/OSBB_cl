@@ -9,7 +9,7 @@ STREAMLIT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import streamlit as st
-from utils.db import get_conn
+from admin_console.utils.db import get_conn
 
 st.set_page_config(
     page_title="OSBB Admin Console",
@@ -23,7 +23,15 @@ st.caption("Просмотр и редактирование данных про
 # Проверка подключения
 conn = get_conn()
 cur = conn.cursor()
-cur.execute("SELECT COUNT(*) FROM apartments")
+# Technical/test units are maintained in the same registry but are not homes
+# and must not inflate the headline count shown to ordinary operators.
+cur.execute(
+    """
+    SELECT COUNT(*) FROM apartments
+    WHERE COALESCE(unit_type, '') <> 'TECHNICAL'
+      AND COALESCE(record_status, '') <> 'TEST'
+    """
+)
 count = cur.fetchone()[0]
 conn.close()
 
@@ -35,7 +43,7 @@ st.success(f"✅ Подключено к БД. Квартир: {count}")
 
 st.markdown("## 📚 Доступные разделы")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
 
 with col1:
     if st.button("🏠 Карточка квартиры", use_container_width=True):
@@ -56,6 +64,22 @@ with col4:
 with col5:
     if st.button("📊 Отчёты", use_container_width=True):
         st.switch_page("pages/06_reports.py")
+
+with col6:
+    if st.button("📥 История импорта", use_container_width=True):
+        st.switch_page("pages/07_import_history.py")
+
+with col7:
+    if st.button("✅ Верификация авто", use_container_width=True):
+        st.switch_page("pages/08_vehicle_verification.py")
+
+with col8:
+    if st.button("📨 Заявки жителей", use_container_width=True):
+        st.switch_page("pages/09_resident_requests.py")
+
+with col9:
+    if st.button("👥 Пользователи и доступ", use_container_width=True):
+        st.switch_page("pages/10_user_access.py")
 
 # Информация о проекте
 with st.expander("ℹ️ О проекте"):

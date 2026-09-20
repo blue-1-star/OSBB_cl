@@ -49,9 +49,9 @@ sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import streamlit as st
 import pandas as pd
-from utils.db import get_conn
+from admin_console.utils.db import get_conn
 
-# ВАЖНО: этот импорт должен идти ПОСЛЕ "from utils.db import get_conn" —
+# ВАЖНО: этот импорт должен идти после подключения ``get_conn`` —
 # именно db.py вставляет PROJECT_ROOT (корень OSBB_cl) в sys.path,
 # а cashier_v2_core.py лежит прямо в корне OSBB_cl.
 from cashier_v2_core import (

@@ -9,6 +9,7 @@
 | **Apartment** | `apartments.md` | Квартира. Объединяет жителей и автомобили. |
 | **Payment** | `payments.md` | Платёж. Сумма, услуга, статус. |
 | **VehicleCandidate** | `vehicle_candidate.md` | Кандидат в автомобили. Ожидает подтверждения. |
+| **Video recognition evidence** | `video_recognition.md` | Подготовка Excel-наблюдений и операторские подсказки из видео. |
 
 ## Связи
 

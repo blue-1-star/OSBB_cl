@@ -1,5 +1,73 @@
 # OSBB Roadmap
 
+> **Working principle (confirmed 2026-09-20).** The project is developed in
+> small, usable vertical steps. The items below describe the target
+> architecture and must guide each step, but are not an instruction to build
+> the whole contour in advance.
+
+## Architectural direction: data quality, cards and resident self-service
+
+Three future mechanisms are parts of one system, not unrelated screens:
+
+1. **Data-quality deviations.** A vehicle, apartment, person or payment may
+   have several independent deviations from the expected data model. A future
+   extensible classifier must therefore support multiple codes per entity;
+   `0` means no known deviation, not a claim of absolute truth. The current
+   `verification_journal.issue_type` and `verification_tasks` are useful
+   specialised predecessors, not the final universal model.
+2. **Entity cards everywhere.** From any operational screen it must be
+   possible to open the contextual card of the apartment, vehicle, payment or
+   person. An edit is a structured proposal containing *current value →
+   proposed value*, rather than an unstructured message about a suspected
+   error. The proposal goes to the authorised operator for approval and is
+   auditable.
+3. **Resident self-service.** A resident may view their own data and submit
+   those structured proposals only within the apartment(s) to which they are
+   authorised. It must reuse the same proposal/review/audit mechanism as the
+   operator workspace; it must not create a parallel, less reliable database
+   path.
+
+### Two views of one vehicle dossier
+
+The full vehicle dossier is a projection of all relevant states, not simply
+`SELECT * FROM vehicles`. It joins registered vehicles, pending candidates
+from `verification_tasks` and `vehicle_candidates`, previous resident answers,
+and later video evidence. **It belongs to the operator workspace.**
+
+The resident must not be confronted with the project's quarantine, duplicate
+records or technical uncertainty. Their portal shows only a calm, minimal
+question based on data that the resident previously supplied: a paper form,
+their messages or the old bot. It asks whether that familiar list is correct,
+needs correction, or needs an addition. If no such prior resident data exists,
+the portal simply asks to add a vehicle; it does not reveal unrelated
+candidates.
+
+The resident's answer becomes evidence for the operator dossier. It never
+creates a duplicate vehicle or silently resolves a verification task. The
+operator then sees all lanes and decides whether to create, update, merge or
+reject a registry row.
+
+### Parking lifecycle and financial history
+
+“Car sold” is an effective-dated business event, not deletion of a vehicle.
+The eventual model must record both the time the change was entered and the
+date through which parking is chargeable. Future charges must use that period;
+existing charges/payments remain historical facts and are handled by a
+documented adjustment or cancellation, with audit. **The agreed policy for a
+partial month is daily prorating**: the amount is calculated from the count of
+chargeable calendar days in the billing month. The exact inclusion convention
+for the final parking day is to be implemented and shown to the operator
+before any automatic recalculation is enabled.
+
+### Order of work
+
+Near-term work remains deliberately narrow: finish a safe resident flow for
+viewing/confirming vehicles and submitting a change request; provide the
+operator queue and approval screen; then add an effective-dated parking-end
+event and make charge generation respect it. A universal quality classifier,
+fully generic cards and optional personal attributes are subsequent layers,
+to be shaped by accumulated real cases rather than guessed in advance.
+
 <!-- RESIDENT_IDENTITY_REFACTOR_V1:BEGIN -->
 
 ## P1. Resident Identity Refactor

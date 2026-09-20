@@ -11,7 +11,7 @@ sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import streamlit as st
 import pandas as pd
-from utils.db import get_conn
+from admin_console.utils.db import get_conn
 
 st.set_page_config(page_title="Платежи", layout="wide")
 st.title("💰 Платежи")

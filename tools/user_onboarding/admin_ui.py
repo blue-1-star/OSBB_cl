@@ -28,6 +28,15 @@ BTN_OPERATORS = "🛠 Операторы"
 BTN_ADMINS = "⭐ Администраторы"
 BTN_PERMISSIONS = "🔑 Права доступа"
 BTN_PERMISSIONS_REFERENCE = "📖 Справочник возможностей"
+BTN_ASSIGN_SELF_SERVICE = "👤 Назначить жителю"
+BTN_ASSIGN_READ_ONLY = "👁 Назначить наблюдателя"
+BTN_MANAGE_READ_ONLY = "👁 Просмотр ОСББ"
+BTN_GRANT_SELF_SERVICE = "✅ Выдать Self Service"
+BTN_REVOKE_SELF_SERVICE = "🚫 Приостановить Self Service"
+BTN_GRANT_READ_ONLY = "✅ Выдать просмотр ОСББ"
+BTN_REVOKE_READ_ONLY = "🚫 Приостановить просмотр ОСББ"
+BTN_SELF_SERVICE_RESIDENTS = "🪪 Self Service жителей"
+BTN_LEGACY_ACCESS = "🧳 Старый реестр доступа"
 
 BTN_BACK = "⬅ Назад"
 BTN_BACK_TO_USERS = "⬅ К пользователям"
@@ -53,6 +62,10 @@ BTN_CANCEL = "❌ Отмена"
 
 ADMIN_BUTTON_RE = re.compile(r"^⭐\s*#(\d+)")
 ACCESS_BUTTON_RE = re.compile(r"^(👤|👮|💰|🛠)\s*#(\d+)")
+SELF_SERVICE_BUTTON_RE = re.compile(r"^🪪\s*#(\d+)")
+READ_ONLY_BUTTON_RE = re.compile(r"^👁\s*#(\d+)")
+SELF_SERVICE_ROLE = "RESIDENT_SELF_SERVICE"
+READ_ONLY_ROLE = "OSBB_READ_ONLY"
 
 ROLE_META = {
     "resident": {
@@ -102,11 +115,10 @@ def keyboard(rows: list[list[str]]) -> ReplyKeyboardMarkup:
 
 def users_roles_keyboard() -> ReplyKeyboardMarkup:
     return keyboard([
-        [BTN_NEW_RESIDENTS],
-        [BTN_CONFIRMED_RESIDENTS, BTN_GUARDS],
-        [BTN_CASHIERS, BTN_OPERATORS],
-        [BTN_ADMINS],
-        [BTN_PERMISSIONS, BTN_PERMISSIONS_REFERENCE],
+        [BTN_NEW_RESIDENTS, BTN_CONFIRMED_RESIDENTS],
+        [BTN_SELF_SERVICE_RESIDENTS],
+        [BTN_ADMINS, BTN_PERMISSIONS],
+        [BTN_PERMISSIONS_REFERENCE, BTN_LEGACY_ACCESS],
         [BTN_BACK],
     ])
 
@@ -221,6 +233,57 @@ def access_role_count(role: str) -> int:
             (role,),
         ).fetchone()
         return int(row["n"])
+    finally:
+        con.close()
+
+
+def resident_dashboard_counts() -> dict[str, int]:
+    """Authoritative resident figures: profiles first, ACL grants separately."""
+    con = connect()
+    try:
+        if not table_exists(con, "resident_accounts"):
+            return {"confirmed": 0, "unconfirmed": 0, "self_service": 0, "legacy": 0}
+        row = con.execute(
+            """
+            SELECT
+                SUM(CASE WHEN status='apartment_confirmed' THEN 1 ELSE 0 END) AS confirmed,
+                SUM(CASE WHEN status<>'apartment_confirmed' OR status IS NULL THEN 1 ELSE 0 END) AS unconfirmed
+            FROM resident_accounts
+            """
+        ).fetchone()
+        self_service = 0
+        if table_exists(con, "access_user_roles"):
+            self_service = int(con.execute(
+                "SELECT COUNT(*) FROM access_user_roles WHERE role_code=? AND is_active=1",
+                (SELF_SERVICE_ROLE,),
+            ).fetchone()[0])
+        legacy = 0
+        if table_exists(con, "resident_access_accounts"):
+            legacy = int(con.execute("SELECT COUNT(*) FROM resident_access_accounts WHERE status='ACTIVE'").fetchone()[0])
+        return {
+            "confirmed": int(row["confirmed"] or 0),
+            "unconfirmed": int(row["unconfirmed"] or 0),
+            "self_service": self_service,
+            "legacy": legacy,
+        }
+    finally:
+        con.close()
+
+
+def list_unconfirmed_residents() -> list[sqlite3.Row]:
+    con = connect()
+    try:
+        if not table_exists(con, "resident_accounts"):
+            return []
+        return con.execute(
+            """
+            SELECT id, telegram_user_id, telegram_username, telegram_first_name,
+                   telegram_last_name, apartment_number, status, created_at, last_seen_at
+            FROM resident_accounts
+            WHERE status<>'apartment_confirmed' OR status IS NULL
+            ORDER BY created_at DESC, id DESC
+            """
+        ).fetchall()
     finally:
         con.close()
 
@@ -447,14 +510,17 @@ def format_request(row: sqlite3.Row | None) -> str:
 
 
 def show_users_roles_text() -> str:
+    counts = resident_dashboard_counts()
     return (
         "👥 Пользователи и роли\n\n"
-        f"🆕 Новые жители: {pending_count()}\n"
-        f"👤 Жильцы: {access_role_count('resident')}\n"
-        f"👮 Охранники: {access_role_count('guard')}\n"
-        f"💰 Кассиры: {access_role_count('cashier')}\n"
-        f"🛠 Операторы: {access_role_count('operator')}\n"
-        f"⭐ Администраторы: {bot_admin_count()}"
+        "Жители — актуальная модель\n"
+        f"🆕 Без подтверждённой квартиры: {counts['unconfirmed']}\n"
+        f"👤 Подтверждённые жители: {counts['confirmed']}\n"
+        f"🪪 Self Service активен: {counts['self_service']}\n\n"
+        "Управление доступом\n"
+        f"⭐ Администраторы: {bot_admin_count()}\n"
+        f"🧳 Legacy-записей доступа: {counts['legacy']}\n\n"
+        "Роли сотрудников и правила доступа открываются через «🔑 Права доступа»."
     )
 
 
@@ -493,6 +559,53 @@ async def show_role_list(update: Update, user_states: dict[int, Any], user_id: i
     rows = list_access_accounts(role)
     user_states[user_id] = {"mode": "user_onboarding_admin", "screen": "role_list", "role": role}
     await update.message.reply_text(format_access_list(role, rows), reply_markup=role_keyboard(role, rows))
+
+
+async def show_self_service_list(update: Update, user_states: dict[int, Any], user_id: int) -> None:
+    rows = list_self_service_residents()
+    user_states[user_id] = {"mode": "user_onboarding_admin", "screen": "self_service_list"}
+    await update.message.reply_text(format_self_service_list(rows), reply_markup=self_service_list_keyboard(rows))
+
+
+async def show_unconfirmed_resident_list(update: Update, user_states: dict[int, Any], user_id: int) -> None:
+    rows = list_unconfirmed_residents()
+    user_states[user_id] = {"mode": "user_onboarding_admin", "screen": "unconfirmed_residents"}
+    await update.message.reply_text(
+        format_unconfirmed_residents(rows),
+        reply_markup=keyboard([[BTN_REFRESH, BTN_BACK_TO_USERS]]),
+    )
+
+
+async def show_self_service_card(update: Update, user_states: dict[int, Any], user_id: int, resident_id: int) -> None:
+    row = get_self_service_resident(resident_id)
+    if row is None:
+        await update.message.reply_text("⚠ Подтверждённый житель не найден.")
+        await show_self_service_list(update, user_states, user_id)
+        return
+    user_states[user_id] = {
+        "mode": "user_onboarding_admin",
+        "screen": "self_service_card",
+        "resident_id": resident_id,
+    }
+    await update.message.reply_text(format_self_service_card(row), reply_markup=self_service_card_keyboard(row))
+
+
+async def show_read_only_list(update: Update, user_states: dict[int, Any], user_id: int) -> None:
+    rows = list_read_only_residents()
+    user_states[user_id] = {"mode": "user_onboarding_admin", "screen": "read_only_list"}
+    await update.message.reply_text(format_read_only_list(rows), reply_markup=read_only_list_keyboard(rows))
+
+
+async def show_read_only_card(update: Update, user_states: dict[int, Any], user_id: int, resident_id: int) -> None:
+    row = get_read_only_resident(resident_id)
+    if row is None:
+        await update.message.reply_text("⚠ Подтверждённый житель не найден.")
+        await show_read_only_list(update, user_states, user_id)
+        return
+    user_states[user_id] = {
+        "mode": "user_onboarding_admin", "screen": "read_only_card", "resident_id": resident_id,
+    }
+    await update.message.reply_text(format_read_only_card(row), reply_markup=read_only_card_keyboard(row))
 
 
 async def show_access_card(update: Update, user_states: dict[int, Any], user_id: int, account_id: int) -> None:
@@ -789,11 +902,362 @@ def list_role_rules(role_code: str) -> list[sqlite3.Row]:
 
 def role_rules_keyboard(role_code: str, rows: list[sqlite3.Row]) -> ReplyKeyboardMarkup:
     buttons: list[list[str]] = []
+    # Put the real administrative operation before a long ACL rule list: the
+    # observer role currently has 23 VIEW rules and its action used to be lost
+    # at the bottom of the keyboard.
+    if role_code == SELF_SERVICE_ROLE:
+        buttons.append([BTN_ASSIGN_SELF_SERVICE])
+    if role_code == READ_ONLY_ROLE:
+        buttons.append([BTN_ASSIGN_READ_ONLY])
     for row in rows:
         mark = "✅" if int(row["is_active"] or 0) == 1 and row["effect"] == "ALLOW" else "☐"
         buttons.append([f"{mark} #{row['id']} {row['resource']}.{row['action']}"])
     buttons.append([BTN_BACK_TO_USERS])
     return keyboard(buttons)
+
+
+def list_self_service_residents() -> list[sqlite3.Row]:
+    """Confirmed residents and their exact, apartment-scoped access state."""
+    con = connect()
+    try:
+        if not table_exists(con, "resident_accounts") or not table_exists(con, "access_user_roles"):
+            return []
+        return con.execute(
+            """
+            SELECT r.id, r.telegram_user_id, r.telegram_username, r.telegram_first_name,
+                   r.telegram_last_name, r.apartment_number, r.status,
+                   COALESCE(ur.is_active, 0) AS self_service_active
+            FROM resident_accounts r
+            LEFT JOIN access_user_roles ur
+              ON ur.telegram_user_id=CAST(r.telegram_user_id AS TEXT)
+             AND ur.role_code=?
+             AND ur.scope_type='APARTMENT'
+             AND ur.scope_value=CAST(r.apartment_number AS TEXT)
+            WHERE r.status='apartment_confirmed'
+              AND TRIM(COALESCE(r.apartment_number, '')) <> ''
+            ORDER BY COALESCE(ur.is_active, 0) DESC, CAST(r.apartment_number AS INTEGER), r.id
+            """,
+            (SELF_SERVICE_ROLE,),
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def get_self_service_resident(resident_id: int) -> sqlite3.Row | None:
+    con = connect()
+    try:
+        if not table_exists(con, "resident_accounts") or not table_exists(con, "access_user_roles"):
+            return None
+        return con.execute(
+            """
+            SELECT r.id, r.telegram_user_id, r.telegram_username, r.telegram_first_name,
+                   r.telegram_last_name, r.apartment_number, r.status,
+                   COALESCE(ur.is_active, 0) AS self_service_active
+            FROM resident_accounts r
+            LEFT JOIN access_user_roles ur
+              ON ur.telegram_user_id=CAST(r.telegram_user_id AS TEXT)
+             AND ur.role_code=?
+             AND ur.scope_type='APARTMENT'
+             AND ur.scope_value=CAST(r.apartment_number AS TEXT)
+            WHERE r.id=? AND r.status='apartment_confirmed'
+              AND TRIM(COALESCE(r.apartment_number, '')) <> ''
+            """,
+            (SELF_SERVICE_ROLE, resident_id),
+        ).fetchone()
+    finally:
+        con.close()
+
+
+def self_service_display_name(row: sqlite3.Row) -> str:
+    full_name = " ".join(str(row[key] or "").strip() for key in ("telegram_first_name", "telegram_last_name")).strip()
+    if full_name:
+        return full_name
+    if row["telegram_username"]:
+        return "@" + str(row["telegram_username"]).lstrip("@")
+    return str(row["telegram_user_id"])
+
+
+def self_service_list_keyboard(rows: list[sqlite3.Row]) -> ReplyKeyboardMarkup:
+    buttons = [
+        [f"🪪 #{row['id']} кв.{row['apartment_number']} {self_service_display_name(row)}"]
+        for row in rows
+    ]
+    buttons.append([BTN_REFRESH, BTN_BACK_TO_USERS])
+    return keyboard(buttons)
+
+
+def format_self_service_list(rows: list[sqlite3.Row]) -> str:
+    lines = ["🪪 Self Service жителей", "", "Показываются только жители с подтверждённой квартирой.", ""]
+    if not rows:
+        lines.append("Подтверждённых жителей пока нет.")
+        return "\n".join(lines)
+    for row in rows:
+        status = "✅ выдан" if int(row["self_service_active"] or 0) else "○ не выдан"
+        lines.append(f"• кв. {row['apartment_number']} | {self_service_display_name(row)} | {status}")
+    lines.extend(["", "Выберите жителя для карточки доступа."])
+    return "\n".join(lines)
+
+
+def self_service_card_keyboard(row: sqlite3.Row) -> ReplyKeyboardMarkup:
+    action = BTN_REVOKE_SELF_SERVICE if int(row["self_service_active"] or 0) else BTN_GRANT_SELF_SERVICE
+    return keyboard([[action], [BTN_MANAGE_READ_ONLY], [BTN_BACK_TO_USERS]])
+
+
+def format_self_service_card(row: sqlite3.Row) -> str:
+    active = int(row["self_service_active"] or 0) == 1
+    return (
+        "🪪 Self Service жителя\n\n"
+        f"Житель: {self_service_display_name(row)}\n"
+        f"Telegram ID: {row['telegram_user_id']}\n"
+        f"Квартира: {row['apartment_number']}\n"
+        f"Привязка квартиры: подтверждена\n"
+        f"Роль: {SELF_SERVICE_ROLE}\n"
+        f"Область: APARTMENT / {row['apartment_number']}\n"
+        f"Доступ: {'✅ выдан' if active else '○ не выдан'}\n\n"
+        "Роль даёт просмотр только этой квартиры и отправку заявок оператору. "
+        "Она не даёт прямого редактирования автомобилей, платежей или начислений."
+    )
+
+
+def format_unconfirmed_residents(rows: list[sqlite3.Row]) -> str:
+    lines = ["🆕 Жители без подтверждённой квартиры", ""]
+    if not rows:
+        return "\n".join(lines + ["Таких регистраций нет."])
+    for row in rows:
+        name = self_service_display_name(row)
+        lines.extend([
+            f"• {name} | Telegram {row['telegram_user_id']}",
+            f"  Квартира: {row['apartment_number'] or 'не указана'} | статус: {row['status'] or '—'}",
+        ])
+    lines.extend(["", "Сначала подтвердите квартиру через обычный процесс привязки; только затем можно выдать Self Service."])
+    return "\n".join(lines)
+
+
+def format_legacy_access_summary() -> str:
+    con = connect()
+    try:
+        if not table_exists(con, "resident_access_accounts"):
+            return "🧳 Старый реестр доступа\n\nТаблица уже отсутствует."
+        rows = con.execute(
+            """
+            SELECT role, status, COUNT(*) AS count
+            FROM resident_access_accounts
+            GROUP BY role, status
+            ORDER BY role, status
+            """
+        ).fetchall()
+    finally:
+        con.close()
+    lines = ["🧳 Старый реестр доступа", "", "Это legacy-данные, не источник истины для жителей и Self Service.", ""]
+    if not rows:
+        lines.append("Записей нет; таблица готова к проверке на удаление.")
+    else:
+        for row in rows:
+            lines.append(f"• {row['role']} / {row['status']}: {row['count']}")
+        lines.extend(["", "Новые записи сюда не добавляются. Сначала переносим оставшиеся роли в ACL, затем очищаем таблицу отдельной миграцией."])
+    return "\n".join(lines)
+
+
+def set_self_service_access(resident_id: int, enabled: bool, admin_id: int) -> tuple[bool, str]:
+    """Grant/revoke one exact scoped role and leave an ACL audit record."""
+    con = connect()
+    try:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("BEGIN IMMEDIATE")
+        resident = cur.execute(
+            """
+            SELECT id, telegram_user_id, apartment_number, status
+            FROM resident_accounts WHERE id=?
+            """,
+            (resident_id,),
+        ).fetchone()
+        if not resident:
+            raise RuntimeError("Житель не найден.")
+        apartment = str(resident["apartment_number"] or "").strip()
+        if resident["status"] != "apartment_confirmed" or not apartment:
+            raise RuntimeError("Доступ можно выдать только после подтверждения квартиры.")
+        role = cur.execute("SELECT 1 FROM access_roles WHERE role_code=? AND is_active=1", (SELF_SERVICE_ROLE,)).fetchone()
+        rules = cur.execute(
+            "SELECT COUNT(*) FROM access_role_permissions WHERE role_code=? AND is_active=1 AND effect='ALLOW'",
+            (SELF_SERVICE_ROLE,),
+        ).fetchone()[0]
+        if not role or rules == 0:
+            raise RuntimeError("Роль Self Service или её правила не подготовлены в БД.")
+        cur.execute(
+            """
+            INSERT INTO access_user_roles(
+                telegram_user_id, role_code, scope_type, scope_value, is_active,
+                valid_from, valid_to, granted_by, note, created_at, updated_at
+            ) VALUES (?, ?, 'APARTMENT', ?, ?, CURRENT_TIMESTAMP,
+                      CASE WHEN ?=1 THEN NULL ELSE CURRENT_TIMESTAMP END,
+                      ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(telegram_user_id, role_code, scope_type, scope_value) DO UPDATE SET
+                is_active=excluded.is_active,
+                valid_from=CASE WHEN excluded.is_active=1 THEN CURRENT_TIMESTAMP ELSE access_user_roles.valid_from END,
+                valid_to=CASE WHEN excluded.is_active=1 THEN NULL ELSE CURRENT_TIMESTAMP END,
+                granted_by=excluded.granted_by,
+                note=excluded.note,
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (
+                str(resident["telegram_user_id"]), SELF_SERVICE_ROLE, apartment, 1 if enabled else 0,
+                1 if enabled else 0, str(admin_id),
+                "Выдано через меню бота" if enabled else "Приостановлено через меню бота",
+            ),
+        )
+        cur.execute(
+            """
+            INSERT INTO access_audit_log(
+                actor_telegram_user_id, action_type, resource, action, scope_type,
+                scope_value, target_table, target_id, success, details
+            ) VALUES (?, ?, 'access_user_roles', ?, 'APARTMENT', ?, 'resident_accounts', ?, 1, ?)
+            """,
+            (
+                str(admin_id), "resident_self_service_granted" if enabled else "resident_self_service_suspended",
+                "GRANT" if enabled else "REVOKE", apartment, str(resident["id"]),
+                f"{SELF_SERVICE_ROLE} for Telegram {resident['telegram_user_id']}; direct registry and finance edits are excluded.",
+            ),
+        )
+        con.commit()
+        return True, "Доступ Self Service выдан." if enabled else "Доступ Self Service приостановлен."
+    except Exception as exc:
+        con.rollback()
+        return False, str(exc)
+    finally:
+        con.close()
+
+
+def list_read_only_residents() -> list[sqlite3.Row]:
+    """Confirmed residents and their OSBB-wide observer-role state."""
+    con = connect()
+    try:
+        if not table_exists(con, "resident_accounts") or not table_exists(con, "access_user_roles"):
+            return []
+        return con.execute(
+            """
+            SELECT r.id, r.telegram_user_id, r.telegram_username, r.telegram_first_name,
+                   r.telegram_last_name, r.apartment_number, r.status,
+                   COALESCE(ur.is_active, 0) AS read_only_active
+            FROM resident_accounts r
+            LEFT JOIN access_user_roles ur
+              ON ur.telegram_user_id=CAST(r.telegram_user_id AS TEXT)
+             AND ur.role_code=? AND ur.scope_type='ALL' AND ur.scope_value='*'
+            WHERE r.status='apartment_confirmed'
+            ORDER BY COALESCE(ur.is_active, 0) DESC, CAST(r.apartment_number AS INTEGER), r.id
+            """,
+            (READ_ONLY_ROLE,),
+        ).fetchall()
+    finally:
+        con.close()
+
+
+def get_read_only_resident(resident_id: int) -> sqlite3.Row | None:
+    con = connect()
+    try:
+        return con.execute(
+            """
+            SELECT r.id, r.telegram_user_id, r.telegram_username, r.telegram_first_name,
+                   r.telegram_last_name, r.apartment_number, r.status,
+                   COALESCE(ur.is_active, 0) AS read_only_active
+            FROM resident_accounts r
+            LEFT JOIN access_user_roles ur
+              ON ur.telegram_user_id=CAST(r.telegram_user_id AS TEXT)
+             AND ur.role_code=? AND ur.scope_type='ALL' AND ur.scope_value='*'
+            WHERE r.id=? AND r.status='apartment_confirmed'
+            """,
+            (READ_ONLY_ROLE, resident_id),
+        ).fetchone()
+    finally:
+        con.close()
+
+
+def read_only_list_keyboard(rows: list[sqlite3.Row]) -> ReplyKeyboardMarkup:
+    return keyboard(
+        [[f"👁 #{row['id']} кв.{row['apartment_number']} {self_service_display_name(row)}"] for row in rows]
+        + [[BTN_REFRESH, BTN_BACK_TO_USERS]]
+    )
+
+
+def format_read_only_list(rows: list[sqlite3.Row]) -> str:
+    lines = ["👁 Наблюдатели ОСББ", "", "Роль открывает только общий режим просмотра: без изменения реестра, платежей и заявок.", ""]
+    if not rows:
+        return "\n".join(lines + ["Подтверждённых жителей пока нет."])
+    for row in rows:
+        status = "✅ выдан" if int(row["read_only_active"] or 0) else "○ не выдан"
+        lines.append(f"• кв. {row['apartment_number'] or '—'} | {self_service_display_name(row)} | {status}")
+    return "\n".join(lines + ["", "Выберите жителя для карточки доступа."])
+
+
+def read_only_card_keyboard(row: sqlite3.Row) -> ReplyKeyboardMarkup:
+    action = BTN_REVOKE_READ_ONLY if int(row["read_only_active"] or 0) else BTN_GRANT_READ_ONLY
+    return keyboard([[action], [BTN_BACK_TO_USERS]])
+
+
+def format_read_only_card(row: sqlite3.Row) -> str:
+    active = int(row["read_only_active"] or 0) == 1
+    return (
+        "👁 Просмотр ОСББ\n\n"
+        f"Житель: {self_service_display_name(row)}\n"
+        f"Telegram ID: {row['telegram_user_id']}\n"
+        f"Квартира: {row['apartment_number'] or '—'}\n"
+        f"Роль: {READ_ONLY_ROLE}\n"
+        "Область: ALL / *\n"
+        f"Доступ: {'✅ выдан' if active else '○ не выдан'}\n\n"
+        "Доступ открывает раздел «Наблюдатель ОСББ» в личном меню. Он даёт только просмотр общих сводок, квартир, автомобилей, оплат и заявок жителей."
+    )
+
+
+def set_read_only_access(resident_id: int, enabled: bool, admin_id: int) -> tuple[bool, str]:
+    """Grant/revoke a global viewing role and write the access audit event."""
+    con = connect()
+    try:
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("BEGIN IMMEDIATE")
+        resident = cur.execute(
+            "SELECT id, telegram_user_id, status FROM resident_accounts WHERE id=?", (resident_id,)
+        ).fetchone()
+        if not resident or resident["status"] != "apartment_confirmed":
+            raise RuntimeError("Роль можно выдать только подтверждённому жителю.")
+        role = cur.execute("SELECT 1 FROM access_roles WHERE role_code=? AND is_active=1", (READ_ONLY_ROLE,)).fetchone()
+        if not role:
+            raise RuntimeError("Роль OSBB_READ_ONLY не подготовлена в БД.")
+        cur.execute(
+            """
+            INSERT INTO access_user_roles(
+                telegram_user_id, role_code, scope_type, scope_value, is_active,
+                valid_from, valid_to, granted_by, note, created_at, updated_at
+            ) VALUES (?, ?, 'ALL', '*', ?, CURRENT_TIMESTAMP,
+                      CASE WHEN ?=1 THEN NULL ELSE CURRENT_TIMESTAMP END,
+                      ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(telegram_user_id, role_code, scope_type, scope_value) DO UPDATE SET
+                is_active=excluded.is_active,
+                valid_from=CASE WHEN excluded.is_active=1 THEN CURRENT_TIMESTAMP ELSE access_user_roles.valid_from END,
+                valid_to=CASE WHEN excluded.is_active=1 THEN NULL ELSE CURRENT_TIMESTAMP END,
+                granted_by=excluded.granted_by, note=excluded.note, updated_at=CURRENT_TIMESTAMP
+            """,
+            (str(resident["telegram_user_id"]), READ_ONLY_ROLE, int(enabled), int(enabled), str(admin_id),
+             "Выдано через меню бота" if enabled else "Приостановлено через меню бота"),
+        )
+        cur.execute(
+            """
+            INSERT INTO access_audit_log(
+                actor_telegram_user_id, action_type, resource, action, scope_type,
+                scope_value, target_table, target_id, success, details
+            ) VALUES (?, ?, 'access_user_roles', ?, 'ALL', '*', 'resident_accounts', ?, 1, ?)
+            """,
+            (str(admin_id), "osbb_read_only_granted" if enabled else "osbb_read_only_suspended",
+             "GRANT" if enabled else "REVOKE", str(resident["id"]),
+             f"{READ_ONLY_ROLE} for Telegram {resident['telegram_user_id']}; read-only observer desk."),
+        )
+        con.commit()
+        return True, "Просмотр ОСББ выдан." if enabled else "Просмотр ОСББ приостановлен."
+    except Exception as exc:
+        con.rollback()
+        return False, str(exc)
+    finally:
+        con.close()
 
 
 def format_permissions_menu() -> str:
@@ -908,7 +1372,11 @@ async def handle_user_onboarding_admin_text(update: Update, context: ContextType
         return True
 
     if text == BTN_NEW_RESIDENTS:
-        await show_pending_residents(update, user_states, user_id)
+        await show_unconfirmed_resident_list(update, user_states, user_id)
+        return True
+
+    if text == BTN_CONFIRMED_RESIDENTS or text == BTN_SELF_SERVICE_RESIDENTS:
+        await show_self_service_list(update, user_states, user_id)
         return True
 
     if text == BTN_ADMINS:
@@ -926,11 +1394,40 @@ async def handle_user_onboarding_admin_text(update: Update, context: ContextType
         await update.message.reply_text(format_permissions_reference(), reply_markup=permissions_roles_keyboard())
         return True
 
+    if text == BTN_LEGACY_ACCESS:
+        user_states[user_id] = {"mode": "user_onboarding_admin", "screen": "legacy_access"}
+        await update.message.reply_text(
+            format_legacy_access_summary(),
+            reply_markup=keyboard([[BTN_REFRESH, BTN_BACK_TO_USERS]]),
+        )
+        return True
+
     if text.startswith("🔑 "):
         role_code = text.replace("🔑", "", 1).strip()
         rows = list_role_rules(role_code)
         user_states[user_id] = {"mode": "user_onboarding_admin", "screen": "role_rules", "role_code": role_code}
         await update.message.reply_text(format_role_rules(role_code, rows), reply_markup=role_rules_keyboard(role_code, rows))
+        return True
+
+    if text == BTN_ASSIGN_SELF_SERVICE:
+        if state.get("screen") != "role_rules" or state.get("role_code") != SELF_SERVICE_ROLE:
+            await update.message.reply_text("⚠ Назначение доступно только из карточки роли RESIDENT_SELF_SERVICE.")
+            return True
+        await show_self_service_list(update, user_states, user_id)
+        return True
+
+    if text == BTN_ASSIGN_READ_ONLY:
+        if state.get("screen") != "role_rules" or state.get("role_code") != READ_ONLY_ROLE:
+            await update.message.reply_text("⚠ Назначение доступно только из карточки роли OSBB_READ_ONLY.")
+            return True
+        await show_read_only_list(update, user_states, user_id)
+        return True
+
+    if text == BTN_MANAGE_READ_ONLY:
+        if state.get("screen") != "self_service_card":
+            await update.message.reply_text("⚠ Откройте карточку подтверждённого жителя.")
+            return True
+        await show_read_only_card(update, user_states, user_id, int(state.get("resident_id") or 0))
         return True
 
     role = role_from_button(text)
@@ -955,6 +1452,17 @@ async def handle_user_onboarding_admin_text(update: Update, context: ContextType
             await show_admins(update, user_states, user_id)
         elif state.get("screen") in {"role_list", "access_card"}:
             await show_role_list(update, user_states, user_id, state.get("role", "guard"))
+        elif state.get("screen") in {"self_service_list", "self_service_card"}:
+            await show_self_service_list(update, user_states, user_id)
+        elif state.get("screen") in {"read_only_list", "read_only_card"}:
+            await show_read_only_list(update, user_states, user_id)
+        elif state.get("screen") == "unconfirmed_residents":
+            await show_unconfirmed_resident_list(update, user_states, user_id)
+        elif state.get("screen") == "legacy_access":
+            await update.message.reply_text(
+                format_legacy_access_summary(),
+                reply_markup=keyboard([[BTN_REFRESH, BTN_BACK_TO_USERS]]),
+            )
         else:
             await show_users_roles(update, user_states, user_id)
         return True
@@ -972,6 +1480,16 @@ async def handle_user_onboarding_admin_text(update: Update, context: ContextType
     m = ACCESS_BUTTON_RE.match(text)
     if m:
         await show_access_card(update, user_states, user_id, int(m.group(2)))
+        return True
+
+    m = SELF_SERVICE_BUTTON_RE.match(text)
+    if m:
+        await show_self_service_card(update, user_states, user_id, int(m.group(1)))
+        return True
+
+    m = READ_ONLY_BUTTON_RE.match(text)
+    if m:
+        await show_read_only_card(update, user_states, user_id, int(m.group(1)))
         return True
 
     if text == BTN_ADD_ADMIN:
@@ -1050,6 +1568,31 @@ async def handle_user_onboarding_admin_text(update: Update, context: ContextType
             await show_role_list(update, user_states, user_id, role)
             return True
 
+    if state.get("screen") == "self_service_card":
+        resident_id = int(state.get("resident_id") or 0)
+        if text == BTN_GRANT_SELF_SERVICE:
+            ok, msg = set_self_service_access(resident_id, True, user_id)
+            await update.message.reply_text(("✅ " if ok else "⚠ ") + msg)
+            await show_self_service_card(update, user_states, user_id, resident_id)
+            return True
+        if text == BTN_REVOKE_SELF_SERVICE:
+            ok, msg = set_self_service_access(resident_id, False, user_id)
+            await update.message.reply_text(("✅ " if ok else "⚠ ") + msg)
+            await show_self_service_card(update, user_states, user_id, resident_id)
+            return True
+
+    if state.get("screen") == "read_only_card":
+        resident_id = int(state.get("resident_id") or 0)
+        if text == BTN_GRANT_READ_ONLY:
+            ok, msg = set_read_only_access(resident_id, True, user_id)
+            await update.message.reply_text(("✅ " if ok else "⚠ ") + msg)
+            await show_read_only_card(update, user_states, user_id, resident_id)
+            return True
+        if text == BTN_REVOKE_READ_ONLY:
+            ok, msg = set_read_only_access(resident_id, False, user_id)
+            await update.message.reply_text(("✅ " if ok else "⚠ ") + msg)
+            await show_read_only_card(update, user_states, user_id, resident_id)
+            return True
     if state.get("screen") == "pending_residents":
         request_id = state.get("request_id")
         if not request_id:

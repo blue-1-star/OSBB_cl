@@ -30,6 +30,8 @@ def init_quarantine_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source_name TEXT,
         file_path TEXT,
+        file_sha256 TEXT,
+        original_file_name TEXT,
         records_count INTEGER,
         imported_at TEXT,
         imported_by TEXT,
@@ -54,6 +56,7 @@ def init_quarantine_db():
         status_raw TEXT,
 
         source TEXT,
+        source_file_id INTEGER,
         imported_at TEXT,
         imported_by TEXT,
         notes TEXT

@@ -25,7 +25,7 @@ STREAMLIT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(STREAMLIT_ROOT))
 
 import streamlit as st
-from utils.db import get_conn  # импорт первым — вставляет PROJECT_ROOT (OSBB_cl) в sys.path
+from admin_console.utils.db import get_conn
 
 # cashier_search.py физически лежит НЕ в корне OSBB_cl (в отличие от
 # cashier_v2_core.py и query_lib/), а вложен в tools/cashier_v2_telegram/.
@@ -35,7 +35,7 @@ TOOLS_CASHIER_DIR = PROJECT_ROOT / "tools" / "cashier_v2_telegram"
 if str(TOOLS_CASHIER_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_CASHIER_DIR))
 
-# После utils.db (и добавления TOOLS_CASHIER_DIR выше) — оба модуля доступны
+# После подключения БД и добавления TOOLS_CASHIER_DIR — оба модуля доступны
 from query_lib.queries import find_by_fio, find_by_plate_fragment, find_by_phone
 from cashier_search import apartment_by_number, vehicles_for_apartment
 

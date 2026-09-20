@@ -12,13 +12,16 @@ from openpyxl.utils import get_column_letter
 STREAMLIT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(STREAMLIT_ROOT))
 
-from utils.db import get_conn
+from admin_console.utils.db import get_conn
 
 
 st.set_page_config(page_title="Отчёты", page_icon="📊", layout="wide")
 st.title("📊 Отчёты")
 
-report_name = st.selectbox("Отчёт", ["🚗 Все автомобили"])
+report_name = st.selectbox(
+    "Отчёт",
+    ["🚗 Все автомобили", "📅 Автомобили, добавленные за период"],
+)
 
 
 def load_all_vehicles() -> pd.DataFrame:
@@ -82,6 +85,32 @@ def build_excel(frame: pd.DataFrame) -> bytes:
     return buffer.getvalue()
 
 
+def load_vehicles_added_between(date_from: date, date_to: date) -> pd.DataFrame:
+    """Vehicles created during the inclusive calendar-date interval."""
+    sql = """
+        SELECT
+            substr(COALESCE(v.created_at, ''), 1, 10) AS "Дата добавления",
+            COALESCE(a.apartment_number, '—') AS "Квартира",
+            COALESCE(NULLIF(v.license_plate_normalized, ''),
+                     NULLIF(v.license_plate, ''), '—') AS "Гос номер",
+            COALESCE(NULLIF(v.car_model_normalized, ''),
+                     NULLIF(v.car_model, ''), '—') AS "Марка",
+            COALESCE(NULLIF(v.source, ''), '—') AS "Источник",
+            COALESCE(NULLIF(v.created_source, ''), '—') AS "Цепочка источника",
+            COALESCE(NULLIF(v.review_status, ''), '—') AS "Статус проверки"
+        FROM vehicles v
+        LEFT JOIN apartments a ON a.id = v.apartment_id
+        WHERE v.created_at >= ?
+          AND v.created_at < date(?, '+1 day')
+        ORDER BY v.created_at, a.apartment_number, v.id
+    """
+    conn = get_conn()
+    try:
+        return pd.read_sql_query(sql, conn, params=(date_from.isoformat(), date_to.isoformat()))
+    finally:
+        conn.close()
+
+
 if report_name == "🚗 Все автомобили":
     st.subheader("🚗 Все зарегистрированные автомобили")
     st.caption(
@@ -102,6 +131,39 @@ if report_name == "🚗 Все автомобили":
         "⬇️ Скачать Excel для ручной сверки",
         data=build_excel(vehicles),
         file_name=f"OSBB_Все_автомобили_{date.today():%Y-%m-%d}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+
+elif report_name == "📅 Автомобили, добавленные за период":
+    st.subheader("📅 Автомобили, добавленные за период")
+    st.caption(
+        "Период определяется по полю `vehicles.created_at`. Для контролируемых "
+        "партий дополнительно показывается путь происхождения данных."
+    )
+    date_from, date_to = st.date_input(
+        "Период добавления",
+        value=(date.today(), date.today()),
+        format="DD.MM.YYYY",
+    )
+    if date_from > date_to:
+        st.error("Дата начала не может быть позже даты окончания.")
+        st.stop()
+
+    vehicles = load_vehicles_added_between(date_from, date_to)
+    st.metric("Добавлено автомобилей", len(vehicles))
+    if vehicles.empty:
+        st.info("За выбранный период автомобилей не добавляли.")
+        st.stop()
+
+    st.dataframe(vehicles, use_container_width=True, hide_index=True)
+    st.download_button(
+        "⬇️ Скачать Excel за период",
+        data=build_excel(vehicles),
+        file_name=(
+            f"OSBB_добавленные_автомобили_"
+            f"{date_from:%Y-%m-%d}_по_{date_to:%Y-%m-%d}.xlsx"
+        ),
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
