@@ -22,7 +22,9 @@ import sys
 from pathlib import Path
 
 STREAMLIT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(STREAMLIT_ROOT))
+PROJECT_ROOT = STREAMLIT_ROOT.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 from admin_console.utils.db import get_conn
@@ -30,7 +32,6 @@ from admin_console.utils.db import get_conn
 # cashier_search.py физически лежит НЕ в корне OSBB_cl (в отличие от
 # cashier_v2_core.py и query_lib/), а вложен в tools/cashier_v2_telegram/.
 # Добавляем эту папку в sys.path отдельно — иначе ModuleNotFoundError.
-PROJECT_ROOT = STREAMLIT_ROOT.parent  # OSBB_cl
 TOOLS_CASHIER_DIR = PROJECT_ROOT / "tools" / "cashier_v2_telegram"
 if str(TOOLS_CASHIER_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_CASHIER_DIR))

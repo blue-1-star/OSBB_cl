@@ -6,7 +6,12 @@ import sys
 from pathlib import Path
 
 STREAMLIT_ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(STREAMLIT_ROOT))
+PROJECT_ROOT = STREAMLIT_ROOT.parent
+# ``streamlit run admin_console/home.py`` places admin_console itself on
+# sys.path, not its parent.  The package name ``admin_console`` therefore
+# needs the project root explicitly, both on a fresh launch and on navigation.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 from admin_console.utils.db import get_conn

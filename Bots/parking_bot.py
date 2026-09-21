@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import asyncio
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
@@ -52,6 +53,7 @@ for p in (OSBB_ROOT, PY_ROOT):
         sys.path.insert(0, str(p))
 
 from config import paths
+from resident_request_delivery import deliver_ready_resident_request_messages
 
 if str(paths.SECRETS_DIR) not in sys.path:
     sys.path.insert(0, str(paths.SECRETS_DIR))
@@ -1777,8 +1779,39 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def _resident_request_delivery_loop(app: Application) -> None:
+    """Small built-in delivery loop; avoids a separate JobQueue dependency."""
+    while True:
+        try:
+            await deliver_ready_resident_request_messages(app.bot)
+        except Exception as exc:
+            print(f"Resident request delivery error: {exc}")
+        await asyncio.sleep(15)
+
+
+async def start_resident_request_delivery(app: Application) -> None:
+    app.bot_data["resident_request_delivery_task"] = asyncio.create_task(
+        _resident_request_delivery_loop(app), name="resident-request-message-delivery"
+    )
+
+
+async def stop_resident_request_delivery(app: Application) -> None:
+    task = app.bot_data.pop("resident_request_delivery_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
 def main():
-    app = Application.builder().token(TOKEN).build()
+    app = (
+        Application.builder().token(TOKEN)
+        .post_init(start_resident_request_delivery)
+        .post_shutdown(stop_resident_request_delivery)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(

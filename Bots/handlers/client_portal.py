@@ -67,6 +67,14 @@ I18N = {
         "vehicle_resident_none": "Мы пока не нашли автомобилей, которые вы ранее сообщали. Если автомобиль есть, добавьте его — оператор проверит данные.",
         "suggest_changes": "✍️ Предложить изменение",
         "my_change_requests": "📨 Мои изменения",
+        "change_requests_menu_title": "📨 Мои обращения\n\nВыберите, что показать.",
+        "change_requests_active": "📨 Ожидающие",
+        "change_requests_history": "🗂️ История",
+        "reply_operator": "💬 Ответить оператору",
+        "clarification_choose": "Выберите заявку, по которой хотите ответить оператору.",
+        "clarification_reply_prompt": "Напишите ответ оператору. Он будет добавлен к этой заявке.",
+        "clarification_none": "Нет заявок, ожидающих вашего ответа.",
+        "clarification_reply_saved": "✅ Ответ отправлен оператору. Заявка снова ожидает рассмотрения.",
         "observer": "📖 Наблюдатель ОСББ",
         "observer_title": "📖 Наблюдатель ОСББ\n\nРежим только для просмотра. Изменение данных, заявок и платежей здесь невозможно.",
         "observer_summary": "📊 Сводка",
@@ -78,13 +86,17 @@ I18N = {
         "observer_prev": "⬅️ Раньше",
         "observer_next": "➡️ Далее",
         "my_change_requests_title": "📨 Мои предложения оператору",
+        "my_change_requests_active_title": "📨 Мои ожидающие обращения",
+        "my_change_requests_history_title": "🗂️ История обращений",
         "my_change_requests_none": "Вы ещё не отправляли предложений по своим данным.",
         "request_status_PENDING": "⏳ ожидает рассмотрения",
         "request_status_IN_PROGRESS": "🔵 в работе",
+        "request_status_NEEDS_CLARIFICATION": "🟡 требуется уточнение",
         "request_status_RESOLVED": "✅ решено",
         "request_status_REJECTED": "❌ отклонено",
         "request_status_CLOSED": "✅ закрыто",
         "request_type_RESIDENT_VEHICLE_PARKING_END": "Автомобиль продан / не паркуется",
+        "request_type_RESIDENT_VEHICLE_REMOVE": "Автомобиль внесён ошибочно",
         "request_type_RESIDENT_VEHICLE_UPDATE": "Исправление данных автомобиля",
         "request_type_RESIDENT_VEHICLE_CHANGE": "Изменение данных автомобиля",
         "request_type_RESIDENT_VEHICLE_ADD": "Добавление автомобиля",
@@ -96,16 +108,24 @@ I18N = {
         "suggest_vehicle_prompt": "Выберите автомобиль, по которому хотите предложить исправление.",
         "suggest_vehicle_text": "Опишите, что нужно исправить в этом автомобиле.",
         "vehicle_change_kind_prompt": "Что нужно изменить? Сначала показаны данные, которые сейчас находятся в реестре.",
-        "vehicle_current": "Сейчас в реестре:\nНомер: {plate}\nМарка/модель: {model}\nРежим парковки: {parking}",
+        "vehicle_current": "Сейчас в реестре:\nНомер: {plate}\nМарка/модель: {model}\nЦвет: {color}\nРежим парковки: {parking}",
         "edit_plate": "🔢 Исправить госномер",
         "edit_model": "🚘 Исправить марку/модель",
+        "edit_color": "🎨 Исправить цвет",
         "edit_parking_time": "🕒 Изменить режим парковки",
         "stop_parking": "🚫 Продан / не паркуется",
+        "remove_vehicle": "🗑️ Внесён ошибочно",
+        "vehicle_remove_prompt": "Подтвердите: этот автомобиль внесён ошибочно. Оператор проверит, можно ли удалить запись без нарушения истории оплат.",
+        "vehicle_remove_confirm": "✅ Да, внесён ошибочно",
+        "vehicle_removal_mode_required": "Для продажи или прекращения парковки сначала нужно указать режим парковки. Это необходимо для проверки начислений и оплат. Выберите «Изменить режим парковки» и отправьте отдельное предложение оператору.",
+        "vehicle_removal_mode_suggested": "Режим парковки в карточке не указан, но в истории оплат квартиры найдено подтверждение режима {mode}. Заявку можно отправить; оператор сначала подтвердит эту рекомендацию.",
+        "vehicle_removal_mode_unknown": "Режим парковки в карточке не указан и финансовой подсказки нет. Сообщение о продаже всё равно будет принято; оператор отдельно сверит расчёты.",
         "other_vehicle_change": "📝 Другое изменение",
         "vehicle_sold": "Автомобиль продан",
         "vehicle_no_longer_parks": "Больше не паркуется",
         "vehicle_plate_prompt": "Введите правильный госномер автомобиля.",
         "vehicle_model_prompt": "Введите правильные марку и модель автомобиля.",
+        "vehicle_color_prompt": "Введите правильный цвет автомобиля.",
         "vehicle_parking_prompt": "Выберите правильный режим парковки.",
         "vehicle_stop_reason_prompt": "Укажите причину прекращения парковки.",
         "vehicle_stop_date_prompt": "Введите последний день парковки в формате ГГГГ-ММ-ДД. Эта дата будет проверена оператором перед перерасчётом.",
@@ -113,6 +133,7 @@ I18N = {
         "vehicle_stop_date_unknown": "Не помню точную дату",
         "vehicle_other_prompt": "Коротко опишите, что следует изменить. Оператор увидит текущие данные автомобиля.",
         "vehicle_change_saved": "✅ Предложение #{id} отправлено оператору. Данные и начисления пока не изменялись.",
+        "request_registered": "✅ Заявка №{id} зарегистрирована в системе. Оператор рассмотрит её при первой возможности. Повторно отправлять это же обращение не нужно.",
         "suggest_new_vehicle_text": "Укажите госномер, марку и всё, что известно об автомобиле.",
         "add_vehicle_possible_correction": "Введённый номер {proposed} отличается всего на один символ от автомобиля {existing}. Возможно, это исправление номера, а не новый автомобиль.",
         "add_vehicle_use_correction": "✏️ Исправить {plate}",
@@ -264,6 +285,14 @@ I18N = {
         "vehicle_resident_none": "Ми поки не знайшли автомобілів, які ви повідомляли раніше. Якщо автомобіль є, додайте його — оператор перевірить дані.",
         "suggest_changes": "✍️ Запропонувати зміну",
         "my_change_requests": "📨 Мої зміни",
+        "change_requests_menu_title": "📨 Мої звернення\n\nОберіть, що показати.",
+        "change_requests_active": "📨 Очікують",
+        "change_requests_history": "🗂️ Історія",
+        "reply_operator": "💬 Відповісти оператору",
+        "clarification_choose": "Оберіть заявку, щодо якої хочете відповісти оператору.",
+        "clarification_reply_prompt": "Напишіть відповідь оператору. Її буде додано до цієї заявки.",
+        "clarification_none": "Немає заявок, що очікують на вашу відповідь.",
+        "clarification_reply_saved": "✅ Відповідь надіслано оператору. Заявка знову очікує розгляду.",
         "observer": "📖 Спостерігач ОСББ",
         "observer_title": "📖 Спостерігач ОСББ\n\nРежим лише для перегляду. Змінювати дані, заявки та платежі тут неможливо.",
         "observer_summary": "📊 Зведення",
@@ -275,13 +304,17 @@ I18N = {
         "observer_prev": "⬅️ Раніше",
         "observer_next": "➡️ Далі",
         "my_change_requests_title": "📨 Мої пропозиції оператору",
+        "my_change_requests_active_title": "📨 Мої звернення в роботі",
+        "my_change_requests_history_title": "🗂️ Історія звернень",
         "my_change_requests_none": "Ви ще не надсилали пропозицій щодо своїх даних.",
         "request_status_PENDING": "⏳ очікує розгляду",
         "request_status_IN_PROGRESS": "🔵 у роботі",
+        "request_status_NEEDS_CLARIFICATION": "🟡 потрібне уточнення",
         "request_status_RESOLVED": "✅ вирішено",
         "request_status_REJECTED": "❌ відхилено",
         "request_status_CLOSED": "✅ закрито",
         "request_type_RESIDENT_VEHICLE_PARKING_END": "Автомобіль продано / не паркується",
+        "request_type_RESIDENT_VEHICLE_REMOVE": "Автомобіль внесено помилково",
         "request_type_RESIDENT_VEHICLE_UPDATE": "Виправлення даних автомобіля",
         "request_type_RESIDENT_VEHICLE_CHANGE": "Зміна даних автомобіля",
         "request_type_RESIDENT_VEHICLE_ADD": "Додавання автомобіля",
@@ -293,16 +326,24 @@ I18N = {
         "suggest_vehicle_prompt": "Оберіть автомобіль, щодо якого хочете запропонувати виправлення.",
         "suggest_vehicle_text": "Опишіть, що потрібно виправити в цьому автомобілі.",
         "vehicle_change_kind_prompt": "Що потрібно змінити? Спочатку показано дані, які зараз є в реєстрі.",
-        "vehicle_current": "Зараз у реєстрі:\nНомер: {plate}\nМарка/модель: {model}\nРежим паркування: {parking}",
+        "vehicle_current": "Зараз у реєстрі:\nНомер: {plate}\nМарка/модель: {model}\nКолір: {color}\nРежим паркування: {parking}",
         "edit_plate": "🔢 Виправити держномер",
         "edit_model": "🚘 Виправити марку/модель",
+        "edit_color": "🎨 Виправити колір",
         "edit_parking_time": "🕒 Змінити режим паркування",
         "stop_parking": "🚫 Продано / не паркується",
+        "remove_vehicle": "🗑️ Внесено помилково",
+        "vehicle_remove_prompt": "Підтвердьте: цей автомобіль внесено помилково. Оператор перевірить, чи можна видалити запис без порушення історії оплат.",
+        "vehicle_remove_confirm": "✅ Так, внесено помилково",
+        "vehicle_removal_mode_required": "Для продажу або припинення паркування спочатку потрібно вказати режим паркування. Це необхідно для перевірки нарахувань і оплат. Оберіть «Змінити режим паркування» та надішліть окрему пропозицію оператору.",
+        "vehicle_removal_mode_suggested": "У картці режим паркування не вказаний, але в історії оплат квартири знайдено підтвердження режиму {mode}. Заяву можна надіслати; оператор спочатку підтвердить цю рекомендацію.",
+        "vehicle_removal_mode_unknown": "Режим паркування в картці не вказаний і фінансової підказки немає. Повідомлення про продаж усе одно буде прийнято; оператор окремо звірить розрахунки.",
         "other_vehicle_change": "📝 Інша зміна",
         "vehicle_sold": "Автомобіль продано",
         "vehicle_no_longer_parks": "Більше не паркується",
         "vehicle_plate_prompt": "Введіть правильний держномер автомобіля.",
         "vehicle_model_prompt": "Введіть правильні марку та модель автомобіля.",
+        "vehicle_color_prompt": "Введіть правильний колір автомобіля.",
         "vehicle_parking_prompt": "Оберіть правильний режим паркування.",
         "vehicle_stop_reason_prompt": "Укажіть причину припинення паркування.",
         "vehicle_stop_date_prompt": "Введіть останній день паркування у форматі РРРР-ММ-ДД. Оператор перевірить цю дату перед перерахунком.",
@@ -310,6 +351,7 @@ I18N = {
         "vehicle_stop_date_unknown": "Не пам’ятаю точну дату",
         "vehicle_other_prompt": "Коротко опишіть, що потрібно змінити. Оператор побачить поточні дані автомобіля.",
         "vehicle_change_saved": "✅ Пропозицію #{id} надіслано оператору. Дані та нарахування поки не змінювалися.",
+        "request_registered": "✅ Заяву №{id} зареєстровано в системі. Оператор розгляне її за першої можливості. Повторно надсилати це саме звернення не потрібно.",
         "suggest_new_vehicle_text": "Вкажіть держномер, марку та все, що відомо про автомобіль.",
         "add_vehicle_possible_correction": "Введений номер {proposed} відрізняється лише на один символ від автомобіля {existing}. Можливо, це виправлення номера, а не новий автомобіль.",
         "add_vehicle_use_correction": "✏️ Виправити {plate}",
@@ -461,6 +503,14 @@ I18N = {
         "vehicle_resident_none": "We have not found vehicles you reported earlier. If you have a vehicle, add it and an operator will verify the details.",
         "suggest_changes": "✍️ Suggest a change",
         "my_change_requests": "📨 My changes",
+        "change_requests_menu_title": "📨 My requests\n\nChoose what to view.",
+        "change_requests_active": "📨 Open requests",
+        "change_requests_history": "🗂️ History",
+        "reply_operator": "💬 Reply to operator",
+        "clarification_choose": "Choose the request you want to reply about.",
+        "clarification_reply_prompt": "Write your reply to the operator. It will be added to this request.",
+        "clarification_none": "There are no requests awaiting your reply.",
+        "clarification_reply_saved": "✅ Your reply was sent to the operator. The request is awaiting review again.",
         "observer": "📖 OSBB observer",
         "observer_title": "📖 OSBB observer\n\nRead-only mode. Data, requests, and payments cannot be changed here.",
         "observer_summary": "📊 Summary",
@@ -472,13 +522,17 @@ I18N = {
         "observer_prev": "⬅️ Newer",
         "observer_next": "➡️ Older",
         "my_change_requests_title": "📨 My proposals to the operator",
+        "my_change_requests_active_title": "📨 My open requests",
+        "my_change_requests_history_title": "🗂️ Request history",
         "my_change_requests_none": "You have not sent any proposals about your details yet.",
         "request_status_PENDING": "⏳ awaiting review",
         "request_status_IN_PROGRESS": "🔵 in progress",
+        "request_status_NEEDS_CLARIFICATION": "🟡 clarification required",
         "request_status_RESOLVED": "✅ resolved",
         "request_status_REJECTED": "❌ rejected",
         "request_status_CLOSED": "✅ closed",
         "request_type_RESIDENT_VEHICLE_PARKING_END": "Vehicle sold / no longer parks",
+        "request_type_RESIDENT_VEHICLE_REMOVE": "Vehicle entered by mistake",
         "request_type_RESIDENT_VEHICLE_UPDATE": "Vehicle data correction",
         "request_type_RESIDENT_VEHICLE_CHANGE": "Vehicle data change",
         "request_type_RESIDENT_VEHICLE_ADD": "Add a vehicle",
@@ -490,16 +544,24 @@ I18N = {
         "suggest_vehicle_prompt": "Choose the vehicle you want to correct.",
         "suggest_vehicle_text": "Describe what should be corrected for this vehicle.",
         "vehicle_change_kind_prompt": "What needs to be changed? The current registry data is shown first.",
-        "vehicle_current": "Currently in the registry:\nPlate: {plate}\nMake/model: {model}\nParking mode: {parking}",
+        "vehicle_current": "Currently in the registry:\nPlate: {plate}\nMake/model: {model}\nColor: {color}\nParking mode: {parking}",
         "edit_plate": "🔢 Correct plate",
         "edit_model": "🚘 Correct make/model",
+        "edit_color": "🎨 Correct color",
         "edit_parking_time": "🕒 Change parking mode",
         "stop_parking": "🚫 Sold / no longer parks",
+        "remove_vehicle": "🗑️ Entered by mistake",
+        "vehicle_remove_prompt": "Confirm that this vehicle was entered by mistake. The operator will check whether it can be removed without breaking payment history.",
+        "vehicle_remove_confirm": "✅ Yes, entered by mistake",
+        "vehicle_removal_mode_required": "Before reporting a sale or parking end, specify the parking mode. It is required to check charges and payments. Choose “Change parking mode” and submit a separate proposal to the operator.",
+        "vehicle_removal_mode_suggested": "The vehicle card has no parking mode, but apartment payment history supports {mode}. You may submit the request; an operator will confirm this recommendation first.",
+        "vehicle_removal_mode_unknown": "The vehicle card has no parking mode and there is no financial hint. Your sale report will still be accepted; an operator will reconcile the billing separately.",
         "other_vehicle_change": "📝 Other change",
         "vehicle_sold": "Vehicle sold",
         "vehicle_no_longer_parks": "No longer parks",
         "vehicle_plate_prompt": "Enter the correct licence plate.",
         "vehicle_model_prompt": "Enter the correct make and model.",
+        "vehicle_color_prompt": "Enter the correct vehicle color.",
         "vehicle_parking_prompt": "Select the correct parking mode.",
         "vehicle_stop_reason_prompt": "Select why parking is ending.",
         "vehicle_stop_date_prompt": "Enter the last parking day as YYYY-MM-DD. An operator will verify it before recalculation.",
@@ -507,6 +569,7 @@ I18N = {
         "vehicle_stop_date_unknown": "I do not remember the exact date",
         "vehicle_other_prompt": "Briefly describe what should change. The operator will see the current vehicle data.",
         "vehicle_change_saved": "✅ Proposal #{id} was sent to the operator. Registry data and charges have not changed.",
+        "request_registered": "✅ Request #{id} was registered. An operator will review it as soon as possible. Please do not submit the same request again.",
         "suggest_new_vehicle_text": "Enter the plate, model, and everything known about the vehicle.",
         "add_vehicle_possible_correction": "The entered plate {proposed} differs by only one character from {existing}. This may be a correction rather than a new vehicle.",
         "add_vehicle_use_correction": "✏️ Correct {plate}",
@@ -943,11 +1006,16 @@ def _vehicles_for_unit(unit_id: int) -> list[dict]:
                 license_plate,
                 car_model_normalized,
                 car_model,
+                car_color_normalized,
+                car_color,
                 parking_time,
                 source,
                 created_source
             FROM vehicles
             WHERE apartment_id = ?
+              -- An archived vehicle is financial/history evidence, not a
+              -- current vehicle a resident may edit or report as sold again.
+              AND COALESCE(lifecycle_status, 'ACTIVE') = 'ACTIVE'
             ORDER BY id
         """, (int(unit_id),))
         return [dict(row) for row in cur.fetchall()]
@@ -995,6 +1063,7 @@ def _vehicle_snapshot(vehicle: dict, lang: str) -> dict[str, str]:
     return {
         "plate": text(vehicle.get("license_plate_normalized")) or text(vehicle.get("license_plate")) or "-",
         "model": text(vehicle.get("car_model_normalized")) or text(vehicle.get("car_model")) or "-",
+        "color": text(vehicle.get("car_color_normalized")) or text(vehicle.get("car_color")) or "-",
         "parking": text(vehicle.get("parking_time")) or tr(lang, "parking_unknown"),
     }
 
@@ -1035,6 +1104,46 @@ def _self_service_allowed(user_id: int, unit: dict, resource: str) -> bool:
         scope_type="APARTMENT",
         scope_value=apartment,
     )
+
+
+def _parking_mode_payment_suggestion(unit: dict) -> dict | None:
+    """Return one unambiguous Day/Night signal from apartment payment metadata.
+
+    Payments remain apartment-level facts and are never allocated to a car here.
+    This is only a yellow operator recommendation for a missing parking mode.
+    """
+    apartment = text(unit.get("apartment_number"))
+    if not apartment:
+        return None
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        if not table_exists(cur, "payments"):
+            return None
+        columns = table_columns(cur, "payments")
+        if "apartment_number" not in columns:
+            return None
+        fields = [field for field in ("service_type", "base_service_code", "service_item_code", "period_code") if field in columns]
+        if not fields:
+            return None
+        cur.execute(
+            f"SELECT {', '.join(fields)} FROM payments WHERE apartment_number=?", (apartment,)
+        )
+        modes: list[str] = []
+        periods: set[str] = set()
+        for row in cur.fetchall():
+            values = " ".join(text(row[field]) for field in fields if field != "period_code").upper()
+            mode = "Night" if "NIGHT" in values else "Day" if "DAY" in values else ""
+            if mode:
+                modes.append(mode)
+                if "period_code" in fields and text(row["period_code"]):
+                    periods.add(text(row["period_code"]))
+        if not modes or len(set(modes)) != 1:
+            return None
+        return {"mode": modes[0], "payment_count": len(modes), "periods": sorted(periods),
+                "source": "apartment_payment_service_type"}
+    finally:
+        conn.close()
 
 
 def _observer_allowed(user_id: int) -> bool:
@@ -1283,31 +1392,115 @@ def _create_resident_change_task(
         conn.close()
 
 
-def _resident_change_tasks(user_id: int) -> list[dict]:
-    """Return only the current resident's own proposals, newest first."""
+def _resident_change_tasks(user_id: int, *, history: bool | None = None) -> list[dict]:
+    """Return only the current resident's proposals, split into open/history."""
     conn = get_conn()
     try:
         cur = conn.cursor()
         if not table_exists(cur, "operator_task_queue"):
             return []
+        status_clause = ""
+        params: list[str] = [str(user_id)]
+        if history is True:
+            status_clause = " AND status IN ('RESOLVED', 'REJECTED', 'CLOSED')"
+        elif history is False:
+            status_clause = " AND status IN ('PENDING', 'IN_PROGRESS', 'NEEDS_CLARIFICATION')"
         cur.execute(
-            """
+            f"""
             SELECT id, task_type, status, vehicle_id, title, description, created_at, updated_at, close_note
             FROM operator_task_queue
             WHERE telegram_user_id=? AND origin='RESIDENT_PORTAL'
+            {status_clause}
             ORDER BY id DESC
             """,
-            (str(user_id),),
+            tuple(params),
         )
         return [dict(row) for row in cur.fetchall()]
     finally:
         conn.close()
 
 
-def _format_resident_change_tasks(rows: list[dict], lang: str) -> str:
+def _clarification_tasks(user_id: int) -> list[dict]:
+    """Open resident tasks for which an operator has asked a question."""
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        if not table_exists(cur, "resident_request_messages"):
+            return []
+        cur.execute(
+            """
+            SELECT q.id, q.title, q.vehicle_id, q.plate, q.close_note, q.updated_at
+            FROM operator_task_queue q
+            WHERE q.telegram_user_id=? AND q.origin='RESIDENT_PORTAL'
+              AND q.status='NEEDS_CLARIFICATION'
+            ORDER BY q.updated_at DESC, q.id DESC
+            """, (str(user_id),),
+        )
+        return [dict(row) for row in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def _save_clarification_reply(user_id: int, request_id: int, message: str) -> None:
+    reply = text(message)
+    if not reply:
+        raise ValueError("Ответ не может быть пустым.")
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("BEGIN IMMEDIATE")
+        task = cur.execute(
+            """
+            SELECT * FROM operator_task_queue
+            WHERE id=? AND telegram_user_id=? AND origin='RESIDENT_PORTAL'
+            """, (int(request_id), str(user_id)),
+        ).fetchone()
+        if not task or task["status"] != "NEEDS_CLARIFICATION":
+            raise ValueError("Заявка уже не ожидает уточнения.")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute(
+            """
+            INSERT INTO resident_request_messages(
+                request_id, telegram_user_id, direction, message_text, delivery_status, created_by, created_at, read_at
+            ) VALUES (?, ?, 'RESIDENT_TO_OPERATOR', ?, 'READ', ?, ?, ?)
+            """, (int(request_id), str(user_id), reply, str(user_id), timestamp, timestamp),
+        )
+        cur.execute(
+            """
+            UPDATE resident_request_messages SET delivery_status='READ', read_at=?
+            WHERE request_id=? AND direction='OPERATOR_TO_RESIDENT' AND delivery_status='SENT'
+            """, (timestamp, int(request_id)),
+        )
+        cur.execute(
+            """
+            UPDATE operator_task_queue
+            SET status='PENDING', assigned_to=NULL, updated_at=?, close_note=? WHERE id=?
+            """, (timestamp, "Житель ответил на вопрос оператора; заявка возвращена в очередь.", int(request_id)),
+        )
+        if audit_log:
+            audit_log(
+                conn=conn, operator_id=str(user_id), user_id=str(user_id), actor_type="resident",
+                action_type="resident_clarification_reply", table_name="operator_task_queue", row_id=int(request_id),
+                field_name="status", old_value="NEEDS_CLARIFICATION", new_value="PENDING",
+                source_context="client_portal", comment=reply, commit=False,
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _format_resident_change_tasks(rows: list[dict], lang: str, *, history: bool | None = None) -> str:
     if not rows:
         return tr(lang, "my_change_requests_none")
-    lines = [tr(lang, "my_change_requests_title"), ""]
+    title_key = (
+        "my_change_requests_history_title" if history is True
+        else "my_change_requests_active_title" if history is False
+        else "my_change_requests_title"
+    )
+    lines = [tr(lang, title_key), ""]
     for row in rows:
         status_key = f"request_status_{text(row.get('status')).upper()}"
         status = I18N[lang].get(status_key, text(row.get("status")) or "—")
@@ -2414,12 +2607,31 @@ async def _show_vehicle_list(update: Update, user_states: dict, user_id: int, la
     )
 
 
-async def _show_my_change_requests(update: Update, user_states: dict, user_id: int, lang: str) -> None:
+async def _show_my_change_request_menu(update: Update, user_states: dict, user_id: int, lang: str) -> None:
     state = _portal_state(user_states, user_id, create=True)
     state["mode"] = "client_change_requests"
     await update.message.reply_text(
-        _format_resident_change_tasks(_resident_change_tasks(user_id), lang),
-        reply_markup=kb([[tr(lang, "back_portal")], [tr(lang, "home")]]),
+        tr(lang, "change_requests_menu_title"),
+        reply_markup=kb([
+            [tr(lang, "change_requests_active"), tr(lang, "change_requests_history")],
+            [tr(lang, "reply_operator")],
+            [tr(lang, "back_portal")], [tr(lang, "home")],
+        ]),
+    )
+
+
+async def _show_my_change_requests(
+    update: Update, user_states: dict, user_id: int, lang: str, *, history: bool
+) -> None:
+    state = _portal_state(user_states, user_id, create=True)
+    state["mode"] = "client_change_requests"
+    await update.message.reply_text(
+        _format_resident_change_tasks(_resident_change_tasks(user_id, history=history), lang, history=history),
+        reply_markup=kb([
+            [tr(lang, "change_requests_active"), tr(lang, "change_requests_history")],
+            [tr(lang, "reply_operator")],
+            [tr(lang, "back_portal")], [tr(lang, "home")],
+        ]),
     )
 
 
@@ -2435,9 +2647,9 @@ async def _show_resident_vehicle_change_menu(
         tr(lang, "vehicle_current", **snapshot) + "\n\n" + tr(lang, "vehicle_change_kind_prompt"),
         reply_markup=kb([
             [tr(lang, "edit_plate"), tr(lang, "edit_model")],
-            [tr(lang, "edit_parking_time")],
+            [tr(lang, "edit_color"), tr(lang, "edit_parking_time")],
             [tr(lang, "stop_parking")],
-            [tr(lang, "other_vehicle_change")],
+            [tr(lang, "remove_vehicle")],
             [tr(lang, "back_portal")],
         ]),
     )
@@ -2803,7 +3015,7 @@ async def handle_client_portal_text(
             ):
                 await update.message.reply_text(tr(lang, "suggest_denied"))
             else:
-                await _show_my_change_requests(update, user_states, user_id, lang)
+                await _show_my_change_request_menu(update, user_states, user_id, lang)
         elif action == "observer":
             await _show_observer_screen(update, user_states, user_id, lang)
         elif action == "parking":
@@ -2930,6 +3142,53 @@ async def handle_client_portal_text(
         await update.message.reply_text(tr(lang, "choose_menu"))
         return True
 
+    if current == "client_change_requests":
+        if message_text == tr(lang, "change_requests_active"):
+            await _show_my_change_requests(update, user_states, user_id, lang, history=False)
+            return True
+        if message_text == tr(lang, "change_requests_history"):
+            await _show_my_change_requests(update, user_states, user_id, lang, history=True)
+            return True
+        if message_text == tr(lang, "reply_operator"):
+            tasks = _clarification_tasks(user_id)
+            if not tasks:
+                await update.message.reply_text(tr(lang, "clarification_none"))
+                return True
+            state["mode"] = "resident_clarification_choose"
+            state["clarification_tasks"] = {
+                f"📨 #{row['id']} · {text(row.get('plate')) or text(row.get('title')) or 'заявка'}": int(row["id"])
+                for row in tasks
+            }
+            await update.message.reply_text(
+                tr(lang, "clarification_choose"),
+                reply_markup=kb([[label] for label in state["clarification_tasks"]] + [[tr(lang, "back_portal")]]),
+            )
+            return True
+        await _show_my_change_request_menu(update, user_states, user_id, lang)
+        return True
+
+    if current == "resident_clarification_choose":
+        request_id = (state.get("clarification_tasks") or {}).get(message_text)
+        if not request_id:
+            await update.message.reply_text(tr(lang, "clarification_choose"))
+            return True
+        state["clarification_request_id"] = int(request_id)
+        state["mode"] = "resident_clarification_reply"
+        await update.message.reply_text(tr(lang, "clarification_reply_prompt"), reply_markup=kb([[tr(lang, "back_portal")]]))
+        return True
+
+    if current == "resident_clarification_reply":
+        try:
+            _save_clarification_reply(user_id, int(state.get("clarification_request_id") or 0), message_text)
+        except ValueError as exc:
+            await update.message.reply_text(str(exc))
+            return True
+        state.pop("clarification_request_id", None)
+        state.pop("clarification_tasks", None)
+        await update.message.reply_text(tr(lang, "clarification_reply_saved"))
+        await _show_my_change_request_menu(update, user_states, user_id, lang)
+        return True
+
     if current == "resident_change_menu":
         data = _account_and_unit(user_id)
         if not data or not data.get("unit"):
@@ -2997,6 +3256,7 @@ async def handle_client_portal_text(
         text_actions = {
             tr(lang, "edit_plate"): ("license_plate", "vehicle_plate_prompt"),
             tr(lang, "edit_model"): ("car_model", "vehicle_model_prompt"),
+            tr(lang, "edit_color"): ("car_color", "vehicle_color_prompt"),
             tr(lang, "other_vehicle_change"): ("other", "vehicle_other_prompt"),
         }
         if message_text in text_actions:
@@ -3014,13 +3274,66 @@ async def handle_client_portal_text(
             )
             return True
         if message_text == tr(lang, "stop_parking"):
+            if not text(vehicle.get("parking_time")):
+                suggestion = _parking_mode_payment_suggestion(data["unit"])
+                if not suggestion:
+                    await update.message.reply_text(
+                        tr(lang, "vehicle_removal_mode_unknown"),
+                    )
+                else:
+                    state["resident_parking_mode_suggestion"] = suggestion
+                    await update.message.reply_text(tr(lang, "vehicle_removal_mode_suggested", mode=suggestion["mode"]))
             state["mode"] = "resident_vehicle_stop_reason"
             await update.message.reply_text(
                 tr(lang, "vehicle_stop_reason_prompt"),
                 reply_markup=kb([[tr(lang, "vehicle_sold")], [tr(lang, "vehicle_no_longer_parks")], [tr(lang, "back_portal")]]),
             )
             return True
+        if message_text == tr(lang, "remove_vehicle"):
+            state["mode"] = "resident_vehicle_remove_confirm"
+            await update.message.reply_text(
+                tr(lang, "vehicle_remove_prompt"),
+                reply_markup=kb([[tr(lang, "vehicle_remove_confirm")], [tr(lang, "back_portal")]]),
+            )
+            return True
         await update.message.reply_text(tr(lang, "choose_menu"))
+        return True
+
+    if current == "resident_vehicle_remove_confirm":
+        data = _account_and_unit(user_id)
+        vehicle_id = state.get("resident_change_vehicle_id")
+        vehicle = next(
+            (row for row in _resident_known_vehicles_for_unit(int(data["unit"]["id"])) if int(row["id"]) == int(vehicle_id or 0)),
+            None,
+        ) if data and data.get("unit") else None
+        if not data or not data.get("unit") or not vehicle or not _self_service_allowed(user_id, data["unit"], "vehicle_change_requests"):
+            await update.message.reply_text(tr(lang, "suggest_denied"))
+            return True
+        if message_text != tr(lang, "vehicle_remove_confirm"):
+            await update.message.reply_text(tr(lang, "vehicle_remove_prompt"))
+            return True
+        snapshot = _vehicle_snapshot(vehicle, lang)
+        task_id = _create_resident_change_task(
+            user_id=user_id,
+            unit=data["unit"],
+            task_type="RESIDENT_VEHICLE_REMOVE",
+            title="Предложение жителя: автомобиль внесён ошибочно",
+            description=(
+                "Житель сообщает, что автомобиль внесён ошибочно.\n"
+                f"Номер: {snapshot['plate']}\nМарка/модель: {snapshot['model']}\n"
+                "Просьба: проверить и удалить запись, только если у неё нет финансовой истории."
+            ),
+            vehicle=vehicle,
+            payload={
+                "schema_version": 1, "entity_type": "vehicle", "entity_id": int(vehicle["id"]),
+                "current": snapshot, "proposed": {"action": "REMOVE"},
+                "removal_reason": "MISTAKEN_ENTRY",
+                "parking_mode_suggestion": state.get("resident_parking_mode_suggestion"),
+            },
+        )
+        state.clear()
+        await update.message.reply_text(tr(lang, "request_registered", id=task_id))
+        await _show_vehicle_list(update, user_states, user_id, lang)
         return True
 
     if current == "resident_vehicle_change_parking_time":
@@ -3085,6 +3398,7 @@ async def handle_client_portal_text(
         labels = {
             "license_plate": "госномер",
             "car_model": "марка/модель",
+            "car_color": "цвет",
             "parking_time": "режим парковки",
             "parking_end_date": "последний день парковки",
             "other": "другое изменение",
@@ -3097,6 +3411,7 @@ async def handle_client_portal_text(
             "proposed": {field: value or None},
             "parking_end_reason": state.get("resident_stop_reason") if field == "parking_end_date" else None,
             "parking_end_date_unknown": bool(state.get("resident_stop_date_unknown")) if field == "parking_end_date" else False,
+            "parking_mode_suggestion": state.get("resident_parking_mode_suggestion") if field == "parking_end_date" else None,
         }
         description = (
             "Текущие данные автомобиля:\n"
@@ -3116,7 +3431,7 @@ async def handle_client_portal_text(
             payload=payload,
         )
         state.clear()
-        await update.message.reply_text(tr(lang, "vehicle_change_saved", id=task_id))
+        await update.message.reply_text(tr(lang, "request_registered", id=task_id))
         await _show_vehicle_list(update, user_states, user_id, lang)
         return True
 
@@ -3158,16 +3473,16 @@ async def handle_client_portal_text(
                 },
             )
             state.clear()
-            await update.message.reply_text(tr(lang, "vehicle_change_saved", id=task_id))
+            await update.message.reply_text(tr(lang, "request_registered", id=task_id))
             await _show_vehicle_list(update, user_states, user_id, lang)
             return True
         if message_text == tr(lang, "add_vehicle_really_new"):
-            _create_resident_change_task(
+            task_id = _create_resident_change_task(
                 user_id=user_id, unit=data["unit"], task_type="RESIDENT_VEHICLE_ADD",
                 title="Предложение жителя: добавить автомобиль", description=source_text,
             )
             state.clear()
-            await update.message.reply_text(tr(lang, "suggest_saved"))
+            await update.message.reply_text(tr(lang, "request_registered", id=task_id))
             await show_client_portal(update, user_states, user_id, lang)
             return True
         await update.message.reply_text(tr(lang, "choose_menu"))
@@ -3208,7 +3523,7 @@ async def handle_client_portal_text(
                         ]),
                     )
                     return True
-            _create_resident_change_task(
+            task_id = _create_resident_change_task(
                 user_id=user_id, unit=data["unit"], task_type="RESIDENT_VEHICLE_CHANGE" if vehicle else "RESIDENT_VEHICLE_ADD",
                 title="Предложение жителя: автомобиль" if vehicle else "Предложение жителя: добавить автомобиль",
                 description=message_text, vehicle=vehicle,
@@ -3217,12 +3532,12 @@ async def handle_client_portal_text(
             if not _self_service_allowed(user_id, data["unit"], "resident_profile_change_requests"):
                 await update.message.reply_text(tr(lang, "suggest_denied"))
                 return True
-            _create_resident_change_task(
+            task_id = _create_resident_change_task(
                 user_id=user_id, unit=data["unit"], task_type="RESIDENT_PROFILE_CHANGE",
                 title="Предложение жителя: личные данные", description=message_text,
             )
         state.clear()
-        await update.message.reply_text(tr(lang, "suggest_saved"))
+        await update.message.reply_text(tr(lang, "request_registered", id=task_id))
         await show_client_portal(update, user_states, user_id, lang)
         return True
 
@@ -3235,14 +3550,14 @@ async def handle_client_portal_text(
         if not vehicles:
             await update.message.reply_text(tr(lang, "vehicle_none"))
             return True
-        _create_resident_change_task(
+        task_id = _create_resident_change_task(
             user_id=user_id,
             unit=data["unit"],
             task_type="RESIDENT_VEHICLES_CONFIRMED",
             title="Житель подтвердил автомобили квартиры",
             description="Житель подтвердил перечень:\n" + _format_vehicles(vehicles, lang),
         )
-        await update.message.reply_text(tr(lang, "confirm_vehicles_saved"))
+        await update.message.reply_text(tr(lang, "request_registered", id=task_id))
         await _show_vehicle_list(update, user_states, user_id, lang)
         return True
 

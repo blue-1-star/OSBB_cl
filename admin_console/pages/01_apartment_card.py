@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 
 STREAMLIT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(STREAMLIT_ROOT))
+PROJECT_ROOT = STREAMLIT_ROOT.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 import pandas as pd
@@ -83,7 +85,11 @@ cur.execute("""
         v.parking_time AS режим,
         COALESCE(SUM(c.amount), 0) AS начислено,
         COALESCE(SUM(pa.amount), 0) AS оплачено,
-        COALESCE(SUM(c.amount), 0) - COALESCE(SUM(pa.amount), 0) AS долг
+        COALESCE(SUM(c.amount), 0) - COALESCE(SUM(pa.amount), 0) AS долг,
+        COALESCE(v.lifecycle_status, 'ACTIVE') AS жизненный_статус,
+        v.archived_at,
+        v.archive_reason,
+        v.parking_end_date
     FROM vehicles v
     LEFT JOIN charges c ON c.vehicle_id = v.id 
         AND c.service_code IN ('PARKING_DAY', 'PARKING_NIGHT')
@@ -124,9 +130,12 @@ else:
 # ==========================================
 st.markdown("### 🚗 Автомобили")
 
-if vehicles:
+active_vehicles = [v for v in vehicles if v[7] == "ACTIVE"]
+archived_vehicles = [v for v in vehicles if v[7] == "ARCHIVED"]
+
+if active_vehicles:
     data = []
-    for v in vehicles:
+    for v in active_vehicles:
         plate = v[1] or "—"
         model = v[2] or "—"
         mode = v[3] or "❓"
@@ -145,4 +154,18 @@ if vehicles:
     total_debt = sum(row["Долг (грн)"] for row in data)
     st.metric("💰 Итого долг по парковке", f"{total_debt:,.2f} UAH")
 else:
-    st.info("Нет автомобилей")
+    st.info("Нет текущих автомобилей")
+
+if archived_vehicles:
+    with st.expander(f"🗄️ История автомобилей ({len(archived_vehicles)})"):
+        history = []
+        for v in archived_vehicles:
+            history.append({
+                "Номер": v[1] or "—",
+                "Марка": v[2] or "—",
+                "Режим": v[3] or "—",
+                "Последний день парковки": v[10] or "—",
+                "Архивирован": v[8] or "—",
+                "Причина": v[9] or "—",
+            })
+        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
