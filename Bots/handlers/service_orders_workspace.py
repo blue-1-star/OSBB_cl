@@ -16,6 +16,7 @@ unchanged; this module is for the new simplified workflow.
 
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 import re
 import sqlite3
@@ -32,6 +33,7 @@ for folder in (ROOT, BOTS_DIR):
         sys.path.insert(0, str(folder))
 
 from access_control import has_permission, write_access_audit
+from inventory_transfer_core import stock_snapshot, LOCATIONS
 from cashier_v2_core import create_payment_notice
 from handlers import client_portal as resident_portal
 from service_orders_core import (
@@ -1638,13 +1640,39 @@ async def _handle_operator(update: Update, user_states: dict, user_id: int, mess
                 reply_markup=kb([["⬅️ К оператору"], [HOME]]),
             )
             return True
+        if action == "issue_new":
+            link = order_supply_link(int(order["id"]))
+            if not link:
+                await update.message.reply_text("Для заказа пока нет привязанной поставки.")
+                return True
+            with closing(get_conn()) as conn:
+                balances, pending = stock_snapshot(conn)
+            quantity = int(link.get("quantity") or 0)
+            locations = {
+                f"{LOCATIONS[b['location_code']]} · {b['quantity']} шт.": b["location_code"]
+                for b in balances
+                if int(b["batch_id"]) == int(link["supplier_batch_id"])
+                and int(b["quantity"]) >= quantity
+            }
+            if not locations:
+                in_transit = sum(int(p["quantity"]) for p in pending
+                                 if int(p["batch_id"]) == int(link["supplier_batch_id"]))
+                await update.message.reply_text(
+                    f"В одном подтверждённом пункте нет {quantity} шт. этой партии. В пути или на разборе: {in_transit} шт. "
+                    "Сначала подтвердите передачу или проверьте остатки."
+                )
+                return True
+            state.update(mode="operator_issue_location", issue_locations=locations)
+            await update.message.reply_text(
+                f"Из какого пункта фактически выдаются {quantity} шт.?",
+                reply_markup=kb([[label] for label in locations] + [["⬅️ К оператору"], [HOME]]),
+            )
+            return True
         try:
             if action == "program_done":
                 _program(order, user_id)
             elif action == "return_remote":
                 _return_own_remote(order, user_id)
-            elif action == "issue_new":
-                issue_new_remotes_from_batch(service_order_id=int(order["id"]), actor_id=user_id)
         except Exception as exc:
             # OSBB_SERVICE_POLICY_UX_V1
             if ServiceAccessDenied is not None and isinstance(exc, ServiceAccessDenied):
@@ -1654,6 +1682,19 @@ async def _handle_operator(update: Update, user_states: dict, user_id: int, mess
                 return True
             await update.message.reply_text(f"⚠️ {exc}"); return True
         await _show_operator_order(update, state, user_id, int(order["id"]), lang); return True
+    if mode == "operator_issue_location":
+        location = (state.get("issue_locations") or {}).get(message_text)
+        if not location:
+            await update.message.reply_text(tr(lang, "wrong")); return True
+        try:
+            issue_new_remotes_from_batch(
+                service_order_id=int(state["order_id"]), actor_id=user_id,
+                source_location_code=location,
+            )
+        except Exception as exc:
+            await update.message.reply_text(f"⚠️ {exc}"); return True
+        await _show_operator_order(update, state, user_id, int(state["order_id"]), lang)
+        return True
     if mode == "operator_remote_label":
         label = text(message_text)
         if len(label) < 3:

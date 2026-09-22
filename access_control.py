@@ -175,6 +175,24 @@ def _active_role_permissions(
     return [dict(row) for row in cur.fetchall()]
 
 
+def _has_global_super_admin_role(cur: sqlite3.Cursor, user_id: int | str) -> bool:
+    """SUPER_ADMIN is a real RBAC role with an intentional global override."""
+    row = cur.execute(
+        """
+        SELECT 1
+        FROM access_user_roles ur
+        JOIN access_roles r ON r.role_code=ur.role_code AND r.is_active=1
+        WHERE ur.telegram_user_id=? AND ur.role_code='SUPER_ADMIN'
+          AND ur.is_active=1
+          AND (ur.valid_from IS NULL OR ur.valid_from<=?)
+          AND (ur.valid_to IS NULL OR ur.valid_to>=?)
+        LIMIT 1
+        """,
+        (str(user_id), now_db(), now_db()),
+    ).fetchone()
+    return row is not None
+
+
 def has_permission(
     user_id: int | str,
     resource: str,
@@ -202,6 +220,11 @@ def has_permission(
             return False
 
         cur = conn.cursor()
+        # A named global role is safer and auditable than a hidden exception
+        # based on a Telegram ID.  It deliberately overrides ordinary DENY
+        # rules: recovery from incorrect access configuration is its purpose.
+        if _has_global_super_admin_role(cur, user_id):
+            return True
         direct = [
             item for item in _active_user_overrides(cur, user_id, resource, action)
             if scope_matches(

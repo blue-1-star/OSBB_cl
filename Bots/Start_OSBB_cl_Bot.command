@@ -10,6 +10,9 @@
 
 PROJECT_ROOT="/Users/san/Developer/Projects/OSBB_cl"
 SECRETS_DIR="/Secret/Soft"
+SECRETS_FILE="${SECRETS_DIR}/telegram_osbb.py"
+# /Secret is a synthetic link; macOS mounts the APFS volume at this real path.
+SECRET_REAL_MOUNT="/Users/san/SecretMount"
 
 STARTED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -27,12 +30,23 @@ echo ""
 echo "============================================================"
 echo ""
 
-if [ ! -d "$SECRETS_DIR" ]; then
-    echo "ОШИБКА: не найден раздел с секретами: $SECRETS_DIR"
+if ! /sbin/mount | /usr/bin/grep -Fq " on ${SECRET_REAL_MOUNT} "; then
+    echo "ОШИБКА: зашифрованный раздел Secret не смонтирован."
+    echo "Ожидалась точка монтирования: ${SECRET_REAL_MOUNT} (доступна как /Secret)."
+    echo "Выполните secret-on или запустите бота командой osbb-bot."
+    read -p "Нажмите Enter для выхода..."
+    exit 1
+fi
+
+if [ ! -r "$SECRETS_FILE" ]; then
+    echo "ОШИБКА: не найден или недоступен файл секретов: $SECRETS_FILE"
     echo "Подключите раздел 'Secret' и запустите заново."
     read -p "Нажмите Enter для выхода..."
     exit 1
 fi
+
+echo "  Secret     : mounted (${SECRETS_FILE})"
+echo ""
 
 export PYTHONPATH="${SECRETS_DIR}:${PYTHONPATH}"
 

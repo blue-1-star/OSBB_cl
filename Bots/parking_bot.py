@@ -20,6 +20,17 @@ from handlers.service_orders_workspace import (
     has_service_workspace_access,
     show_service_operator_workspace,
 )
+from handlers.service_catalog_workspace import (
+    ENTRY as SERVICE_CATALOG_ENTRY,
+    handle_service_catalog_text,
+    has_catalog_access,
+    show_catalog_workspace,
+)
+from handlers.inventory_transfers_workspace import (
+    ENTRY as INVENTORY_ENTRY,
+    handle_inventory_text,
+    has_inventory_access,
+)
 from handlers.client_portal_v3 import (
     handle_client_portal_text,
     client_menu_keyboard,
@@ -196,7 +207,9 @@ ADMIN_MENU = [
     ["🚗 Проверка авто"],
     ["🧾 Журнал действий"],
     ["🤝 Согласование"],
-    ["🔑 Заявки на пульты"],
+    ["📦 Исполнение заказов"],
+    ["📦 Передачи товаров"],
+    ["📚 Каталог услуг"],
     ["📞 Телефонный доступ"],
     ["💳 Платежи"],
     ["📊 Отчёты"],
@@ -367,12 +380,26 @@ async def show_mode_menu(update: Update, lang: str):
         buttons.append(["🛡 Пост охраны O"])
     if has_service_workspace_access(user_id):
         buttons.append(["🔑 Оператор услуг"])
+    if has_inventory_access(user_id):
+        buttons.append([INVENTORY_ENTRY])
+    if has_catalog_access(user_id):
+        buttons.append([SERVICE_CATALOG_ENTRY])
     if is_admin_user(user_id):
         buttons.append([t["admin_mode"]])
 
     await update.message.reply_text(
         t["mode"],
         reply_markup=kb(buttons),
+    )
+
+
+def has_work_mode(user_id: int) -> bool:
+    return (
+        is_admin_user(user_id)
+        or has_guard_workspace_access(user_id, cashbox_code="O")
+        or has_service_workspace_access(user_id)
+        or has_inventory_access(user_id)
+        or has_catalog_access(user_id)
     )
 
 # async def show_client_menu(update: Update, lang: str):
@@ -1023,7 +1050,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_languages[user_id] = "ru"
         lang = "ru"
 
-        if is_admin_user(user_id):
+        if has_work_mode(user_id):
             await show_mode_menu(update, lang)
         else:
             user_modes[user_id] = "client"
@@ -1034,7 +1061,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_languages[user_id] = "uk"
         lang = "uk"
 
-        if is_admin_user(user_id):
+        if has_work_mode(user_id):
             await show_mode_menu(update, lang)
         else:
             user_modes[user_id] = "client"
@@ -1045,7 +1072,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_languages[user_id] = "en"
         lang = "en"
 
-        if is_admin_user(user_id):
+        if has_work_mode(user_id):
             await show_mode_menu(update, lang)
         else:
             user_modes[user_id] = "client"
@@ -1086,6 +1113,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_admin_menu(update)
         else:
             await show_mode_menu(update, lang)
+        return
+
+    # Physical-stock transfers have their own short wizard, independent of
+    # the service-order, guard-cashier and administrator keyboards.
+    if text == INVENTORY_ENTRY:
+        user_modes.pop(user_id, None)
+    if await handle_inventory_text(update, user_states, user_id, text):
         return
 
     # =========================
@@ -1438,6 +1472,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =========================
+    # Каталог услуг: отдельный допуск SERVICE_CATALOG_MANAGER
+    # =========================
+    if await handle_service_catalog_text(update, user_states, user_id, text):
+        return
+
+    # =========================
     # Заказы услуг: житель и оператор
     # =========================
     if await handle_service_orders_text(
@@ -1709,12 +1749,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await handle_agreement_menu_text(update, user_states, user_id, text):
         return
 
-    if text == "🔑 Заявки на пульты":
-        await update.message.reply_text(
-            "🔑 Заявки на пульты\n\n"
-            "Здесь будет обработка заказов пультов.",
-            reply_markup=kb(ADMIN_MENU),
-        )
+    if text in {"📦 Исполнение заказов", "🔑 Заявки на пульты"}:
+        # The former remote-only button is retained as an input alias for old
+        # keyboards.  The canonical workspace operates all service orders;
+        # remotes are its first physical-item adapter.
+        if has_service_workspace_access(user_id):
+            user_modes[user_id] = "service_operator"
+            user_states.pop(user_id, None)
+            await show_service_operator_workspace(update, user_states, user_id, lang=lang)
+        else:
+            await update.message.reply_text("Нет доступа к кабинету исполнения заказов.")
         return
 
     if text == "📞 Телефонный доступ":

@@ -48,7 +48,7 @@ st.success(f"✅ Подключено к БД. Квартир: {count}")
 
 st.markdown("## 📚 Доступные разделы")
 
-col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
+col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11 = st.columns(11)
 
 with col1:
     if st.button("🏠 Карточка квартиры", use_container_width=True):
@@ -85,6 +85,14 @@ with col8:
 with col9:
     if st.button("👥 Пользователи и доступ", use_container_width=True):
         st.switch_page("pages/10_user_access.py")
+
+with col10:
+    if st.button("📦 Исполнение заказов", use_container_width=True):
+        st.switch_page("pages/11_order_fulfillment.py")
+
+with col11:
+    if st.button("📚 Каталог услуг", use_container_width=True):
+        st.switch_page("pages/12_service_catalog.py")
 
 # Информация о проекте
 with st.expander("ℹ️ О проекте"):

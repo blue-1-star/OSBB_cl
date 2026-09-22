@@ -1,570 +1,363 @@
-"""
-Управление актуальным каталогом услуг без удаления истории.
+"""Audited administration of published OSBB service offers.
 
-Слой service_catalog / service_items остаётся источником списка услуг.
-Этот модуль добавляет:
-- создание новой услуги и статьи;
-- настройку профиля выполнения;
-- версионирование цены;
-- архивирование вместо удаления;
-- возврат архивной услуги.
-
-Ни одна услуга с историческими заказами, начислениями или платежами не удаляется.
-Она только исчезает из актуального выбора после archive/retire.
+One offer consists of a catalog category, a concrete service item, its workflow
+and a dated price version.  This module is intentionally the only writer used
+by the Streamlit and Telegram catalog screens.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import date, datetime, timedelta
+import re
 import sqlite3
-import sys
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent
-for folder in (ROOT, ROOT / "Bots"):
-    if str(folder) not in sys.path:
-        sys.path.insert(0, str(folder))
-
-from service_orders_core import (
-    get_conn,
-    now_db,
-    schema_ready,
-    table_columns,
-    table_exists,
-    text,
-)
-
-try:
-    from access_control import has_permission
-except Exception:
-    has_permission = None
+from audit_logger import audit_log
+from service_orders_core import get_conn, table_exists, text
 
 
-def _catalog_permission(actor_id: int | str | None) -> None:
-    if actor_id is None or has_permission is None:
-        return
-    if not has_permission(
-        actor_id,
-        "service_catalog",
-        "MANAGE",
-        scope_type="ALL",
-        scope_value="*",
-    ):
-        raise PermissionError("Нет права service_catalog.MANAGE.")
+CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 
 
-def _required_defaults(cur: sqlite3.Cursor, table: str) -> dict[str, Any]:
-    cur.execute(f'PRAGMA table_info("{table}")')
-    defaults: dict[str, Any] = {}
-    for _, name, col_type, notnull, default_value, pk in cur.fetchall():
-        if pk or not notnull or default_value is not None:
-            continue
-        upper = text(name).upper()
-        typ = text(col_type).upper()
-        if name == "service_group":
-            defaults[name] = "GENERAL"
-        elif name == "unit":
-            defaults[name] = "service"
-        elif name in {"service_name", "service_item_name", "name", "title"}:
-            defaults[name] = "Без названия"
-        elif name in {"service_code", "service_item_code", "code"}:
-            defaults[name] = "UNSET"
-        elif "ACTIVE" in upper:
-            defaults[name] = 1
-        elif "STATUS" in upper:
-            defaults[name] = "active"
-        elif any(token in upper for token in ("AMOUNT", "PRICE", "SUM", "BALANCE")):
-            defaults[name] = 0
-        elif "INT" in typ:
-            defaults[name] = 0
-        elif any(token in typ for token in ("REAL", "NUM", "DEC")):
-            defaults[name] = 0
-        elif upper.endswith("_AT") or "DATE" in upper or "TIME" in upper:
-            defaults[name] = now_db()
-        else:
-            defaults[name] = ""
-    return defaults
+def now_db() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _insert_dynamic(cur: sqlite3.Cursor, table: str, values: dict[str, Any]) -> int:
-    cols = table_columns(cur, table)
-    values = {**_required_defaults(cur, table), **values}
-    actual = {key: value for key, value in values.items() if key in cols}
-    if not actual:
-        raise RuntimeError(f"В таблице {table} нет полей для вставки.")
-    cur.execute(
-        f"""
-        INSERT INTO "{table}" ({', '.join(actual)})
-        VALUES ({', '.join('?' for _ in actual)})
-        """,
-        tuple(actual.values()),
-    )
-    return int(cur.lastrowid)
-
-
-def _update_dynamic(
-    cur: sqlite3.Cursor,
-    table: str,
-    where_sql: str,
-    where_params: tuple[Any, ...],
-    values: dict[str, Any],
-) -> None:
-    cols = table_columns(cur, table)
-    actual = {key: value for key, value in values.items() if key in cols}
-    if not actual:
-        return
-    cur.execute(
-        f"""
-        UPDATE "{table}"
-        SET {', '.join(f'{key} = ?' for key in actual)}
-        WHERE {where_sql}
-        """,
-        tuple(actual.values()) + where_params,
+def _audit(conn: sqlite3.Connection, actor_id: int | str, action: str, table: str,
+           row_id: str, old: Any, new: Any, comment: str) -> None:
+    audit_log(
+        conn=conn, operator_id=str(actor_id), user_id=str(actor_id),
+        actor_type="service_catalog_manager", action_type=action,
+        table_name=table, row_id=row_id, field_name="service_catalog",
+        old_value=str(old or ""), new_value=str(new or ""),
+        source_context="service_catalog_admin_core", comment=comment, commit=False,
     )
 
 
-def _valid_code(value: str, label: str) -> str:
-    raw = text(value).upper()
-    if not raw:
-        raise ValueError(f"Укажите {label}.")
-    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
-    if any(ch not in allowed for ch in raw):
-        raise ValueError(
-            f"{label} используйте латиницей: A-Z, цифры, _ или -."
-        )
-    return raw
+def _validate_code(value: str, label: str) -> str:
+    code = text(value).upper()
+    if not CODE_RE.fullmatch(code):
+        raise ValueError(f"{label}: только A–Z, цифры и _, начало с буквы (3–64 символа).")
+    return code
 
 
-def _price(amount: float | int | str | None) -> float | None:
-    if amount is None or text(amount) == "":
-        return None
-    raw = float(str(amount).replace(",", "."))
-    if raw < 0:
-        raise ValueError("Цена не может быть отрицательной.")
-    return round(raw, 2)
-
-
-def _validate_date(value: str) -> str:
-    try:
-        return datetime.strptime(text(value), "%Y-%m-%d").strftime("%Y-%m-%d")
-    except ValueError as exc:
-        raise ValueError("Дата: ГГГГ-ММ-ДД, например 2026-07-01.") from exc
-
-
-def list_service_offers(
-    *,
-    include_retired: bool = False,
-    conn: sqlite3.Connection | None = None,
-) -> list[dict]:
+def list_profiles(conn: sqlite3.Connection | None = None) -> list[dict]:
     owns = conn is None
     conn = conn or get_conn()
     try:
-        cur = conn.cursor()
-        if not table_exists(cur, "service_items"):
-            return []
+        return [dict(row) for row in conn.execute(
+            "SELECT profile_code, profile_name, service_category, description "
+            "FROM service_workflow_profiles WHERE is_active=1 ORDER BY service_category, profile_name"
+        )]
+    finally:
+        if owns:
+            conn.close()
 
-        icols = table_columns(cur, "service_items")
-        name = "i.service_item_name" if "service_item_name" in icols else "i.service_item_code"
-        service_code = "i.service_code" if "service_code" in icols else "NULL"
-        active = "COALESCE(i.is_active, 1)" if "is_active" in icols else "1"
-        status = "COALESCE(i.status, 'active')" if "status" in icols else "'active'"
-        amount = "i.amount_default" if "amount_default" in icols else "NULL"
-        currency = "i.currency" if "currency" in icols else "'UAH'"
 
-        where = "" if include_retired else f"WHERE {active} = 1 AND {status} = 'active'"
-        cur.execute(
-            f"""
-            SELECT
-                i.service_item_code,
-                {service_code} AS service_code,
-                {name} AS service_item_name,
-                {amount} AS amount_default,
-                {currency} AS currency,
-                {active} AS is_active,
-                {status} AS status,
-                w.workflow_profile_code,
-                w.resident_request_enabled,
-                w.operator_create_enabled,
-                w.is_active AS workflow_active,
-                p.profile_name,
-                p.service_category
+def describe_profile(profile_code: str, conn: sqlite3.Connection | None = None) -> str:
+    """Explain a configured order workflow in terms of its actual steps."""
+    owns = conn is None
+    conn = conn or get_conn()
+    try:
+        profile = conn.execute(
+            "SELECT profile_name, service_category FROM service_workflow_profiles "
+            "WHERE profile_code=? AND is_active=1",
+            (profile_code,),
+        ).fetchone()
+        if profile is None:
+            return "Маршрут исполнения не найден."
+        steps = conn.execute(
+            "SELECT step_name FROM service_workflow_steps WHERE profile_code=? "
+            "AND is_required=1 ORDER BY sequence_no, id",
+            (profile_code,),
+        ).fetchall()
+        parts = [f"{index}. {row['step_name']}" for index, row in enumerate(steps, 1)]
+        detail = "\n".join(parts) if parts else "Шаги для этого маршрута ещё не настроены."
+        if profile_code == "REMOTE_NEW_PREORDER":
+            detail += (
+                "\nПосле поставки партия учитывается на ЦС; её можно передать на пост O "
+                "или консьержу K с подтверждением приёма. Сейчас выдачу жителю "
+                "фиксирует оператор; отдельного подтверждения жителя ещё нет."
+            )
+        return f"{profile['profile_name']} ({profile['service_category']}):\n{detail}"
+    finally:
+        if owns:
+            conn.close()
+
+
+def list_offers(conn: sqlite3.Connection | None = None) -> list[dict]:
+    owns = conn is None
+    conn = conn or get_conn()
+    try:
+        return [dict(row) for row in conn.execute(
+            """
+            SELECT i.service_item_code, i.service_code, i.service_item_name,
+                   i.amount_default, i.currency, i.status AS item_status,
+                   i.is_active AS item_active, i.description,
+                   c.service_name AS catalog_name, c.category,
+                   w.workflow_profile_code, w.resident_request_enabled,
+                   w.operator_create_enabled, w.requires_charge, w.payment_timing,
+                   w.inventory_mode, w.resident_asset_mode, w.is_active AS workflow_active,
+                   p.profile_name,
+                   (SELECT amount FROM service_price_versions pv
+                     WHERE pv.service_item_code=i.service_item_code AND pv.is_active=1
+                       AND pv.effective_from<=date('now')
+                       AND (pv.effective_to IS NULL OR pv.effective_to='' OR pv.effective_to>=date('now'))
+                     ORDER BY pv.effective_from DESC, pv.id DESC LIMIT 1) AS current_price,
+                   (SELECT effective_from FROM service_price_versions pv
+                     WHERE pv.service_item_code=i.service_item_code AND pv.is_active=1
+                     ORDER BY pv.effective_from DESC, pv.id DESC LIMIT 1) AS price_since
             FROM service_items i
-            LEFT JOIN service_item_workflows w
-              ON w.service_item_code = i.service_item_code
-            LEFT JOIN service_workflow_profiles p
-              ON p.profile_code = w.workflow_profile_code
-            {where}
-            ORDER BY COALESCE(p.service_category, ''), {name}, i.service_item_code
+            LEFT JOIN service_catalog c ON c.service_code=i.service_code
+            LEFT JOIN service_item_workflows w ON w.service_item_code=i.service_item_code
+            LEFT JOIN service_workflow_profiles p ON p.profile_code=w.workflow_profile_code
+            ORDER BY COALESCE(c.category, ''), i.service_item_name, i.service_item_code
             """
-        )
-        return [dict(row) for row in cur.fetchall()]
+        )]
     finally:
         if owns:
             conn.close()
 
 
-def add_or_update_service_offer(
-    *,
-    service_code: str,
-    service_name: str,
-    service_group: str,
-    service_type: str,
-    category: str,
-    service_item_code: str,
-    service_item_name: str,
-    workflow_profile_code: str,
-    amount: float | int | str | None,
-    effective_from: str,
-    resident_request_enabled: bool,
-    actor_id: int | str | None,
-    description: str = "",
-    conn: sqlite3.Connection | None = None,
-) -> dict:
-    """
-    Creates or updates a catalog service and one active service item.
-    It never removes old price history. New price version starts at effective_from.
-    """
-    owns = conn is None
-    conn = conn or get_conn()
+def create_offer(*, actor_id: int | str, service_code: str, catalog_name: str,
+                 category: str, item_code: str, item_name: str,
+                 workflow_profile_code: str, price: float, currency: str = "UAH",
+                 resident_request_enabled: bool = False, description: str = "") -> dict:
+    service_code = _validate_code(service_code, "Код категории")
+    item_code = _validate_code(item_code, "Код позиции")
+    profile = _validate_code(workflow_profile_code, "Профиль")
+    category = _validate_code(category, "Категория")
+    catalog_name, item_name = text(catalog_name), text(item_name)
+    if not catalog_name or not item_name:
+        raise ValueError("Укажите название категории и название позиции.")
+    if price < 0:
+        raise ValueError("Цена не может быть отрицательной.")
+    currency = text(currency).upper() or "UAH"
+    if len(currency) != 3:
+        raise ValueError("Валюта указывается трёхбуквенным кодом, например UAH.")
+
+    conn = get_conn()
     try:
-        ready, reason = schema_ready(conn)
-        if not ready:
-            raise RuntimeError(reason)
-        _catalog_permission(actor_id)
         cur = conn.cursor()
-
-        service_code = _valid_code(service_code, "код услуги")
-        service_item_code = _valid_code(service_item_code, "код статьи услуги")
-        effective_from = _validate_date(effective_from)
-        amount_value = _price(amount)
-
-        cur.execute(
-            "SELECT 1 FROM service_workflow_profiles WHERE profile_code = ? AND is_active = 1",
-            (workflow_profile_code,),
-        )
-        if not cur.fetchone():
-            raise ValueError(f"Неизвестный активный профиль: {workflow_profile_code}")
-
-        if not table_exists(cur, "service_catalog") or not table_exists(cur, "service_items"):
-            raise RuntimeError("Нужны таблицы service_catalog и service_items.")
-
-        cur.execute(
-            "SELECT 1 FROM service_catalog WHERE service_code = ?",
-            (service_code,),
-        )
-        catalog_values = {
-            "service_code": service_code,
-            "service_name": text(service_name),
-            "service_group": text(service_group) or "GENERAL",
-            "unit": "service",
-            "service_type": text(service_type) or "ONE_TIME",
-            "category": text(category) or "GENERAL",
-            "is_monthly": 1 if text(service_type).upper() == "MONTHLY" else 0,
-            "is_fundraising": 1 if text(service_type).upper() == "FUNDRAISING" else 0,
-            "is_commercial": 1 if text(service_type).upper() == "COMMERCIAL" else 0,
-            "is_access_control": 1 if text(category).upper() == "ACCESS" else 0,
-            "is_cash_collectable": 1,
-            "is_active": 1,
-            "comment": text(description) or None,
-            "updated_at": now_db(),
-        }
-        if cur.fetchone():
-            _update_dynamic(
-                cur, "service_catalog", "service_code = ?", (service_code,), catalog_values
-            )
-        else:
-            catalog_values["created_at"] = now_db()
-            _insert_dynamic(cur, "service_catalog", catalog_values)
-
-        cur.execute(
-            "SELECT id FROM service_items WHERE service_item_code = ?",
-            (service_item_code,),
-        )
-        item_values = {
-            "service_item_code": service_item_code,
-            "service_code": service_code,
-            "service_item_name": text(service_item_name),
-            "service_type": text(service_type) or "ONE_TIME",
-            "period_code": None,
-            "sequence_no": 1000,
-            "amount_default": amount_value,
-            "currency": "UAH",
-            "date_from": effective_from,
-            "date_to": None,
-            "status": "active",
-            "is_active": 1,
-            "description": text(description) or None,
-            "comment": "Управляется через каталог услуг.",
-            "updated_at": now_db(),
-        }
-        if cur.fetchone():
-            _update_dynamic(
-                cur, "service_items", "service_item_code = ?",
-                (service_item_code,), item_values
-            )
-        else:
-            item_values["created_at"] = now_db()
-            _insert_dynamic(cur, "service_items", item_values)
-
-        cur.execute(
-            """
-            INSERT INTO service_item_workflows (
-                service_item_code, workflow_profile_code,
-                resident_request_enabled, operator_create_enabled,
-                requires_charge, payment_timing,
-                inventory_mode, resident_asset_mode, is_active,
-                retired_at, retired_reason, created_at, updated_at
-            )
-            VALUES (?, ?, ?, 1, 1, 'BEFORE_FULFILLMENT',
-                    'NONE', 'NONE', 1, NULL, NULL, ?, ?)
-            ON CONFLICT(service_item_code) DO UPDATE SET
-                workflow_profile_code = excluded.workflow_profile_code,
-                resident_request_enabled = excluded.resident_request_enabled,
-                operator_create_enabled = 1,
-                requires_charge = 1,
-                is_active = 1,
-                retired_at = NULL,
-                retired_reason = NULL,
-                updated_at = excluded.updated_at
-            """,
-            (
-                service_item_code,
-                workflow_profile_code,
-                1 if resident_request_enabled else 0,
-                now_db(),
-                now_db(),
-            ),
-        )
-
-        if amount_value is not None:
-            set_service_price(
-                service_item_code=service_item_code,
-                amount=amount_value,
-                effective_from=effective_from,
-                actor_id=actor_id,
-                note="Создание/обновление услуги",
-                conn=conn,
-            )
-
-        if owns:
-            conn.commit()
-        return {
-            "service_code": service_code,
-            "service_item_code": service_item_code,
-            "workflow_profile_code": workflow_profile_code,
-            "amount": amount_value,
-            "effective_from": effective_from,
-        }
-    except Exception:
-        if owns:
-            conn.rollback()
-        raise
-    finally:
-        if owns:
-            conn.close()
-
-
-def set_service_price(
-    *,
-    service_item_code: str,
-    amount: float | int | str,
-    effective_from: str,
-    actor_id: int | str | None,
-    note: str = "",
-    conn: sqlite3.Connection | None = None,
-) -> None:
-    """
-    Adds a new effective-dated price. It closes the preceding active version;
-    it does not overwrite the old price record.
-    """
-    owns = conn is None
-    conn = conn or get_conn()
-    try:
-        _catalog_permission(actor_id)
-        cur = conn.cursor()
-        amount_value = _price(amount)
-        if amount_value is None:
-            raise ValueError("Для цены укажите число.")
-        effective_from = _validate_date(effective_from)
-
-        cur.execute(
-            """
-            SELECT id, effective_from
-            FROM service_price_versions
-            WHERE service_item_code = ?
-              AND is_active = 1
-              AND effective_from < ?
-              AND (effective_to IS NULL OR effective_to = '' OR effective_to >= ?)
-            ORDER BY effective_from DESC, id DESC
-            LIMIT 1
-            """,
-            (service_item_code, effective_from, effective_from),
-        )
-        previous = cur.fetchone()
-        if previous:
-            day_before = (
-                datetime.strptime(effective_from, "%Y-%m-%d").date()
-                - timedelta(days=1)
-            ).strftime("%Y-%m-%d")
+        profile_row = cur.execute(
+            "SELECT service_category FROM service_workflow_profiles WHERE profile_code=? AND is_active=1", (profile,)
+        ).fetchone()
+        if not profile_row:
+            raise ValueError("Активный профиль исполнения не найден.")
+        if text(profile_row[0]).upper() != category:
+            raise ValueError("Категория должна соответствовать выбранному профилю исполнения.")
+        if cur.execute("SELECT 1 FROM service_items WHERE service_item_code=?", (item_code,)).fetchone():
+            raise ValueError("Позиция с таким кодом уже существует.")
+        catalog = cur.execute("SELECT service_name, category FROM service_catalog WHERE service_code=?", (service_code,)).fetchone()
+        if catalog and text(catalog[1]).upper() != category:
+            raise ValueError("У существующей категории другой тип; выберите другой код категории.")
+        if not catalog:
             cur.execute(
-                """
-                UPDATE service_price_versions
-                SET effective_to = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (day_before, now_db(), int(previous["id"])),
+                """INSERT INTO service_catalog(service_code, service_group, service_name, unit, is_active,
+                   comment, service_type, category, is_monthly, is_fundraising, is_commercial,
+                   is_access_control, is_cash_collectable, access_policy_enabled, access_policy_scope,
+                   access_policy_mode, manual_review_required, created_at, updated_at)
+                   VALUES (?, 'ACCESS_CONTROL', ?, 'шт.', 1, ?, 'ONE_TIME', ?, 0,0,0,1,1,0,'NONE','NONE',0,?,?)""",
+                (service_code, catalog_name, "Создано через каталог услуг.", category, now_db(), now_db()),
             )
-
+            _audit(conn, actor_id, "service_catalog_created", "service_catalog", service_code, "", catalog_name, "Создана категория услуг")
         cur.execute(
-            """
-            INSERT INTO service_price_versions (
-                service_item_code, amount, currency,
-                effective_from, effective_to, is_active,
-                created_by, note, created_at, updated_at
-            )
-            VALUES (?, ?, 'UAH', ?, NULL, 1, ?, ?, ?, ?)
-            ON CONFLICT(service_item_code, effective_from) DO UPDATE SET
-                amount = excluded.amount,
-                currency = 'UAH',
-                effective_to = NULL,
-                is_active = 1,
-                created_by = excluded.created_by,
-                note = excluded.note,
-                updated_at = excluded.updated_at
-            """,
-            (
-                service_item_code, amount_value, effective_from,
-                str(actor_id) if actor_id is not None else "system",
-                text(note) or None,
-                now_db(), now_db(),
-            ),
+            """INSERT INTO service_items(service_item_code, service_code, service_item_name, service_type,
+                 amount_default, currency, status, is_active, description, comment, created_at, updated_at)
+               VALUES (?, ?, ?, 'ONE_TIME', ?, ?, 'draft', 1, ?, 'Создано через каталог услуг.', ?, ?)""",
+            (item_code, service_code, item_name, float(price), currency, description or None, now_db(), now_db()),
         )
-        _update_dynamic(
-            cur,
-            "service_items",
-            "service_item_code = ?",
-            (service_item_code,),
-            {"amount_default": amount_value, "currency": "UAH", "updated_at": now_db()},
+        cur.execute(
+            """INSERT INTO service_item_workflows(service_item_code, workflow_profile_code,
+                 resident_request_enabled, operator_create_enabled, requires_charge, payment_timing,
+                 inventory_mode, resident_asset_mode, is_active, created_at, updated_at)
+               VALUES (?, ?, 0, 1, 1, 'BEFORE_FULFILLMENT', 'NONE', 'NONE', 1, ?, ?)""",
+            (item_code, profile, now_db(), now_db()),
         )
-        if owns:
-            conn.commit()
+        cur.execute(
+            """INSERT INTO service_price_versions(service_item_code, amount, currency, effective_from,
+                 effective_to, is_active, created_by, note, created_at, updated_at)
+               VALUES (?, ?, ?, ?, NULL, 1, ?, 'Первичная цена позиции.', ?, ?)""",
+            (item_code, float(price), currency, date.today().isoformat(), str(actor_id), now_db(), now_db()),
+        )
+        _audit(conn, actor_id, "service_item_created", "service_items", item_code, "", item_name,
+               "Создан черновик позиции каталога")
+        conn.commit()
+        return next(row for row in list_offers(conn) if row["service_item_code"] == item_code)
     except Exception:
-        if owns:
-            conn.rollback()
+        conn.rollback()
         raise
     finally:
-        if owns:
-            conn.close()
+        conn.close()
 
 
-def retire_service_offer(
-    *,
-    service_item_code: str,
-    actor_id: int | str | None,
-    reason: str,
-    conn: sqlite3.Connection | None = None,
-) -> None:
-    """
-    Archive only. Historical orders, charges and payments stay untouched.
-    """
+def set_publication(*, actor_id: int | str, item_code: str, published: bool) -> dict:
+    item_code = _validate_code(item_code, "Код позиции")
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        row = cur.execute("SELECT status FROM service_items WHERE service_item_code=?", (item_code,)).fetchone()
+        if not row:
+            raise ValueError("Позиция каталога не найдена.")
+        old = text(row[0])
+        new = "active" if published else "draft"
+        cur.execute("UPDATE service_items SET status=?, updated_at=? WHERE service_item_code=?", (new, now_db(), item_code))
+        cur.execute("UPDATE service_item_workflows SET resident_request_enabled=?, updated_at=? WHERE service_item_code=?", (int(published), now_db(), item_code))
+        _audit(conn, actor_id, "service_item_published" if published else "service_item_unpublished",
+               "service_items", item_code, old, new,
+               "Позиция опубликована для жителей" if published else "Позиция снята с публикации")
+        conn.commit()
+        return next(row for row in list_offers(conn) if row["service_item_code"] == item_code)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def change_price(*, actor_id: int | str, item_code: str, price: float, currency: str = "UAH", note: str = "") -> dict:
+    item_code = _validate_code(item_code, "Код позиции")
+    if price < 0:
+        raise ValueError("Цена не может быть отрицательной.")
+    currency = text(currency).upper() or "UAH"
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        if not cur.execute("SELECT 1 FROM service_items WHERE service_item_code=?", (item_code,)).fetchone():
+            raise ValueError("Позиция каталога не найдена.")
+        old = cur.execute("SELECT amount, currency FROM service_price_versions WHERE service_item_code=? AND is_active=1 ORDER BY id DESC LIMIT 1", (item_code,)).fetchone()
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        cur.execute("UPDATE service_price_versions SET is_active=0, effective_to=?, updated_at=? WHERE service_item_code=? AND is_active=1", (yesterday, now_db(), item_code))
+        cur.execute("UPDATE service_items SET amount_default=?, currency=?, updated_at=? WHERE service_item_code=?", (float(price), currency, now_db(), item_code))
+        cur.execute("""INSERT INTO service_price_versions(service_item_code, amount, currency, effective_from,
+                       effective_to, is_active, created_by, note, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, NULL, 1, ?, ?, ?, ?)""",
+                    (item_code, float(price), currency, date.today().isoformat(), str(actor_id), text(note) or "Изменение цены через каталог услуг.", now_db(), now_db()))
+        _audit(conn, actor_id, "service_price_changed", "service_price_versions", item_code,
+               f"{old[0]} {old[1]}" if old else "", f"{price} {currency}", text(note) or "Новая версия цены")
+        conn.commit()
+        return next(row for row in list_offers(conn) if row["service_item_code"] == item_code)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# Compatibility names retained for the established service preflight scripts.
+# The UI uses the shorter API above; these functions keep older automation
+# working while writing the same catalog/item/workflow/price-version records.
+def list_service_offers(*, include_retired: bool = False, conn: sqlite3.Connection | None = None) -> list[dict]:
+    rows = list_offers(conn)
+    if include_retired:
+        return rows
+    return [row for row in rows if int(row.get("item_active") or 0) == 1 and row.get("item_status") != "archived"]
+
+
+def add_or_update_service_offer(*, service_code: str, service_name: str, service_group: str,
+                                service_type: str, category: str, service_item_code: str,
+                                service_item_name: str, workflow_profile_code: str,
+                                amount: float | int | str | None, effective_from: str,
+                                resident_request_enabled: bool, actor_id: int | str | None,
+                                description: str = "", conn: sqlite3.Connection | None = None) -> dict:
+    # Historical callers use this for seed/preflight.  Existing entries keep
+    # their identity; their current attributes and a dated price are updated.
+    existing = next((r for r in list_offers(conn) if r["service_item_code"] == text(service_item_code).upper()), None)
+    if not existing:
+        result = create_offer(
+            actor_id=actor_id or "system", service_code=service_code, catalog_name=service_name,
+            category=category, item_code=service_item_code, item_name=service_item_name,
+            workflow_profile_code=workflow_profile_code, price=float(amount or 0),
+            resident_request_enabled=False, description=description,
+        )
+    else:
+        own = conn is None
+        db = conn or get_conn()
+        try:
+            cur = db.cursor()
+            cur.execute("UPDATE service_catalog SET service_name=?, service_group=?, service_type=?, category=?, comment=?, updated_at=? WHERE service_code=?",
+                        (text(service_name), text(service_group) or "GENERAL", text(service_type) or "ONE_TIME", text(category) or "GENERAL", text(description) or None, now_db(), text(service_code).upper()))
+            cur.execute("UPDATE service_items SET service_item_name=?, service_type=?, description=?, updated_at=? WHERE service_item_code=?",
+                        (text(service_item_name), text(service_type) or "ONE_TIME", text(description) or None, now_db(), text(service_item_code).upper()))
+            cur.execute("UPDATE service_item_workflows SET workflow_profile_code=?, resident_request_enabled=?, is_active=1, updated_at=? WHERE service_item_code=?",
+                        (text(workflow_profile_code).upper(), int(resident_request_enabled), now_db(), text(service_item_code).upper()))
+            _audit(db, actor_id or "system", "service_item_updated", "service_items", text(service_item_code).upper(), "", text(service_item_name), "Обновление позиции через совместимый API")
+            if own:
+                db.commit()
+        except Exception:
+            if own:
+                db.rollback()
+            raise
+        finally:
+            if own:
+                db.close()
+        result = next(r for r in list_offers(conn) if r["service_item_code"] == text(service_item_code).upper())
+    if amount is not None:
+        set_service_price(service_item_code=service_item_code, amount=amount,
+                          effective_from=effective_from, actor_id=actor_id, conn=conn)
+    set_publication(actor_id=actor_id or "system", item_code=service_item_code, published=resident_request_enabled)
+    return result
+
+
+def set_service_price(*, service_item_code: str, amount: float | int | str, effective_from: str,
+                      actor_id: int | str | None, note: str = "", conn: sqlite3.Connection | None = None) -> None:
+    # Current UI permits a price from today; older scripts may deliberately
+    # supply another effective date, so retain that useful administrative path.
+    try:
+        when = datetime.strptime(text(effective_from), "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError("Дата цены: ГГГГ-ММ-ДД.") from exc
+    if when != date.today():
+        own = conn is None
+        db = conn or get_conn()
+        try:
+            cur = db.cursor(); code = _validate_code(service_item_code, "Код позиции")
+            value = float(str(amount).replace(",", "."))
+            cur.execute("UPDATE service_price_versions SET effective_to=?, updated_at=? WHERE service_item_code=? AND is_active=1 AND effective_from<?",
+                        ((when - timedelta(days=1)).isoformat(), now_db(), code, when.isoformat()))
+            cur.execute("INSERT INTO service_price_versions(service_item_code, amount, currency, effective_from, effective_to, is_active, created_by, note, created_at, updated_at) VALUES (?, ?, 'UAH', ?, NULL, 1, ?, ?, ?, ?)",
+                        (code, value, when.isoformat(), str(actor_id or "system"), text(note) or "Версия цены", now_db(), now_db()))
+            cur.execute("UPDATE service_items SET amount_default=?, updated_at=? WHERE service_item_code=?", (value, now_db(), code))
+            _audit(db, actor_id or "system", "service_price_changed", "service_price_versions", code, "", value, text(note) or "Версия цены")
+            if own: db.commit()
+        except Exception:
+            if own: db.rollback()
+            raise
+        finally:
+            if own: db.close()
+        return
+    change_price(actor_id=actor_id or "system", item_code=service_item_code, price=float(str(amount).replace(",", ".")), note=note)
+
+
+def retire_service_offer(*, service_item_code: str, actor_id: int | str | None, reason: str,
+                         conn: sqlite3.Connection | None = None) -> None:
     if not text(reason):
         raise ValueError("Для архивирования укажите причину.")
-
-    owns = conn is None
-    conn = conn or get_conn()
+    own = conn is None; db = conn or get_conn()
     try:
-        _catalog_permission(actor_id)
-        cur = conn.cursor()
-        _service = _fetch_service_item_or_raise(cur, service_item_code)
-
-        _update_dynamic(
-            cur,
-            "service_items",
-            "service_item_code = ?",
-            (service_item_code,),
-            {
-                "is_active": 0,
-                "status": "archived",
-                "date_to": today_iso(),
-                "updated_at": now_db(),
-            },
-        )
-        cur.execute(
-            """
-            UPDATE service_item_workflows
-            SET is_active = 0,
-                retired_at = ?,
-                retired_reason = ?,
-                updated_at = ?
-            WHERE service_item_code = ?
-            """,
-            (now_db(), text(reason), now_db(), service_item_code),
-        )
-        if owns:
-            conn.commit()
+        code = _validate_code(service_item_code, "Код позиции")
+        db.execute("UPDATE service_items SET is_active=0, status='archived', date_to=?, updated_at=? WHERE service_item_code=?", (date.today().isoformat(), now_db(), code))
+        db.execute("UPDATE service_item_workflows SET is_active=0, retired_at=?, retired_reason=?, updated_at=? WHERE service_item_code=?", (now_db(), text(reason), now_db(), code))
+        _audit(db, actor_id or "system", "service_item_archived", "service_items", code, "active", "archived", text(reason))
+        if own: db.commit()
     except Exception:
-        if owns:
-            conn.rollback()
+        if own: db.rollback()
         raise
     finally:
-        if owns:
-            conn.close()
+        if own: db.close()
 
 
-def restore_service_offer(
-    *,
-    service_item_code: str,
-    actor_id: int | str | None,
-    conn: sqlite3.Connection | None = None,
-) -> None:
-    owns = conn is None
-    conn = conn or get_conn()
+def restore_service_offer(*, service_item_code: str, actor_id: int | str | None,
+                          conn: sqlite3.Connection | None = None) -> None:
+    own = conn is None; db = conn or get_conn()
     try:
-        _catalog_permission(actor_id)
-        cur = conn.cursor()
-        _fetch_service_item_or_raise(cur, service_item_code)
-        _update_dynamic(
-            cur,
-            "service_items",
-            "service_item_code = ?",
-            (service_item_code,),
-            {"is_active": 1, "status": "active", "date_to": None, "updated_at": now_db()},
-        )
-        cur.execute(
-            """
-            UPDATE service_item_workflows
-            SET is_active = 1,
-                retired_at = NULL,
-                retired_reason = NULL,
-                updated_at = ?
-            WHERE service_item_code = ?
-            """,
-            (now_db(), service_item_code),
-        )
-        if owns:
-            conn.commit()
+        code = _validate_code(service_item_code, "Код позиции")
+        db.execute("UPDATE service_items SET is_active=1, status='draft', date_to=NULL, updated_at=? WHERE service_item_code=?", (now_db(), code))
+        db.execute("UPDATE service_item_workflows SET is_active=1, resident_request_enabled=0, retired_at=NULL, retired_reason=NULL, updated_at=? WHERE service_item_code=?", (now_db(), code))
+        _audit(db, actor_id or "system", "service_item_restored", "service_items", code, "archived", "draft", "Восстановлено без автоматической публикации")
+        if own: db.commit()
     except Exception:
-        if owns:
-            conn.rollback()
+        if own: db.rollback()
         raise
     finally:
-        if owns:
-            conn.close()
-
-
-def _fetch_service_item_or_raise(cur: sqlite3.Cursor, service_item_code: str) -> dict:
-    if not table_exists(cur, "service_items"):
-        raise RuntimeError("Не найдена service_items.")
-    cur.execute(
-        "SELECT * FROM service_items WHERE service_item_code = ?",
-        (service_item_code,),
-    )
-    row = cur.fetchone()
-    if not row:
-        raise ValueError(f"Статья услуги не найдена: {service_item_code}")
-    return dict(row)
-
-
-def today_iso() -> str:
-    return datetime.now().strftime("%Y-%m-%d")
+        if own: db.close()

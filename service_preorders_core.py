@@ -37,6 +37,13 @@ from service_orders_core import (
     table_exists,
     text,
 )
+from order_fulfillment_core import (
+    PHYSICAL_ITEM,
+    attach_fulfillment_item,
+    ensure_order_fulfillment,
+    transition_fulfillment,
+)
+from inventory_transfer_core import consume_for_order, receive_supplier_stock
 
 
 INTEREST = "INTEREST"
@@ -873,6 +880,18 @@ def create_supplier_batch(
                 source_context="supplier_batch",
                 conn=conn,
             )
+            # The supplier-specific link remains an adapter.  The canonical
+            # cross-service state is now a physical fulfillment awaiting
+            # supply, usable later for keys, cards and other goods as well.
+            ensure_order_fulfillment(
+                conn,
+                service_order_id=int(order["id"]),
+                fulfillment_kind=PHYSICAL_ITEM,
+                initial_status="AWAITING_SUPPLY",
+                source_location_code="CS",
+                actor_id=actor_id,
+                note=f"Включено в поставку {batch_number}.",
+            )
         result = get_supplier_batch(batch_id, conn=conn)
         if owns:
             conn.commit()
@@ -972,6 +991,10 @@ def receive_supplier_batch(
                 now_db(), now_db(), text(note) or None, int(batch_id),
             ),
         )
+        receive_supplier_stock(
+            conn, batch_id=int(batch_id), service_item_code=str(batch["service_item_code"]),
+            quantity=received_now, actor_id=actor_id or "system",
+        )
         # The queue is FIFO. An order becomes ready only when the batch can
         # cover its full requested quantity; no fractional resident issue.
         links = _rows(
@@ -1004,6 +1027,24 @@ def receive_supplier_batch(
                 source_context="supplier_batch",
                 conn=conn,
             )
+            fulfillment = ensure_order_fulfillment(
+                conn,
+                service_order_id=int(link["service_order_id"]),
+                fulfillment_kind=PHYSICAL_ITEM,
+                initial_status="AWAITING_SUPPLY",
+                source_location_code="CS",
+                actor_id=actor_id,
+                note=f"Поставка {batch['batch_number']} принята на склад.",
+            )
+            if fulfillment.get("fulfillment_status") != "AT_WAREHOUSE":
+                transition_fulfillment(
+                    conn,
+                    fulfillment_id=int(fulfillment["id"]),
+                    target_status="AT_WAREHOUSE",
+                    event_code="SUPPLIER_DELIVERY_RECEIVED",
+                    actor_id=actor_id,
+                    note=f"Поставка {batch['batch_number']} принята на склад.",
+                )
             capacity -= qty
         result = get_supplier_batch(batch_id, conn=conn)
         if owns:
@@ -1047,9 +1088,10 @@ def issue_new_remotes_from_batch(
     service_order_id: int,
     actor_id: int | str | None,
     note: str = "",
+    source_location_code: str = "CS",
     conn: sqlite3.Connection | None = None,
 ) -> dict:
-    """Create actual asset records at issue time and complete the paid preorder."""
+    """Issue an order from accepted stock at CS, O or K."""
     owns = conn is None
     conn = conn or get_conn()
     try:
@@ -1067,6 +1109,41 @@ def issue_new_remotes_from_batch(
         available = int(batch.get("quantity_received") or 0) - int(batch.get("quantity_issued") or 0)
         if available < quantity:
             raise ValueError("В поставке недостаточно фактически полученных пультов.")
+        consume_for_order(
+            conn, batch_id=int(batch["id"]), location=source_location_code,
+            quantity=quantity, service_order_id=int(service_order_id),
+            actor_id=actor_id or "system",
+        )
+        fulfillment = ensure_order_fulfillment(
+            conn,
+            service_order_id=int(service_order_id),
+            fulfillment_kind=PHYSICAL_ITEM,
+            initial_status="AWAITING_SUPPLY",
+            source_location_code=source_location_code,
+            actor_id=actor_id,
+            note=f"Пультовая заявка {order['order_number']} переведена в общий контур исполнения.",
+        )
+        cur.execute(
+            """UPDATE order_fulfillments SET source_location_code=?,pickup_point_code=?,
+               updated_at=? WHERE id=?""",
+            (source_location_code, source_location_code, now_db(), int(fulfillment["id"])),
+        )
+        cur.execute(
+            """INSERT INTO order_fulfillment_events
+               (fulfillment_id,event_code,actor_id,note,created_at)
+               VALUES (?,'ISSUE_LOCATION_SELECTED',?,?,?)""",
+            (int(fulfillment["id"]), str(actor_id) if actor_id is not None else "system",
+             f"Фактическая выдача из {source_location_code}.", now_db()),
+        )
+        if fulfillment.get("fulfillment_status") != "AT_WAREHOUSE":
+            fulfillment = transition_fulfillment(
+                conn,
+                fulfillment_id=int(fulfillment["id"]),
+                target_status="AT_WAREHOUSE",
+                event_code="SUPPLIER_DELIVERY_RECEIVED",
+                actor_id=actor_id,
+                note=f"Поставка {batch['batch_number']} подтверждена в общем контуре исполнения.",
+            )
         issued_assets: list[int] = []
         start = int(batch.get("quantity_issued") or 0) + 1
         for position in range(quantity):
@@ -1083,6 +1160,16 @@ def issue_new_remotes_from_batch(
                 conn=conn,
             )
             asset_id = int(asset["id"])
+            attach_fulfillment_item(
+                conn,
+                fulfillment_id=int(fulfillment["id"]),
+                item_kind="REMOTE_ASSET",
+                external_asset_id=asset_id,
+                item_label=asset_number,
+                item_status="HANDED_OVER",
+                actor_id=actor_id,
+                note=f"Пульт из партии {batch['batch_number']}.",
+            )
             record_remote_movement(
                 remote_asset_id=asset_id,
                 service_order_id=int(service_order_id),
@@ -1091,7 +1178,8 @@ def issue_new_remotes_from_batch(
                 actor_id=actor_id,
                 apartment_id=int(order["apartment_id"]) if order.get("apartment_id") is not None else None,
                 apartment_number=text(order.get("apartment_number")),
-                note=f"Выдан по оплаченной заявке из поставки {batch['batch_number']}.",
+                note=f"Выдан из {source_location_code} по оплаченной заявке из поставки {batch['batch_number']}.",
+                post_code=source_location_code,
                 confirm_step_code="REMOTE_BATCH_ISSUED",
                 conn=conn,
             )
@@ -1116,6 +1204,18 @@ def issue_new_remotes_from_batch(
                 ),
             )
             issued_assets.append(asset_id)
+        # Compatibility adapter: the old operator action is still named
+        # "issue" and physically hands the remotes to the resident at once.
+        # The next UI step will split this into READY_FOR_PICKUP → HANDED_OVER
+        # → RECEIPT_CONFIRMED without changing the commercial order tables.
+        transition_fulfillment(
+            conn,
+            fulfillment_id=int(fulfillment["id"]),
+            target_status="HANDED_OVER",
+            event_code="LEGACY_REMOTE_DIRECT_HANDOVER",
+            actor_id=actor_id,
+            note=text(note) or f"Пульты выданы из поставки {batch['batch_number']}.",
+        )
         cur.execute(
             """
             UPDATE remote_supplier_batch_links

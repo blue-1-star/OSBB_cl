@@ -1118,7 +1118,7 @@ def create_remote_asset(
             "remote_assets",
             "MOVE",
             "POST",
-            "O",
+            text(post_code) or "O",
         )
         cur.execute(
             """
@@ -1182,6 +1182,7 @@ def record_remote_movement(
     apartment_id: int | None = None,
     apartment_number: str = "",
     note: str = "",
+    post_code: str = "O",
     confirm_step_code: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> dict:
@@ -1195,7 +1196,7 @@ def record_remote_movement(
             "remote_assets",
             "MOVE",
             "POST",
-            "O",
+            text(post_code) or "O",
         )
         asset = _fetchone_dict(
             cur,
@@ -1230,12 +1231,13 @@ def record_remote_movement(
                 from_state, to_state, apartment_id, apartment_number,
                 post_code, actor_id, note, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'O', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 int(remote_asset_id), int(service_order_id), text(movement_type),
                 from_state, text(to_state),
                 apartment_id, text(apartment_number) or None,
+                text(post_code) or "O",
                 str(actor_id) if actor_id is not None else "system",
                 text(note) or None, now_db(),
             ),
