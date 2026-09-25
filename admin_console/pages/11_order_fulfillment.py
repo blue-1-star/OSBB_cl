@@ -1,4 +1,4 @@
-"""Read-only operator view of the canonical OSBB order-fulfillment model."""
+"""Order fulfillment overview and operator intake of preliminary demand."""
 
 from __future__ import annotations
 
@@ -15,16 +15,17 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from admin_console.utils.db import get_conn
-from cash_claim_points_core import assign_collector, custodian_at, end_collector_assignment, list_claim_points
-from service_interest_intake_core import record_external_interest
+from cash_claim_points_core import assign_collector, bind_collector_telegram, create_collector_slot, custodian_at, end_collector_assignment, list_claim_points
+from service_cash_claims_core import confirm_claim_cash, transfer_collector_cash
+from service_interest_intake_core import record_external_interest, record_cash_handover_claim
+from resident_identity_core import apartment_telegram_accounts, link_interest_telegram_recipient
+from supplier_terms_core import current_supplier_minimum, order_preorder_context, set_supplier_minimum
 
 
 st.set_page_config(page_title="Исполнение заказов", page_icon="📦", layout="wide")
 st.title("📦 Исполнение заказов")
-st.caption(
-    "Единый контур: предмет, цифровой доступ или работа. Пульты отображаются как первый "
-    "адаптер физического предмета; старые remote_* таблицы показаны только как техническая история."
-)
+session_actor = st.sidebar.text_input("Оператор этой сессии", key="order_fulfillment_actor")
+st.sidebar.caption("Админ-консоль пока без персонального входа. Это имя записывается в журнал действий.")
 
 
 def table_exists(conn, name: str) -> bool:
@@ -43,77 +44,119 @@ try:
 
     st.subheader("📝 Намерения и потребность")
     if table_exists(conn, "service_order_interests"):
-        with st.expander("👤 Кто уполномочен принимать деньги в ячейках И1/И2"):
-            st.caption(
-                "И1 и И2 — постоянные коды ячеек; ФИО назначенного человека меняется по датам. "
-                "Назначение здесь не создаёт кассовую операцию."
-            )
+        with st.expander("👤 Уполномоченные сборщики"):
+            st.caption("Число сборщиков не ограничено. К1–К6 остаются местами передачи со слов жителя; здесь назначаются люди, которые собирают и сверяют деньги.")
+            with st.form("new_collector_slot"):
+                new_collector_label = st.text_input("Название новой роли / точки", placeholder="Например, представитель 3-го подъезда")
+                create_collector = st.form_submit_button("Добавить сборщика")
+            if create_collector:
+                try:
+                    created = create_collector_slot(point_name=new_collector_label, created_by=session_actor)
+                    st.success(f"Добавлена точка {created['point_code']}: {created['point_name']}. Теперь назначьте ФИО ниже.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+            collector_slots = [dict(row) for row in conn.execute(
+                "SELECT point_code,point_name FROM cash_claim_points "
+                "WHERE point_kind='COLLECTOR_SLOT' AND is_active=1 ORDER BY point_code"
+            )]
+            current = {row["point_code"]: custodian_at(conn, row["point_code"], date.today().isoformat())
+                       for row in collector_slots}
             if table_exists(conn, "cash_claim_custodians"):
                 assignments = [dict(row) for row in conn.execute(
                     """SELECT point_code,person_name,valid_from,valid_to,assigned_by,note
                        FROM cash_claim_custodians ORDER BY point_code,valid_from DESC"""
                 )]
                 if assignments:
-                    st.dataframe(pd.DataFrame(assignments), hide_index=True, use_container_width=True)
-                else:
-                    st.info("Для И1/И2 пока никто не назначен; эти ячейки недоступны для новых заявлений.")
-            with st.form("assign_cash_collector"):
-                slot_col, name_col, date_col = st.columns(3)
-                with slot_col:
-                    collector_slot = st.selectbox("Ячейка", ["I1", "I2"])
-                with name_col:
-                    collector_name = st.text_input("ФИО уполномоченного *")
-                with date_col:
-                    collector_from = st.date_input("Действует с")
-                collector_actor = st.text_input("Кто внёс назначение *")
-                collector_note = st.text_input("Основание / примечание")
-                collector_submit = st.form_submit_button("Сохранить назначение")
-            if collector_submit:
-                try:
-                    saved_assignment = assign_collector(
-                        point_code=collector_slot, person_name=collector_name,
-                        valid_from=collector_from.isoformat(), assigned_by=collector_actor,
-                        note=collector_note,
-                    )
-                    st.success(
-                        f"{saved_assignment['point_code']}: {saved_assignment['person_name']} "
-                        f"с {saved_assignment['valid_from']}. Предыдущее назначение завершено накануне."
-                    )
-                except Exception as exc:
-                    st.error(str(exc))
-            with st.form("end_cash_collector"):
-                st.caption("Если уполномоченный ушёл без замены, закройте назначение: после указанной даты ячейка исчезнет из выбора.")
-                end_col1, end_col2 = st.columns(2)
-                with end_col1:
-                    end_slot = st.selectbox("Освободить ячейку", ["I1", "I2"])
-                with end_col2:
-                    end_last_day = st.date_input("Последний день полномочий")
-                end_actor = st.text_input("Кто прекратил полномочия *")
-                end_submit = st.form_submit_button("Закрыть назначение")
-            if end_submit:
-                try:
-                    ended = end_collector_assignment(
-                        point_code=end_slot, last_day=end_last_day.isoformat(), ended_by=end_actor,
-                    )
-                    st.success(f"Назначение {ended['person_name']} в {end_slot} завершено {ended['valid_to']}.")
-                except Exception as exc:
-                    st.error(str(exc))
+                    with st.expander("История назначений"):
+                        st.dataframe(pd.DataFrame(assignments), hide_index=True, use_container_width=True)
+            for slot in collector_slots:
+                collector_slot, collector_label = slot["point_code"], slot["point_name"]
+                assigned = current[collector_slot]
+                if assigned:
+                    with st.form(f"collector_telegram_{collector_slot}"):
+                        tg_id = st.text_input(
+                            f"{collector_label} · {assigned['person_name']} · Telegram ID",
+                            value=assigned.get("telegram_user_id") or "",
+                            help="Только этот Telegram-пользователь увидит поступления данного назначения в боте.",
+                        )
+                        bind_submit = st.form_submit_button("Сохранить привязку к боту")
+                    if bind_submit:
+                        try:
+                            bind_collector_telegram(point_code=collector_slot,
+                                telegram_user_id=tg_id, actor=session_actor)
+                            st.success("Telegram ID сборщика сохранён.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
+                with st.form(f"collector_{collector_slot}"):
+                    name_col, date_col, button_col = st.columns((3, 2, 2))
+                    with name_col:
+                        collector_name = st.text_input(
+                            f"{collector_label} (ФИО)", value=assigned["person_name"] if assigned else "",
+                            key=f"collector_name_{collector_slot}",
+                        )
+                    with date_col:
+                        collector_day = st.date_input("Дата начала нового назначения / последний день при снятии", key=f"collector_date_{collector_slot}")
+                    with button_col:
+                        st.write("")
+                        collector_submit = st.form_submit_button("Сохранить")
+                if collector_submit:
+                    try:
+                        if collector_name.strip():
+                            if assigned and collector_name.strip() == assigned["person_name"]:
+                                st.info("ФИО не изменилось.")
+                            else:
+                                assign_collector(
+                                    point_code=collector_slot, person_name=collector_name,
+                                    valid_from=collector_day.isoformat(), assigned_by=session_actor,
+                                )
+                                st.success(f"{collector_label}: {collector_name.strip()} с {collector_day.isoformat()}.")
+                                st.rerun()
+                        elif assigned:
+                            end_collector_assignment(
+                                point_code=collector_slot, last_day=collector_day.isoformat(), ended_by=session_actor,
+                            )
+                            st.success(f"{collector_label}: полномочия завершены {collector_day.isoformat()}.")
+                            st.rerun()
+                        else:
+                            st.info("ФИО не указано; назначение не менялось.")
+                    except Exception as exc:
+                        st.error(str(exc))
 
-        with st.expander("➕ Внести сообщение жителя без регистрации в боте"):
-            st.caption(
-                "Оператор переносит исходное сообщение в намерение. Квартира пока указана со слов отправителя. "
-                "Фраза «деньги сдал» сохраняется как заявление, но не создаёт платёж и не подтверждает кассу."
+        with st.expander("➕ Внести сообщение жителя из другого канала"):
+            st.caption("Слова о передаче денег сохраняются как сообщение, не как подтверждённый платёж.")
+            intake_apartment = st.text_input("Квартира, названная отправителем", key="intake_apartment_lookup")
+            unit_matches = [row[0] for row in conn.execute(
+                """SELECT id FROM apartments WHERE apartment_number=?
+                   AND COALESCE(unit_type,'')<>'TECHNICAL'
+                   AND COALESCE(record_status,'')<>'TEST'""", (intake_apartment.strip(),),
+            )] if intake_apartment.strip() else []
+            candidates = (apartment_telegram_accounts(apartment_id=int(unit_matches[0]),
+                           apartment_number=intake_apartment.strip(), conn=conn)
+                          if len(unit_matches) == 1 else [])
+            accounts_by_id = {str(row["id"]): row for row in candidates}
+            account_options = [""] + list(accounts_by_id)
+            selected_account = st.selectbox(
+                "Telegram-адресат этого сообщения",
+                account_options, index=1 if len(candidates) == 1 else 0,
+                format_func=lambda key: (
+                    "Не определён — не отправлять автоматически" if not key else
+                    f"{' '.join(x for x in [accounts_by_id[key]['telegram_first_name'], accounts_by_id[key]['telegram_last_name']] if x) or 'Пользователь'} "
+                    f"@{accounts_by_id[key]['telegram_username'] or '—'} · ID {accounts_by_id[key]['telegram_user_id']}"
+                ),
+                help="Если в квартире несколько пользователей, выберите конкретного отправителя. По одному номеру квартиры адресат не угадывается.",
             )
+            if intake_apartment and not candidates:
+                st.caption("Для этой квартиры нет подтверждённого Telegram-пользователя; адресата можно добавить позже после регистрации.")
             with st.form("external_service_interest"):
                 a1, a2, a3 = st.columns(3)
                 with a1:
-                    intake_apartment = st.text_input("Квартира, названная отправителем")
                     intake_quantity = st.number_input("Количество пультов", min_value=1, value=1, step=1)
                 with a2:
                     intake_channel = st.selectbox("Откуда сообщение", ["TELEGRAM", "VIBER", "OTHER_MESSENGER", "PHONE", "PAPER", "OTHER"])
                     intake_sender = st.text_input("Имя / контакт отправителя (если известен)")
                 with a3:
-                    intake_operator = st.text_input("Кто внёс сообщение *")
                     intake_reference = st.text_input("Ссылка / ID сообщения (если есть)")
                 intake_message_date = st.date_input("Дата исходного сообщения", max_value=date.today())
                 intake_message = st.text_area("Исходный текст сообщения *", placeholder="Хочу 2 пульта, деньги сдал консьержу")
@@ -121,15 +164,14 @@ try:
                 claim_points = list_claim_points(conn=conn, include_historical_collectors=True)
                 point_labels = {
                     p["point_code"]: f"{p['point_code']} — {p['point_name']}"
-                    + (" (ФИО проверяется по дате сообщения)"
-                       if p["point_code"].startswith("I") else "")
+                    + (f" ({p['custodian']})" if p["point_code"].startswith("KAS") else "")
                     for p in claim_points
                 }
                 intake_cashbox = st.selectbox(
                     "Пункт, куда, по словам отправителя, переданы деньги",
                     [""] + list(point_labels),
                     format_func=lambda code: point_labels.get(code, "Не указан"),
-                    help="K1–K6, O; И1/И2 доступны только после назначения уполномоченного. Это ещё не подтверждённая оплата.",
+                    help="K1–K6 — консьержи, O — охрана, KAS… — назначенные сборщики. Это не подтверждённая оплата.",
                 )
                 intake_duplicate = st.checkbox("Это отдельное обращение, хотя по квартире уже может быть открыто намерение")
                 intake_submit = st.form_submit_button("Записать намерение", type="primary")
@@ -138,9 +180,11 @@ try:
                     created_interest = record_external_interest(
                         apartment_number=intake_apartment, quantity=int(intake_quantity),
                         original_message=intake_message, source_channel=intake_channel,
-                        entered_by=intake_operator, sender_label=intake_sender,
+                        entered_by=session_actor, sender_label=intake_sender,
                         source_reference=intake_reference, claimed_cash_handover=intake_claimed_cash,
                         claimed_cashbox=intake_cashbox, allow_duplicate=intake_duplicate,
+                        resident_account_id=int(selected_account) if selected_account else None,
+                        auto_resolve_telegram=False,
                         message_received_at=intake_message_date.isoformat(),
                     )
                     st.success(
@@ -151,22 +195,227 @@ try:
                     st.error(str(exc))
 
         has_intake = table_exists(conn, "service_interest_intake")
+        has_claimed_amount = has_intake and any(
+            row[1] == "claimed_amount" for row in conn.execute("PRAGMA table_info(service_interest_intake)")
+        )
         intake_fields = (
-            "x.source_channel, x.original_message, x.claimed_cash_handover, "
-            "x.claimed_cashbox, x.message_received_at, x.verification_status, x.entered_by"
+            "x.source_channel, x.original_message, x.sender_label, x.claimed_cash_handover, "
+            "x.claimed_cashbox, "
+            + ("x.claimed_amount" if has_claimed_amount else "NULL AS claimed_amount")
+            + ", x.message_received_at, x.verification_status, x.entered_by"
             if has_intake else
-            "NULL AS source_channel, NULL AS original_message, NULL AS claimed_cash_handover, "
-            "NULL AS claimed_cashbox, NULL AS message_received_at, NULL AS verification_status, NULL AS entered_by"
+            "NULL AS source_channel, NULL AS original_message, NULL AS sender_label, NULL AS claimed_cash_handover, "
+            "NULL AS claimed_cashbox, NULL AS claimed_amount, NULL AS message_received_at, NULL AS verification_status, NULL AS entered_by"
         )
         intake_join = "LEFT JOIN service_interest_intake x ON x.interest_id=i.id" if has_intake else ""
         interest_rows = [dict(row) for row in conn.execute(
-            f"""SELECT i.id, i.interest_number, i.apartment_number, i.service_item_code,
+            f"""SELECT i.id, i.interest_number, i.apartment_id, i.apartment_number, i.service_item_code,
                        i.service_name_snapshot, i.quantity, i.amount_due_snapshot, i.currency,
-                       i.interest_status, i.payment_notice_number, i.payment_id,
+                       i.interest_status, i.telegram_user_id, i.payment_notice_number, i.payment_id,
                        i.service_order_id, i.resident_comment, i.created_at,
                        {intake_fields}
                 FROM service_order_interests i {intake_join} ORDER BY i.id DESC"""
         )]
+        cash_claims = [row for row in interest_rows if row["interest_status"] == "INTEREST"]
+        st.markdown("#### 💵 Открытые намерения — оплата")
+        st.caption("Выберите любое намерение. Сначала можно записать заявление о передаче денег; кассовая проводка появится только после отдельного подтверждения фактического получения.")
+        st.warning("Админ-консоль пока без персонального входа: работайте здесь только локально. Назначенный сборщик может подтверждать свои поступления в боте после привязки Telegram ID.")
+        if notice := st.session_state.pop("cash_claim_confirmed_notice", None):
+            st.success(notice)
+        if cash_claims:
+            claim_generation = st.session_state.get("cash_claim_selection_generation", 0)
+            claim_selection = st.dataframe(pd.DataFrame([{
+                "Намерение": row["interest_number"], "Квартира": row["apartment_number"],
+                "Позиция": row["service_name_snapshot"], "Количество": row["quantity"],
+                "Заявленная сумма": f"{float(row['amount_due_snapshot']):.2f} {row['currency']}",
+                "Состояние оплаты": (
+                    "⚠️ принято, сумма расходится" if row["verification_status"] == "AMOUNT_MISMATCH" else
+                    "ждёт подтверждения" if row["claimed_cash_handover"] else "не заявлена"
+                ),
+                "Заявленная передача": (
+                    f"{row['claimed_cashbox']} · {float(row['claimed_amount'] if row['claimed_amount'] is not None else row['amount_due_snapshot']):.2f}"
+                    if row["claimed_cash_handover"] else "не указана"
+                ),
+                "Когда заявлено": row["message_received_at"],
+                "Источник": row["source_channel"] or "—",
+            } for row in cash_claims]), hide_index=True, use_container_width=True,
+                on_select="rerun", selection_mode="single-row",
+                key=f"cash_claim_selection_{claim_generation}")
+            selected_rows = claim_selection.selection.rows
+            if selected_rows and 0 <= selected_rows[0] < len(cash_claims):
+                claim = cash_claims[selected_rows[0]]
+                st.markdown(f"**Намерение {claim['interest_number']} · кв. {claim['apartment_number']}**")
+                st.write(f"{claim['quantity']} × {claim['service_name_snapshot']} · к оплате "
+                         f"**{float(claim['amount_due_snapshot']):.2f} {claim['currency']}**")
+                st.write(f"Сообщение отправителя: {claim['original_message'] or claim['resident_comment'] or '—'}")
+                if not claim["claimed_cash_handover"]:
+                    st.info("Передача денег ещё не заявлена. Запись ниже не создаёт платёж и заказ.")
+                    points = [p for p in list_claim_points(conn=conn) if p["point_kind"] == "COLLECTOR_SLOT" or p["point_code"] == "O"]
+                    points_by_code = {p["point_code"]: p for p in points}
+                    with st.form(f"stage_cash_claim_{claim['id']}"):
+                        stage_actor = st.text_input("Кто записывает заявление *", value=session_actor)
+                        stage_point = st.selectbox("Где ожидается получение денег", ["C"] + list(points_by_code),
+                            format_func=lambda code: "Центральная касса C" if code == "C" else
+                            f"{points_by_code[code]['point_name']} — {points_by_code[code].get('custodian') or 'не назначен'}")
+                        stage_amount = st.number_input("Заявленная сумма, UAH", min_value=0.01,
+                            value=float(claim["amount_due_snapshot"]), step=1.0, key=f"stage_amount_{claim['id']}")
+                        stage_note = st.text_input("Сообщение / основание заявления")
+                        stage_submit = st.form_submit_button("Записать заявление о передаче денег")
+                    if stage_submit:
+                        try:
+                            record_cash_handover_claim(interest_id=int(claim["id"]), point_code=stage_point,
+                                amount=stage_amount, actor=stage_actor, source_note=stage_note)
+                            st.success("Заявление записано. Ожидается фактическое подтверждение получателя.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
+                elif not claim["payment_id"]:
+                    st.write(f"Заявлено: **{claim['claimed_cashbox']}**, "
+                             f"**{float(claim['claimed_amount'] if claim['claimed_amount'] is not None else claim['amount_due_snapshot']):.2f} UAH**. "
+                             "Это ещё не подтверждённый платёж.")
+                    with st.expander("✏️ Исправить место или заявленную сумму до подтверждения"):
+                        points = [p for p in list_claim_points(conn=conn)
+                                  if p["point_kind"] == "COLLECTOR_SLOT" or p["point_code"] == "O"]
+                        labels = {"C": "Центральная касса C"}
+                        labels.update({p["point_code"]: p["point_name"] for p in points})
+                        with st.form(f"amend_cash_claim_{claim['id']}"):
+                            amend_actor = st.text_input("Кто исправляет заявление *", value=session_actor)
+                            amend_point = st.selectbox("Пункт передачи", list(labels),
+                                index=list(labels).index(claim["claimed_cashbox"]) if claim["claimed_cashbox"] in labels else 0,
+                                format_func=lambda code: labels[code])
+                            amend_amount = st.number_input("Заявленная сумма, UAH", min_value=0.01,
+                                value=float(claim["claimed_amount"] if claim["claimed_amount"] is not None else claim["amount_due_snapshot"]),
+                                step=1.0, key=f"amend_claim_amount_{claim['id']}")
+                            amend_note = st.text_input("Основание исправления *")
+                            amend_submit = st.form_submit_button("Сохранить исправление заявления")
+                        if amend_submit:
+                            if not amend_note.strip():
+                                st.error("Укажите причину исправления ранее записанного заявления.")
+                            else:
+                                try:
+                                    record_cash_handover_claim(interest_id=int(claim["id"]),
+                                        point_code=amend_point, amount=amend_amount,
+                                        actor=amend_actor, source_note=amend_note)
+                                    st.success("Заявление исправлено; платёж по-прежнему не создан.")
+                                    st.rerun()
+                                except Exception as exc:
+                                    st.error(str(exc))
+                if claim["payment_id"]:
+                    st.warning(f"Получение уже учтено платежом #{claim['payment_id']}; "
+                               "если заказ не создан, сумма требует отдельной сверки. Повторный приём здесь запрещён.")
+                    receivers = []
+                elif not claim["claimed_cash_handover"]:
+                    receivers = []
+                elif claim["claimed_cashbox"] == "O":
+                    receivers = ["O"]
+                elif str(claim["claimed_cashbox"] or "").startswith("KAS"):
+                    active_codes = {p["point_code"] for p in list_claim_points(conn=conn)
+                                    if p["point_kind"] == "COLLECTOR_SLOT"}
+                    receivers = ["C"] + ([claim["claimed_cashbox"]] if claim["claimed_cashbox"] in active_codes else [])
+                else:
+                    receivers = ["C"] + [p["point_code"] for p in list_claim_points(conn=conn)
+                                           if p["point_kind"] == "COLLECTOR_SLOT"]
+                receiver_labels = {"O": "O — охрана", "C": "C — центральная касса"}
+                receiver_labels.update({p["point_code"]: f"{p['point_name']} — {p['custodian']}"
+                                        for p in list_claim_points(conn=conn)
+                                        if p["point_kind"] == "COLLECTOR_SLOT"})
+                if receivers:
+                  with st.form(f"confirm_cash_claim_{claim['id']}"):
+                    confirming_actor = st.text_input(
+                        "Кто подтверждает получение *",
+                        value=session_actor,
+                        help="Укажите своё имя: оно будет записано в журнал действий."
+                    )
+                    receiving_point = st.selectbox(
+                        "Кто фактически принял деньги", receivers,
+                        format_func=lambda code: receiver_labels.get(code, code),
+                    )
+                    evidence = st.text_input(
+                        "Основание фактического приёма *",
+                        placeholder="Номер бумажной квитанции, ведомости или акта передачи",
+                    )
+                    actual_amount = st.number_input(
+                        "Фактически получено, UAH", min_value=0.01,
+                        value=float(claim["claimed_amount"] if claim["claimed_amount"] is not None else claim["amount_due_snapshot"]),
+                        step=1.0, key=f"actual_cash_amount_{claim['id']}",
+                    )
+                    st.caption("Если сумма отличается от стоимости заказа, деньги будут учтены в кассе, но оплаченный заказ не создастся до отдельной сверки.")
+                    actually_received = st.checkbox("Подтверждаю: деньги фактически получены в указанной полной сумме")
+                    confirm = st.form_submit_button(
+                        "Подтвердить фактический приём", type="primary",
+                    )
+                  if confirm:
+                    if not confirming_actor.strip():
+                        st.error("Укажите, кто подтверждает фактическое получение денег.")
+                    elif not evidence.strip():
+                        st.error("Укажите номер бумажной квитанции, ведомости или акта передачи.")
+                    elif not actually_received:
+                        st.error("Сначала подтвердите фактическое получение денег.")
+                    else:
+                        try:
+                            result = confirm_claim_cash(
+                                interest_id=int(claim["id"]), receiving_point=receiving_point,
+                                actor=confirming_actor, evidence=evidence,
+                                actual_amount=actual_amount,
+                            )
+                            st.session_state["cash_claim_confirmed_notice"] = (
+                                f"{result['interest_number']}: принято {result['amount']:.2f} UAH "
+                                f"в {result['cashbox_code']}; квитанция {result['receipt_number']}; "
+                                + (f"заказ {result['order_number']}." if result['order_number'] else
+                                   "сумма расходится, заказ не создан — нужна сверка.")
+                            )
+                            st.session_state["cash_claim_selection_generation"] = claim_generation + 1
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
+            else:
+                st.caption("Выберите строку заявления, чтобы сверить и подтвердить приём.")
+        else:
+            st.info("Непроверенных заявлений о передаче денег нет.")
+        with st.expander("💼 Остатки мобильных сборщиков и сдача в центральную кассу"):
+            mobile_boxes = [dict(row) for row in conn.execute(
+                "SELECT cashbox_code,cashbox_name,current_balance FROM cashboxes "
+                "WHERE cashbox_code GLOB 'MC[0-9]*' AND is_active=1 AND current_balance>0 "
+                "ORDER BY cashbox_code"
+            )]
+            if transfer_notice := st.session_state.pop("mobile_cash_transfer_notice", None):
+                st.success(transfer_notice)
+            if mobile_boxes:
+                st.dataframe(pd.DataFrame(mobile_boxes), hide_index=True, use_container_width=True)
+                boxes_by_code = {row["cashbox_code"]: row for row in mobile_boxes}
+                with st.form("mobile_cash_transfer"):
+                    selected_box_code = st.selectbox(
+                        "Кто сдаёт наличные", list(boxes_by_code),
+                        format_func=lambda code: (
+                            f"{boxes_by_code[code]['cashbox_name']} · {code} · "
+                            f"остаток {boxes_by_code[code]['current_balance']:.2f} UAH"
+                        ),
+                    )
+                    selected_box = boxes_by_code[selected_box_code]
+                    transfer_amount = st.number_input("Сумма передачи в C", min_value=0.01,
+                                                      max_value=float(selected_box["current_balance"]),
+                                                      value=float(selected_box["current_balance"]), step=1.0)
+                    transfer_evidence = st.text_input("Номер акта / ведомости передачи *")
+                    transfer_confirmed = st.checkbox("Подтверждаю физическую передачу в центральную кассу")
+                    transfer_submit = st.form_submit_button("Оформить передачу", disabled=not bool(session_actor.strip()))
+                if transfer_submit:
+                    if not transfer_confirmed:
+                        st.error("Подтвердите физическую передачу денег.")
+                    else:
+                        try:
+                            transfer = transfer_collector_cash(
+                                cashbox_code=selected_box["cashbox_code"], amount=transfer_amount,
+                                actor=session_actor, evidence=transfer_evidence,
+                            )
+                            st.session_state["mobile_cash_transfer_notice"] = (
+                                f"В C передано {transfer['amount']:.2f} UAH. "
+                                f"Остаток сборщика: {transfer['from_balance']:.2f} UAH."
+                            )
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(str(exc))
+            else:
+                st.caption("У мобильных сборщиков нет учтённых остатков для передачи.")
         item_codes = sorted({row["service_item_code"] for row in interest_rows})
         if "REMOTE_NEW" not in item_codes and conn.execute(
             "SELECT 1 FROM service_items WHERE service_item_code='REMOTE_NEW'"
@@ -202,51 +451,145 @@ try:
             m2.metric("Пультов по намерениям", open_quantity)
             m3.metric("Оплачено, ещё не в партии", paid_quantity)
             m4.metric("Предварительный спрос", demand_quantity)
-            st.caption(
-                "Предварительный спрос = неоплаченные намерения + подтверждённые оплаченные заказы, "
-                "ещё не включённые в партию. Одно и то же обращение не считается дважды. "
-                "Сообщение жителя о передаче денег само по себе не считается оплатой."
-            )
+            st.caption("Предварительный спрос: намерения + оплаченные заказы вне партии. Слова о передаче денег оплатой не считаются.")
             if selected_interests:
                 st.dataframe(pd.DataFrame([{
                     "Намерение": r["interest_number"], "Квартира": r["apartment_number"],
                     "Кол-во": r["quantity"], "Сумма": f"{float(r['amount_due_snapshot']):.2f} {r['currency']}",
                     "Статус": r["interest_status"], "Уведомление об оплате": r["payment_notice_number"] or "—",
-                    "Заказ": r["service_order_id"] or "—", "Получено": r["created_at"],
+                    "Заказ": str(r["service_order_id"]) if r["service_order_id"] else "—", "Получено": r["created_at"],
                     "Источник": r["source_channel"] or "Бот",
                     "Сообщение": r["original_message"] or r["resident_comment"] or "—",
-                    "Оплата со слов": "да, не подтверждена" if r["claimed_cash_handover"] else "—",
+                    "Заявление о передаче": "да" if r["claimed_cash_handover"] else "—",
+                    "Оплата": (
+                        "подтверждена" if r["payment_id"] and r["service_order_id"]
+                        and r["interest_status"] == "PAID_ORDER_CREATED" else
+                        "принята, сумма расходится" if r["verification_status"] == "AMOUNT_MISMATCH"
+                        and r["payment_id"] else
+                        "платёж учтён, заказ не создан" if r["payment_id"] else
+                        "ожидает подтверждения" if r["claimed_cash_handover"] else "не подтверждена"
+                    ),
+                    "Платёж": str(r["payment_id"]) if r["payment_id"] else "—",
                     "Пункт со слов": r["claimed_cashbox"] or "—",
                     "Ответственный на дату сообщения": (
                         (custodian_at(conn, r["claimed_cashbox"], r["message_received_at"] or r["created_at"]) or {}).get("person_name", "—")
-                        if r["claimed_cashbox"] in {"I1", "I2"} else "—"
+                        if str(r["claimed_cashbox"] or "").startswith("KAS") else "—"
                     ),
                     "Внёс": r["entered_by"] or "—",
                 } for r in selected_interests]), hide_index=True, use_container_width=True)
             else:
                 st.info("Намерений по этой позиции ещё нет.")
 
-            minimum = st.number_input(
-                "Минимальная партия поставщика, шт. (0 — пока неизвестна)",
-                min_value=0, value=0, step=1, key="fulfillment_supplier_minimum",
-            )
+            term = current_supplier_minimum(selected_item, conn=conn)
+            minimum = int(term["minimum_quantity"]) if term else None
+            st.markdown("#### Условие поставщика — минимальная партия")
             if minimum:
-                shortfall = max(int(minimum) - demand_quantity, 0)
+                st.write(f"Действующий минимум: **{minimum} шт.** · установлен {term['valid_from'][:10]}.")
+                shortfall = max(minimum - paid_quantity, 0)
                 if shortfall:
-                    st.info(f"До минимальной партии по предварительному спросу не хватает {shortfall} шт.")
+                    st.info(f"Оплачено {paid_quantity} из {minimum} шт.; до минимума не хватает {shortfall} шт. "
+                            f"Неподтверждённые намерения ({open_quantity} шт.) в оплаченный пакет не входят.")
                 else:
-                    st.success("Предварительный спрос достиг минимальной партии. Для заказа поставщику отдельно проверьте подтверждённую оплату.")
+                    st.success(f"Оплачено {paid_quantity} шт. — минимум {minimum} достигнут. "
+                               "Пакет предзаказов готов к оформлению поставщику, но ещё не является заказом поставщику.")
                 announcement = (
                     f"📦 Нові пульти: зафіксовано попередній попит на {demand_quantity} шт. "
                     f"(намірів без підтвердженої оплати — {open_quantity} шт.; "
                     f"оплачених замовлень поза партією — {paid_quantity} шт.). "
-                    f"Мінімальна партія постачальника — {int(minimum)} шт. "
-                    + (f"До неї поки бракує {shortfall} шт. Продовжуємо збір заявок."
-                       if shortfall else "Попередній попит досяг мінімуму; формування замовлення залежить від підтвердження оплат.")
+                    f"Мінімальна партія постачальника — {minimum} шт. "
+                    + (f"До оплаченої партії бракує {shortfall} шт. Продовжуємо збір заявок."
+                       if shortfall else "Оплачений пакет досяг мінімуму; замовлення постачальнику ще не оформлене.")
                 )
                 st.markdown("**Черновик объявления для копирования**")
                 st.code(announcement, language=None)
-                st.caption("Порог введён только для текущего просмотра. Объявление автоматически не публикуется.")
+                st.caption("Объявление автоматически не публикуется.")
+            else:
+                st.info("Минимальная партия ещё не задана для этой позиции.")
+            no_telegram = [r for r in selected_interests
+                           if selected_item == "REMOTE_NEW"
+                           if r["interest_status"] == "PAID_ORDER_CREATED"
+                           and r["service_order_id"] and not r["telegram_user_id"]]
+            if no_telegram:
+                with st.expander(f"📨 Подтверждения для отправки вручную ({len(no_telegram)})"):
+                    st.caption("У этих заказчиков нет Telegram ID в записи намерения; бот не может отправить им сообщение сам.")
+                    for row in no_telegram:
+                        st.write(f"Кв. {row['apartment_number']} · {row['sender_label'] or 'контакт не указан'}")
+                        possible_accounts = apartment_telegram_accounts(
+                            apartment_id=int(row["apartment_id"]),
+                            apartment_number=str(row["apartment_number"]), conn=conn,
+                        )
+                        if possible_accounts:
+                            account_by_id = {str(account["id"]): account for account in possible_accounts}
+                            with st.form(f"link_interest_recipient_{row['id']}"):
+                                account_id = st.selectbox(
+                                    "Привязать заказ к конкретному Telegram-пользователю",
+                                    [""] + list(account_by_id),
+                                    index=1 if len(possible_accounts) == 1 else 0,
+                                    format_func=lambda key: "Не выбран" if not key else
+                                    f"{account_by_id[key]['telegram_first_name'] or 'Пользователь'} · ID {account_by_id[key]['telegram_user_id']}",
+                                )
+                                link_actor = st.text_input("Кто подтверждает адресата *", value=session_actor)
+                                link_submit = st.form_submit_button("Сохранить адресата и подготовить уведомление")
+                            if link_submit:
+                                try:
+                                    if not account_id:
+                                        raise ValueError("Выберите конкретного пользователя этой квартиры.")
+                                    link_interest_telegram_recipient(
+                                        interest_id=int(row["id"]), resident_account_id=int(account_id),
+                                        actor=link_actor,
+                                    )
+                                    st.success("Адресат сохранён; уведомление поставлено в очередь бота.")
+                                    st.rerun()
+                                except Exception as exc:
+                                    st.error(str(exc))
+                        context = order_preorder_context(int(row["service_order_id"]), conn=conn)
+                        manual_text = (
+                            f"✅ Оплату за нові пульти підтверджено. Кв. {row['apartment_number']}: "
+                            f"{int(row['quantity'])} шт., отримано {float(row['amount_due_snapshot']):.2f} грн. "
+                            + (f"Партія постачальника: {context['batch_number']}."
+                               if context["batch_number"] else
+                               f"Оплачений пакет зараз — {context['quantity']} із мінімальних {context['minimum']} шт. "
+                               "Замовлення постачальнику ще не оформлено."
+                               if context["minimum"] else
+                               "Мінімальна партія постачальника ще уточнюється.")
+                        )
+                        st.code(manual_text, language=None)
+            if table_exists(conn, "service_order_notifications"):
+                notice_rows = [dict(row) for row in conn.execute(
+                    """SELECT n.service_order_id,n.delivery_status,n.sent_at,n.delivery_error
+                       FROM service_order_notifications n
+                       JOIN service_orders o ON o.id=n.service_order_id
+                       WHERE o.service_item_code=? AND n.notification_kind='PAYMENT_CONFIRMED'
+                       ORDER BY n.id DESC LIMIT 30""", (selected_item,),
+                )]
+                if notice_rows:
+                    with st.expander("📨 Доставка подтверждений в бот"):
+                        st.dataframe(pd.DataFrame(notice_rows), hide_index=True, use_container_width=True)
+            with st.expander("✏️ Изменить условие поставщика"):
+                with st.form(f"supplier_minimum_{selected_item}"):
+                    new_minimum = st.number_input("Минимум, шт.", min_value=1,
+                        value=minimum or 1, step=1)
+                    minimum_actor = st.text_input("Кто меняет условие *", value=session_actor)
+                    minimum_reason = st.text_input("Основание изменения *",
+                        placeholder="Например, новые условия поставщика")
+                    minimum_submit = st.form_submit_button("Сохранить минимум")
+                if minimum_submit:
+                    try:
+                        set_supplier_minimum(service_item_code=selected_item,
+                            minimum_quantity=int(new_minimum), actor=minimum_actor,
+                            reason=minimum_reason)
+                        st.success("Условие сохранено с историей изменений.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
+                if table_exists(conn, "service_supplier_minimum_history"):
+                    history = [dict(row) for row in conn.execute(
+                        """SELECT minimum_quantity,valid_from,valid_to,changed_by,reason
+                           FROM service_supplier_minimum_history WHERE service_item_code=?
+                           ORDER BY id DESC""", (selected_item,),
+                    )]
+                    if history:
+                        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
         else:
             st.info("Позиции услуг и намерения пока отсутствуют.")
     else:

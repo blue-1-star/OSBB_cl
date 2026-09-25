@@ -50,6 +50,7 @@ from cashier_v2_core import (
     table_exists,
     today,
 )
+from service_cash_claims_core import confirm_claim_cash
 
 
 POST_CODE = "O"
@@ -64,6 +65,7 @@ MENU = [
     ["🔔 Поступления O", "💵 Принять наличные"],
     ["📥 Пульт принят", "📤 Пульт выдан"],
     ["📋 Мои операции"],
+    ["✍️ Предложить исправление", "📝 Мои предложения"],
     ["🏠 Главное меню"],
 ]
 BACK = "⬅️ К посту O"
@@ -90,6 +92,7 @@ def _global_switch_text(message_text: str) -> bool:
         "👤 Клиентский режим", "👤 Режим мешканця", "👤 User mode",
         "🔐 Админ-режим", "🔐 Адмін-режим", "🔐 Admin mode",
         "🛡 Пост охраны O",
+        "💵 Мои поступления",
     }
 
 
@@ -196,6 +199,24 @@ def _cash_notices_o() -> list[dict]:
         conn.close()
 
 
+def _external_cash_claims_o() -> list[dict]:
+    conn = get_conn()
+    try:
+        if not table_exists(conn.cursor(), "service_interest_intake"):
+            return []
+        return [dict(row) for row in conn.execute(
+            """SELECT i.id,i.interest_number,i.apartment_number,i.amount_due_snapshot,
+                      i.currency,i.service_name_snapshot,i.quantity,x.original_message
+               FROM service_order_interests i
+               JOIN service_interest_intake x ON x.interest_id=i.id
+               WHERE x.claimed_cash_handover=1 AND x.claimed_cashbox='O'
+                 AND x.verification_status='UNVERIFIED' AND i.interest_status='INTEREST'
+               ORDER BY i.id LIMIT 40"""
+        )]
+    finally:
+        conn.close()
+
+
 async def _show_cash_notices(update: Update, state: dict, user_id: int) -> None:
     if not _is_allowed(
         user_id, "payment_notices", "VIEW",
@@ -205,8 +226,10 @@ async def _show_cash_notices(update: Update, state: dict, user_id: int) -> None:
         return
 
     rows = _cash_notices_o()
+    claims = _external_cash_claims_o()
     state["mode"] = "notice_list"
     state["notice_buttons"] = {}
+    state["claim_buttons"] = {}
     buttons: list[list[str]] = []
     lines = ["🔔 Ожидают подтверждения — касса O", ""]
 
@@ -223,7 +246,14 @@ async def _show_cash_notices(update: Update, state: dict, user_id: int) -> None:
             f"{row.get('declared_period_code') or '-'}"
         )
 
-    if not rows:
+    for row in claims:
+        label = f"📦 {row['interest_number']} | кв.{row['apartment_number']} | {money(row['amount_due_snapshot'])}"
+        state["claim_buttons"][label] = int(row["id"])
+        buttons.append([label])
+        lines.append(f"Намерение {row['interest_number']} | кв.{row['apartment_number']} | "
+                     f"{money(row['amount_due_snapshot'])} грн. — со слов жителя оставлено в O")
+
+    if not rows and not claims:
         lines.append("Нет уведомлений о наличных для кассы O.")
 
     buttons.extend([[BACK], [HOME]])
@@ -265,6 +295,45 @@ async def _show_notice_card(update: Update, state: dict, notice_id: int) -> None
             ["⬅️ К поступлениям", HOME],
         ]),
     )
+
+
+async def _show_external_claim_card(update: Update, state: dict, interest_id: int) -> None:
+    claim = next((row for row in _external_cash_claims_o() if int(row["id"]) == interest_id), None)
+    if not claim:
+        await update.message.reply_text("Намерение уже обработано или не относится к посту O.")
+        return
+    state.update(mode="external_claim_card", interest_id=interest_id)
+    await update.message.reply_text(
+        f"📦 Намерение {claim['interest_number']}\n\n"
+        f"Квартира: {claim['apartment_number']}\n"
+        f"Услуга: {claim['service_name_snapshot']} · {claim['quantity']} шт.\n"
+        f"Полная сумма: {money(claim['amount_due_snapshot'])} грн.\n"
+        f"Исходное сообщение: {claim['original_message']}\n\n"
+        "Подтверждайте только если наличные в полной сумме действительно приняты постом O. "
+        "Будет создана квитанция и оплаченный заказ.",
+        reply_markup=kb([["✅ Принято в O по намерению"], ["⬅️ К поступлениям", HOME]]),
+    )
+
+
+async def _confirm_external_claim_o(update: Update, state: dict, user_id: int) -> None:
+    if not _is_allowed(user_id, "cashier_receipts", "CREATE",
+                       scope_type="CASHBOX", scope_value=CASHBOX_CODE):
+        await _denied(update)
+        return
+    try:
+        result = confirm_claim_cash(
+            interest_id=int(state["interest_id"]), receiving_point="O",
+            actor=str(user_id), evidence=f"Подтверждено охранником O в Telegram, ID {user_id}",
+        )
+    except Exception as exc:
+        await update.message.reply_text(f"Не удалось подтвердить приём: {exc}")
+        return
+    await update.message.reply_text(
+        f"✅ Принято {money(result['amount'])} грн. в O.\n"
+        f"Квитанция: {result['receipt_number']}\n"
+        f"Оплаченный заказ: {result['order_number']}"
+    )
+    await _show_cash_notices(update, state, user_id)
 
 
 async def _confirm_notice(
@@ -1132,8 +1201,20 @@ async def handle_guard_workspace_text(
         notice_id = (state.get("notice_buttons") or {}).get(message_text)
         if notice_id:
             await _show_notice_card(update, state, int(notice_id))
+        elif interest_id := (state.get("claim_buttons") or {}).get(message_text):
+            await _show_external_claim_card(update, state, int(interest_id))
         else:
             await update.message.reply_text("Выберите поступление кнопкой.")
+        return True
+
+    if mode == "external_claim_card":
+        if message_text == "✅ Принято в O по намерению":
+            await _confirm_external_claim_o(update, state, user_id)
+            return True
+        if message_text == "⬅️ К поступлениям":
+            await _show_cash_notices(update, state, user_id)
+            return True
+        await update.message.reply_text("Выберите действие кнопкой.")
         return True
 
     if mode == "notice_card":

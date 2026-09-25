@@ -17,6 +17,7 @@ from service_orders_core import get_conn, table_exists, text
 
 
 CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
+EXISTING_CODE_RE = re.compile(r"^[A-Za-z0-9_]{3,64}$")
 
 
 def now_db() -> str:
@@ -38,6 +39,18 @@ def _validate_code(value: str, label: str) -> str:
     code = text(value).upper()
     if not CODE_RE.fullmatch(code):
         raise ValueError(f"{label}: только A–Z, цифры и _, начало с буквы (3–64 символа).")
+    return code
+
+
+def _validate_existing_code(value: str, label: str) -> str:
+    """Keep legacy item IDs unchanged when editing an existing DB row.
+
+    Creation uses stricter uppercase IDs, but historic items such as
+    ``01_BarrierPhoneConnect`` are valid primary keys and must not be uppercased.
+    """
+    code = text(value)
+    if not EXISTING_CODE_RE.fullmatch(code):
+        raise ValueError(f"{label}: допустимы буквы A–Z, цифры и _ (3–64 символа).")
     return code
 
 
@@ -192,7 +205,7 @@ def create_offer(*, actor_id: int | str, service_code: str, catalog_name: str,
 
 
 def set_publication(*, actor_id: int | str, item_code: str, published: bool) -> dict:
-    item_code = _validate_code(item_code, "Код позиции")
+    item_code = _validate_existing_code(item_code, "Код позиции")
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -216,7 +229,7 @@ def set_publication(*, actor_id: int | str, item_code: str, published: bool) -> 
 
 
 def change_price(*, actor_id: int | str, item_code: str, price: float, currency: str = "UAH", note: str = "") -> dict:
-    item_code = _validate_code(item_code, "Код позиции")
+    item_code = _validate_existing_code(item_code, "Код позиции")
     if price < 0:
         raise ValueError("Цена не может быть отрицательной.")
     currency = text(currency).upper() or "UAH"
@@ -311,7 +324,7 @@ def set_service_price(*, service_item_code: str, amount: float | int | str, effe
         own = conn is None
         db = conn or get_conn()
         try:
-            cur = db.cursor(); code = _validate_code(service_item_code, "Код позиции")
+            cur = db.cursor(); code = _validate_existing_code(service_item_code, "Код позиции")
             value = float(str(amount).replace(",", "."))
             cur.execute("UPDATE service_price_versions SET effective_to=?, updated_at=? WHERE service_item_code=? AND is_active=1 AND effective_from<?",
                         ((when - timedelta(days=1)).isoformat(), now_db(), code, when.isoformat()))
@@ -335,7 +348,7 @@ def retire_service_offer(*, service_item_code: str, actor_id: int | str | None, 
         raise ValueError("Для архивирования укажите причину.")
     own = conn is None; db = conn or get_conn()
     try:
-        code = _validate_code(service_item_code, "Код позиции")
+        code = _validate_existing_code(service_item_code, "Код позиции")
         db.execute("UPDATE service_items SET is_active=0, status='archived', date_to=?, updated_at=? WHERE service_item_code=?", (date.today().isoformat(), now_db(), code))
         db.execute("UPDATE service_item_workflows SET is_active=0, retired_at=?, retired_reason=?, updated_at=? WHERE service_item_code=?", (now_db(), text(reason), now_db(), code))
         _audit(db, actor_id or "system", "service_item_archived", "service_items", code, "active", "archived", text(reason))
@@ -351,7 +364,7 @@ def restore_service_offer(*, service_item_code: str, actor_id: int | str | None,
                           conn: sqlite3.Connection | None = None) -> None:
     own = conn is None; db = conn or get_conn()
     try:
-        code = _validate_code(service_item_code, "Код позиции")
+        code = _validate_existing_code(service_item_code, "Код позиции")
         db.execute("UPDATE service_items SET is_active=1, status='draft', date_to=NULL, updated_at=? WHERE service_item_code=?", (now_db(), code))
         db.execute("UPDATE service_item_workflows SET is_active=1, resident_request_enabled=0, retired_at=NULL, retired_reason=NULL, updated_at=? WHERE service_item_code=?", (now_db(), code))
         _audit(db, actor_id or "system", "service_item_restored", "service_items", code, "archived", "draft", "Восстановлено без автоматической публикации")

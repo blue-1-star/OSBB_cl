@@ -17,6 +17,7 @@ unchanged; this module is for the new simplified workflow.
 from __future__ import annotations
 
 from contextlib import closing
+from datetime import datetime
 from pathlib import Path
 import re
 import sqlite3
@@ -668,7 +669,7 @@ def _step_lines(order: dict) -> list[str]:
     return result or ["—"]
 
 
-def _order_card(order: dict, *, title: str) -> str:
+def _order_card(order: dict, *, title: str, resident_view: bool = False, lang: str = "uk") -> str:
     quantity = int(float(order.get("quantity") or 1))
     phone_summary = _phone_access_summary_for_order(order.get("id"))
     lines = [
@@ -703,6 +704,28 @@ def _order_card(order: dict, *, title: str) -> str:
         f"Оплата: {order.get('payment_status') or '-'}", "",
         "Кроки:", *_step_lines(order),
     ]
+    if resident_view and order.get("service_item_code") == "REMOTE_NEW":
+        from supplier_terms_core import order_preorder_context
+        received = sum(float(p.get("amount") or 0) for p in order.get("payments") or [])
+        context = order_preorder_context(int(order["id"]))
+        if lang == "ru":
+            lines += ["", f"Получено за заказ: {money(received)} грн."]
+            if context["batch_number"]:
+                lines.append(f"Партия поставщика: {context['batch_number']} · {context['batch_status']}.")
+            elif context["minimum"]:
+                lines.append(f"Сбор оплаченной партии: {context['quantity']} из минимальных {context['minimum']} пультов.")
+                lines.append("Заказ поставщику ещё не оформлен.")
+            else:
+                lines.append("Минимальная партия поставщика ещё не указана.")
+        else:
+            lines += ["", f"Отримано за замовлення: {money(received)} грн."]
+            if context["batch_number"]:
+                lines.append(f"Партія постачальника: {context['batch_number']} · {context['batch_status']}.")
+            elif context["minimum"]:
+                lines.append(f"Збір оплаченої партії: {context['quantity']} із мінімальних {context['minimum']} пультів.")
+                lines.append("Замовлення постачальнику ще не оформлено.")
+            else:
+                lines.append("Мінімальну партію постачальника ще не вказано.")
     return "\n".join(lines)
 
 def _interest_card(interest: dict, lang: str) -> str:
@@ -1049,8 +1072,11 @@ async def _show_resident_records(update: Update, state: dict, lang: str) -> None
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, order_number, service_name_snapshot, quantity,
-                   order_status, payment_status
+            SELECT id, order_number, service_item_code, service_name_snapshot, quantity,
+                   order_status, payment_status, requested_at AS created_at,
+                   unit_price_snapshot, amount_due_snapshot, currency,
+                   COALESCE((SELECT SUM(amount) FROM service_order_payment_links l
+                             WHERE l.service_order_id=service_orders.id),0) AS amount_received
             FROM service_orders
             WHERE resident_account_id = ?
             ORDER BY id DESC LIMIT 60
@@ -1061,19 +1087,69 @@ async def _show_resident_records(update: Update, state: dict, lang: str) -> None
         interests = list_resident_service_interests(int(state["account"]["id"]), conn=conn)
     finally:
         conn.close()
+    def display_date(value: object) -> str:
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00")).strftime("%d.%m.%Y")
+        except ValueError:
+            return str(value or "—")[:10]
+
+    def subject(row: dict) -> str:
+        count = int(float(row.get("quantity") or 1))
+        if row.get("service_item_code") == "REMOTE_NEW":
+            forms = ("пульт", "пульта", "пультов") if lang == "ru" else ("пульт", "пульти", "пультів")
+            form = forms[2] if count % 100 in (11, 12, 13, 14) else forms[0] if count % 10 == 1 else forms[1] if count % 10 in (2, 3, 4) else forms[2]
+            return f"{count} {form}"
+        return f"{row.get('service_name_snapshot') or row.get('service_item_code') or 'услуга'} ×{count}"
+
     mapping: dict[str, tuple[str, int]] = {}
     buttons: list[list[str]] = []
     lines = [tr(lang, "my_title"), ""]
     for row in interests:
-        label = f"📝 {row['interest_number']} | {row.get('service_name_snapshot')} | ×{row.get('quantity')}"
+        if text(row.get("interest_status")) == PAID_ORDER_CREATED and row.get("service_order_id"):
+            continue  # The resulting paid order is shown once below, not as a second "intent".
+        name = subject(row)
+        label = f"📝 {display_date(row.get('created_at'))} · {name} (#{row['id']})"
         mapping[label] = ("interest", int(row["id"]))
         buttons.append([label])
-        lines.append(f"{row['interest_number']} | {row.get('interest_status')} | ×{row.get('quantity')}")
+        count = int(float(row.get('quantity') or 1))
+        unit_price = money(row.get('unit_price_snapshot'))
+        total = money(row.get('amount_due_snapshot'))
+        currency = "грн" if row.get("currency") == "UAH" else row.get("currency") or "грн"
+        status = text(row.get("interest_status"))
+        if status == INTEREST:
+            detail = (f"Заказ после подтверждения оплаты {count} × {unit_price} = {total} {currency}."
+                      if lang == "ru" else f"Замовлення після підтвердження оплати {count} × {unit_price} = {total} {currency}.")
+        elif status == PAYMENT_NOTICE:
+            detail = "Ожидается подтверждение оплаты." if lang == "ru" else "Очікується підтвердження оплати."
+        else:
+            detail = "Оплата подтверждена, заказ создан." if lang == "ru" else "Оплату підтверджено, замовлення створено."
+        prefix = "Создано намерение" if lang == "ru" else "Створено намір"
+        lines.append(f"{display_date(row.get('created_at'))}: {prefix} — {name}. {detail}")
     for row in orders:
-        label = f"📄 {row['order_number']} | {row.get('service_name_snapshot')} | ×{int(float(row.get('quantity') or 1))}"
+        name = subject(row)
+        label = f"📦 {display_date(row.get('created_at'))} · {name} (#{row['id']})"
         mapping[label] = ("order", int(row["id"]))
         buttons.append([label])
-        lines.append(f"{row['order_number']} | {STATUS_LABELS.get(text(row.get('order_status')), row.get('order_status'))}")
+        prefix = "Заказ" if lang == "ru" else "Замовлення"
+        if row.get("service_item_code") == "REMOTE_NEW":
+            from supplier_terms_core import order_preorder_context
+            context = order_preorder_context(int(row["id"]))
+            received = money(row.get("amount_received"))
+            if lang == "ru":
+                detail = f"оплата подтверждена, получено {received} грн"
+                detail += (f"; партия поставщика {context['batch_number']}"
+                           if context["batch_number"] else
+                           f"; оплаченный пакет {context['quantity']}/{context['minimum']} пультов"
+                           if context["minimum"] else "; минимум пока не задан")
+            else:
+                detail = f"оплату підтверджено, отримано {received} грн"
+                detail += (f"; партія постачальника {context['batch_number']}"
+                           if context["batch_number"] else
+                           f"; оплачений пакет {context['quantity']}/{context['minimum']} пультів"
+                           if context["minimum"] else "; мінімум ще не задано")
+            lines.append(f"{display_date(row.get('created_at'))}: {prefix} — {name}; {detail}.")
+        else:
+            lines.append(f"{display_date(row.get('created_at'))}: {prefix} — {name}. {STATUS_LABELS.get(text(row.get('order_status')), row.get('order_status'))}.")
     if not mapping:
         lines.append(tr(lang, "no_items"))
     state["resident_record_buttons"] = mapping
@@ -1102,7 +1178,7 @@ async def _show_resident_order(update: Update, state: dict, order_id: int, lang:
         return
     state["mode"] = "resident_order_card"
     state["order_id"] = int(order_id)
-    await update.message.reply_text(_order_card(order, title="📄 Моє замовлення"), reply_markup=kb([[tr(lang, "my_requests")], [BACK], [HOME]]))
+    await update.message.reply_text(_order_card(order, title="📄 Моє замовлення", resident_view=True, lang=lang), reply_markup=kb([[tr(lang, "my_requests")], [BACK], [HOME]]))
 
 
 async def _handle_resident(update: Update, user_states: dict, user_id: int, message_text: str, *, lang: str, state: dict) -> bool:

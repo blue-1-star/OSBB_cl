@@ -5428,6 +5428,31 @@ def get_apartment_card(apartment_number):
     }
 
 
+def get_apartment_telegram_contacts(card):
+    """Telegram identities linked to this unit; no owner-of-vehicle inference."""
+    apartment_ids = [int(value) for value in card.get("lookup_apartment_ids", [])]
+    apartment_numbers = [str(value) for value in card.get("lookup_numbers", [])]
+    if not apartment_ids or not apartment_numbers:
+        return []
+    id_marks = ",".join("?" for _ in apartment_ids)
+    number_marks = ",".join("?" for _ in apartment_numbers)
+    conn = get_conn()
+    try:
+        rows = conn.execute(f"""
+            SELECT telegram_user_id,telegram_first_name,telegram_last_name,
+                   telegram_username,status
+            FROM resident_accounts
+            WHERE apartment_id IN ({id_marks})
+               OR (apartment_id IS NULL AND apartment_number IN ({number_marks}))
+            ORDER BY telegram_user_id
+        """, tuple(apartment_ids) + tuple(apartment_numbers)).fetchall()
+        return [dict(zip(
+            ("telegram_user_id", "first_name", "last_name", "username", "status"), row
+        )) for row in rows]
+    finally:
+        conn.close()
+
+
 def format_apartment_card(card):
     """Короткая карточка для обычного раздела «Квартиры»."""
     if not card:
@@ -5455,6 +5480,9 @@ def format_apartment_card(card):
 
     lines.append("")
     lines.append(f"👥 Пользователи: {residents_count}")
+    for contact in get_apartment_telegram_contacts(card):
+        name = " ".join(str(value) for value in (contact.get("first_name"), contact.get("last_name")) if value) or "Пользователь"
+        lines.append(f"  • {name} · Telegram ID {contact.get('telegram_user_id') or '—'}")
     lines.append(f"🚗 Авто: {vehicles_count}")
     lines.append("")
     lines.append("Выберите раздел:")

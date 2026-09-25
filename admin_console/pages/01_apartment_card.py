@@ -63,8 +63,9 @@ entrance = apartment[2] or "—"
 # ==========================================
 cur.execute("""
     SELECT 
-        telegram_first_name || ' ' || telegram_last_name AS фио,
+        TRIM(COALESCE(telegram_first_name, '') || ' ' || COALESCE(telegram_last_name, '')) AS фио,
         telegram_username,
+        telegram_user_id,
         status,
         verified_at
     FROM resident_accounts
@@ -73,6 +74,25 @@ cur.execute("""
 """, (apartment_id,))
 
 residents = cur.fetchall()
+
+# Contacts belong to the apartment, not to a specific vehicle. Until the
+# vehicle-person relation exists, never label one of these people as owner.
+cur.execute("""
+    SELECT full_name, phone_raw
+    FROM persons
+    WHERE apartment_id = ?
+    ORDER BY id
+""", (apartment_id,))
+apartment_people = cur.fetchall()
+
+names = list(dict.fromkeys(
+    str(person[0]).strip() for person in apartment_people if person[0] and str(person[0]).strip()
+))
+phones = list(dict.fromkeys(
+    str(person[1]).strip() for person in apartment_people if person[1] and str(person[1]).strip()
+))
+apartment_names = "; ".join(names) or "—"
+apartment_phones = "; ".join(phones) or "—"
 
 # ==========================================
 # 3. Автомобили с долгом
@@ -119,9 +139,10 @@ if residents:
     for r in residents:
         name = r[0] or "Неизвестно"
         username = f"@{r[1]}" if r[1] else "—"
-        status = r[2] or "new"
-        verified = "✅" if r[3] else "⏳"
-        st.markdown(f"- **{name}** | {username} | {verified} {status}")
+        telegram_id = str(r[2]) if r[2] else "—"
+        status = r[3] or "new"
+        verified = "✅" if r[4] else "⏳"
+        st.markdown(f"- **{name}** | Telegram ID: `{telegram_id}` | {username} | {verified} {status}")
 else:
     st.info("Нет жильцов")
 
@@ -141,14 +162,17 @@ if active_vehicles:
         mode = v[3] or "❓"
         debt = v[6] or 0.0
         data.append({
+            "ФИО": apartment_names,
             "Номер": plate,
             "Марка": model,
             "Режим": mode,
-            "Долг (грн)": round(debt, 2)
+            "Долг (грн)": round(debt, 2),
+            "Телефон": apartment_phones,
         })
     
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
+    st.caption("ФИО и телефоны взяты из записей квартиры. Связь с конкретным автомобилем и право собственности пока не подтверждены.")
     
     # Итоговый долг по квартире
     total_debt = sum(row["Долг (грн)"] for row in data)

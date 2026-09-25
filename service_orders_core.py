@@ -508,6 +508,7 @@ def create_service_order(
     actor_id: int | str | None = None,
     actor_role: str = "",
     source_context: str = "",
+    existing_interest_id: int | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> dict:
     if quantity <= 0:
@@ -526,7 +527,15 @@ def create_service_order(
 
         request_allowed = int(workflow.get("resident_request_enabled") or 0) == 1
         if actor_id is None and not request_allowed:
-            raise PermissionError("Эта услуга пока недоступна для самостоятельной заявки жителя.")
+            existing_interest = _fetchone_dict(
+                cur,
+                """SELECT id FROM service_order_interests
+                   WHERE id=? AND service_item_code=? AND apartment_id=?
+                     AND quantity=? AND interest_status IN ('INTEREST','PAYMENT_NOTICE')""",
+                (existing_interest_id, service_item_code, apartment_id, int(quantity)),
+            ) if existing_interest_id is not None and table_exists(cur, "service_order_interests") else None
+            if not existing_interest:
+                raise PermissionError("Эта услуга пока недоступна для самостоятельной заявки жителя.")
 
         category = text(workflow.get("service_category")) or "GENERAL"
         _permission_or_raise(

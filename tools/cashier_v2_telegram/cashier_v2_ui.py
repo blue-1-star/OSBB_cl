@@ -179,6 +179,7 @@ def menu_kb() -> ReplyKeyboardMarkup:
         [BTN_LAST_RECEIPTS, BTN_SUMMARY],
         [BTN_VEHICLES_BY_APARTMENT],
         [BTN_SETTINGS],
+        ["✍️ Предложить исправление", "📝 Мои предложения"],
         [BTN_BACK, BTN_MAIN],
     ])
 

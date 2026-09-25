@@ -673,6 +673,7 @@ def reconcile_paid_service_interests(
                 currency_snapshot_override=text(interest.get("currency")) or "UAH",
                 actor_id=None,
                 source_context=f"paid_interest:{interest['interest_number']}",
+                existing_interest_id=int(interest["id"]),
                 conn=conn,
             )
             linked = link_payment_to_order(
@@ -713,6 +714,8 @@ def reconcile_paid_service_interests(
                     int(interest["id"]),
                 ),
             )
+            from service_order_notifications import enqueue_paid_order_confirmation
+            enqueue_paid_order_confirmation(int(order["id"]), conn=conn)
             created.append(
                 {
                     "interest_id": int(interest["id"]),

@@ -97,19 +97,27 @@ with st.expander("➕ Создать новый вид товара / услуг
             )
             st.success(f"Черновик {created['service_item_code']} создан. Опубликуйте его после проверки.")
             st.session_state["catalog_new_created_code"] = created["service_item_code"]
+            st.session_state["catalog_selection_generation"] = st.session_state.get("catalog_selection_generation", 0) + 1
         except Exception as exc:
             st.error(str(exc))
+
+def is_published(row: dict) -> bool:
+    return row["item_status"] == "active" and int(row["resident_request_enabled"] or 0) == 1
+
 
 offers = [
     row for row in list_offers()
     if row.get("workflow_profile_code")
     and not str(row.get("service_item_code") or "").upper().startswith("TEST_")
 ]
+offers.sort(key=lambda row: (not is_published(row), str(row["service_item_name"]).casefold(), row["service_item_code"]))
 if not offers:
     st.info("Заказываемые товары и услуги ещё не созданы.")
     st.stop()
 
 st.markdown("### Позиции")
+if notice := st.session_state.pop("catalog_publication_notice", None):
+    st.success(notice)
 
 
 def display_price(row: dict) -> str:
@@ -121,14 +129,29 @@ table = pd.DataFrame([{
     "Код": r["service_item_code"], "Категория": r["category"] or "—",
     "Позиция": r["service_item_name"], "Маршрут": r["profile_name"] or r["workflow_profile_code"],
     "Цена": display_price(r),
-    "Статус": "Опубликовано" if r["item_status"] == "active" and r["resident_request_enabled"] else "Черновик",
+    "Статус": "🟢 Опубликовано" if is_published(r) else "⚪ Не опубликовано",
     "Цена с": r["price_since"] or "—",
 } for r in offers])
-st.dataframe(table, hide_index=True, use_container_width=True)
+st.caption("Опубликованные позиции — вверху. Нажмите строку, чтобы открыть карточку и изменить публикацию или цену.")
 
-options = {r["service_item_code"]: f"{r['service_item_name']} · {r['service_item_code']}" for r in offers}
-selected_code = st.selectbox("Открыть позицию", list(options), format_func=options.get)
-selected = next(r for r in offers if r["service_item_code"] == selected_code)
+
+def shade_unpublished(row: pd.Series) -> list[str]:
+    style = "color: #697386; background-color: #F0F2F5" if row["Статус"] == "⚪ Не опубликовано" else ""
+    return [style] * len(row)
+
+
+generation = st.session_state.get("catalog_selection_generation", 0)
+selection = st.dataframe(
+    table.style.apply(shade_unpublished, axis=1),
+    hide_index=True, use_container_width=True,
+    on_select="rerun", selection_mode="single-row", key=f"catalog_offer_selection_{generation}",
+)
+selected_rows = selection.selection.rows
+if not selected_rows or not 0 <= selected_rows[0] < len(offers):
+    st.info("Выберите позицию в таблице, чтобы открыть её карточку.")
+    st.stop()
+selected = offers[selected_rows[0]]
+selected_code = selected["service_item_code"]
 
 st.markdown(f"### {selected['service_item_name']}")
 left, right = st.columns(2)
@@ -137,7 +160,7 @@ with left:
     st.write(f"**Маршрут:** {selected['profile_name'] or selected['workflow_profile_code']}")
     st.write(f"**Описание:** {selected['description'] or '—'}")
 with right:
-    published = selected["item_status"] == "active" and int(selected["resident_request_enabled"] or 0) == 1
+    published = is_published(selected)
     st.write(f"**Состояние:** {'опубликовано для жителей' if published else 'черновик / скрыто'}")
     st.write(f"**Текущая цена:** {display_price(selected)}")
     st.write(f"**Действует с:** {selected['price_since'] or '—'}")
@@ -148,7 +171,10 @@ with action_col:
     if st.button(label, type="primary" if not published else "secondary", use_container_width=True):
         try:
             set_publication(actor_id=ACTOR, item_code=selected_code, published=not published)
-            st.success("Состояние публикации изменено.")
+            st.session_state["catalog_selection_generation"] = generation + 1
+            st.session_state["catalog_publication_notice"] = (
+                f"{selected['service_item_name']}: {'опубликовано для жителей' if not published else 'снято с публикации'}."
+            )
             st.rerun()
         except Exception as exc:
             st.error(str(exc))

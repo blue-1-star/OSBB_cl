@@ -157,6 +157,16 @@ def update_dynamic(
     return v1.update_dynamic(cur, table, row_id, values)
 
 
+def ensure_cash_telegram_fields(cur: sqlite3.Cursor) -> None:
+    """Nullable recipient snapshots; resident_accounts remains authoritative."""
+    for table in ("cashier_receipts", "payments"):
+        existing = table_columns(cur, table)
+        if "resident_account_id" not in existing:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN resident_account_id INTEGER")
+        if "telegram_user_id" not in existing:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN telegram_user_id TEXT")
+
+
 def schema_ready() -> tuple[bool, str]:
     conn = get_conn()
     try:
@@ -596,6 +606,7 @@ def create_cash_receipt(
     commercial_unit_id: int | None = None,
     commercial_contract_item_id: int | None = None,
     vehicle_id: int | None = None,
+    resident_account_id: int | None = None,
 ) -> dict:
     """
     Writes receipt + payment + cashbox income.  It does not commit.
@@ -604,8 +615,10 @@ def create_cash_receipt(
     an exact charge in a reviewed batch; that is the only allowed automatic
     allocation path.
     """
-    if cashbox_code not in CASH_CODES:
-        raise ValueError("Для наличных доступны O, K1–K6 или C.")
+    # MC<assignment_id> is a dedicated mobile-collector balance, created only
+    # after an effective-dated collector assignment has been verified.
+    if cashbox_code not in CASH_CODES and not re.fullmatch(r"MC[1-9]\d*", cashbox_code):
+        raise ValueError("Для наличных доступны O, K1–K6, C или назначенный мобильный сборщик.")
     if not text(source_text):
         raise ValueError("Нужно указать основание: отметку, комментарий или номер листа.")
 
@@ -619,6 +632,24 @@ def create_cash_receipt(
 
     apartment_id = int(apartment["id"]) if apartment and apartment.get("id") is not None else None
     apartment_number = text(apartment.get("apartment_number")) if apartment else None
+    # Store a recipient snapshot on the financial record, never infer a person
+    # from a vehicle. A resident-origin notice identifies its author exactly;
+    # otherwise only a single confirmed account can be prefilled safely.
+    from resident_identity_core import resolve_apartment_telegram_account
+    if notice_id is not None and resident_account_id is None:
+        notice_account = cur.execute(
+            "SELECT resident_account_id FROM payment_notices WHERE id=?", (int(notice_id),)
+        ).fetchone()
+        resident_account_id = int(notice_account[0]) if notice_account and notice_account[0] else None
+    account = (resolve_apartment_telegram_account(
+        apartment_id=apartment_id, apartment_number=apartment_number or "",
+        resident_account_id=resident_account_id, conn=cur.connection,
+    ) if apartment_id is not None else None)
+    ensure_cash_telegram_fields(cur)
+    contact_fields = {
+        "resident_account_id": int(account["id"]) if account else None,
+        "telegram_user_id": str(account["telegram_user_id"]) if account else None,
+    }
 
     temp = "TMP-" + uuid4().hex.upper()
     receipt_id = insert_dynamic(
@@ -633,6 +664,7 @@ def create_cash_receipt(
             "origin_kind": origin_kind,
             "apartment_id": apartment_id,
             "apartment_number": apartment_number,
+            **contact_fields,
             "vehicle_id": vehicle_id,
             "service_hint": service["service_code"],
             "service_item_code": service.get("service_item_code"),
@@ -666,6 +698,7 @@ def create_cash_receipt(
             "period_code": period_code,
             "apartment_id": apartment_id,
             "apartment_number": apartment_number,
+            **contact_fields,
             "vehicle_id": vehicle_id,
             "service_code": service["service_code"],
             "base_service_code": service["service_code"],

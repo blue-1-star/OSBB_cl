@@ -21,13 +21,13 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE_DIR = ROOT / "Data" / "raw" / "video_recognition"
 
 HEADER_ALIASES = {
-    "row": {"#", "№", "row", "rownumber", "rowno", "number"},
-    "make_model": {"carmakemodel", "makemodel", "vehicle", "make/model", "make / model"},
-    "plate": {"licenseplate", "plate"},
-    "timestamp": {"timestamp", "videotimestamp"},
-    "video_part": {"videopart", "videopartnumber", "partnumber", "videopart№", "videopartno"},
-    "video_date": {"videodate"},
-    "video_time": {"videotime"},
+    "row": {"#", "№", "row", "rownumber", "rowno", "number", "row№"},
+    "make_model": {"carmakemodel", "carmake/model", "makemodel", "make/model", "vehicle", "маркамодель", "марка/модель"},
+    "plate": {"licenseplate", "plate", "platenumber", "номернийзнак"},
+    "timestamp": {"timestamp", "videotimestamp", "таймстамп"},
+    "video_part": {"videopart", "videopartnumber", "partnumber", "videopart№", "videopartno", "частинавідео"},
+    "video_date": {"videodate", "датавідео"},
+    "video_time": {"videotime", "часвідео"},
 }
 
 CYR_TO_LAT = str.maketrans({
@@ -172,6 +172,10 @@ def extract_file(path: Path) -> tuple[list[dict], dict]:
             plate_raw = text(value_at(values, mapping, "plate"))
             make_raw = text(value_at(values, mapping, "make_model"))
             row_value = text(value_at(values, mapping, "row"))
+            # Some workbooks repeat a header and a placeholder row inside the data.
+            if canonical_header(plate_raw) == "plate" or plate_raw in {"—", "–", "-"}:
+                skipped += 1
+                continue
             if not plate_raw and not make_raw:
                 skipped += 1
                 continue
@@ -181,6 +185,9 @@ def extract_file(path: Path) -> tuple[list[dict], dict]:
             plate_normalized, plate_status = normalize_plate(plate_raw)
             video_time = format_clock(value_at(values, mapping, "video_time")) or title_time
             part_raw = text(value_at(values, mapping, "video_part"))
+            if not part_raw:
+                filename_part = re.search(r"(?:video[_ -]?)?part[_ -]?(\d+)", path.stem, flags=re.I)
+                part_raw = filename_part.group(1) if filename_part else ""
             part_match = re.search(r"\d+", part_raw)
             rows.append({
                 "row": row_value or str(excel_row - header_row),

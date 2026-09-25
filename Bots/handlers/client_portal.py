@@ -41,6 +41,7 @@ for folder in (OSBB_ROOT, PY_ROOT):
 
 from config import paths, USE_TEST_DB
 from access_control import has_permission
+from data_quality_report import build_quality_issues, quality_summary
 from utils import normalize_plate as _registry_normalize_plate
 
 try:
@@ -82,6 +83,7 @@ I18N = {
         "observer_vehicles": "🚗 Все автомобили",
         "observer_payments": "💰 Последние оплаты",
         "observer_requests": "📨 Заявки жителей",
+        "observer_quality": "🧩 Пробелы в данных",
         "observer_denied": "У вас нет роли наблюдателя ОСББ.",
         "observer_prev": "⬅️ Раньше",
         "observer_next": "➡️ Далее",
@@ -300,6 +302,7 @@ I18N = {
         "observer_vehicles": "🚗 Усі автомобілі",
         "observer_payments": "💰 Останні оплати",
         "observer_requests": "📨 Заявки мешканців",
+        "observer_quality": "🧩 Прогалини в даних",
         "observer_denied": "У вас немає ролі спостерігача ОСББ.",
         "observer_prev": "⬅️ Раніше",
         "observer_next": "➡️ Далі",
@@ -518,6 +521,7 @@ I18N = {
         "observer_vehicles": "🚗 All vehicles",
         "observer_payments": "💰 Recent payments",
         "observer_requests": "📨 Resident requests",
+        "observer_quality": "🧩 Data gaps",
         "observer_denied": "You do not have the OSBB observer role.",
         "observer_prev": "⬅️ Newer",
         "observer_next": "➡️ Older",
@@ -1175,13 +1179,37 @@ def _observer_labels(lang: str) -> dict[str, str]:
     }.get(lang, {})
 
 
-def _observer_data(kind: str, page: int) -> tuple[str, bool]:
+def _observer_data(kind: str, page: int, lang: str = "ru", apartment_filter: str = "") -> tuple[str, bool]:
     """Read-only OSBB-wide report pages.  No write statement belongs here."""
     page = max(0, page)
     limit, offset = 15, page * 15
     conn = get_conn()
     try:
         cur = conn.cursor()
+        if kind == "quality":
+            issues = build_quality_issues(conn)
+            if apartment_filter:
+                issues = [item for item in issues if item["apartment"] == apartment_filter]
+            summary = quality_summary(issues)
+            rows = issues[offset:offset + limit + 1]
+            more, rows = len(rows) > limit, rows[:limit]
+            headings = {
+                "ru": ("Пробелов", "затронуто записей", "кв.", "критично", "важно", "дополнить"),
+                "uk": ("Прогалин", "записів потребують уваги", "кв.", "критично", "важливо", "доповнити"),
+                "en": ("Gaps", "affected records", "apt.", "critical", "important", "complete"),
+            }.get(lang, ("Пробелов", "затронуто записей", "кв.", "критично", "важно", "дополнить"))
+            fields = {
+                "uk": {"Квартира": "Квартира", "Госномер": "Держномер", "Госномер требует проверки": "Держномер потребує перевірки", "Марка/модель": "Марка/модель", "Режим парковки": "Режим паркування", "Цвет": "Колір", "Площадь": "Площа", "ФИО жителя/собственника": "ПІБ мешканця/власника", "Контакт": "Контакт"},
+                "en": {"Квартира": "Apartment", "Госномер": "Plate", "Госномер требует проверки": "Plate needs review", "Марка/модель": "Make/model", "Режим парковки": "Parking mode", "Цвет": "Color", "Площадь": "Area", "ФИО жителя/собственника": "Resident/owner name", "Контакт": "Contact"},
+            }.get(lang, {})
+            levels = {"Критично": headings[3], "Важно": headings[4], "Дополнить": headings[5]}
+            body = [f"{headings[0]}: {summary['issues']}; {headings[1]}: {summary['records']}."] if page == 0 else []
+            body.extend(
+                f"• {headings[2]}{row['apartment']} | {row['plate']} | {fields.get(row['field'], row['field'])} "
+                f"({levels[row['severity']]}; #{row['object_id']})"
+                for row in rows
+            )
+            return "\n".join(body), more
         if kind == "summary":
             cur.execute("""
                 SELECT COUNT(*) FROM apartments
@@ -1285,7 +1313,8 @@ def _observer_data(kind: str, page: int) -> tuple[str, bool]:
 
 
 async def _show_observer_screen(
-    update: Update, user_states: dict, user_id: int, lang: str, kind: str = "summary", page: int = 0
+    update: Update, user_states: dict, user_id: int, lang: str, kind: str = "summary", page: int = 0,
+    apartment_filter: str = "",
 ) -> None:
     if not _observer_allowed(user_id):
         await update.message.reply_text(tr(lang, "observer_denied"))
@@ -1295,8 +1324,9 @@ async def _show_observer_screen(
     state["mode"] = "observer"
     state["observer_kind"] = kind
     state["observer_page"] = max(0, page)
+    state["observer_apartment_filter"] = apartment_filter if kind == "quality" else ""
     labels = _observer_labels(lang)
-    raw, more = _observer_data(kind, page)
+    raw, more = _observer_data(kind, page, lang, apartment_filter)
     if kind == "summary":
         apartments, residents, vehicles, payments, total, open_requests = raw.split("|")
         body = "\n".join([
@@ -1312,8 +1342,18 @@ async def _show_observer_screen(
             "vehicles": tr(lang, "observer_vehicles"),
             "payments": tr(lang, "observer_payments"),
             "requests": tr(lang, "observer_requests"),
+            "quality": tr(lang, "observer_quality"),
         }[kind]
-        body = f"{title}\n\n{raw or labels['empty']}\n\n{labels['page'].format(page=page + 1)}"
+        search_hint = (
+            "\n\nЧтобы найти квартиру, отправьте её номер, например 160."
+            if kind == "quality" and lang == "ru" else
+            "\n\nЩоб знайти квартиру, надішліть її номер, наприклад 160."
+            if kind == "quality" and lang == "uk" else
+            "\n\nTo find an apartment, send its number, e.g. 160."
+            if kind == "quality" else ""
+        )
+        scope = f" · {apartment_filter}" if apartment_filter else ""
+        body = f"{title}{scope}\n\n{raw or labels['empty']}\n\n{labels['page'].format(page=page + 1)}{search_hint}"
     nav: list[str] = []
     if page > 0:
         nav.append(tr(lang, "observer_prev"))
@@ -1322,6 +1362,7 @@ async def _show_observer_screen(
     buttons = [
         [tr(lang, "observer_summary")],
         [tr(lang, "observer_apartments"), tr(lang, "observer_vehicles")],
+        [tr(lang, "observer_quality")],
         [tr(lang, "observer_payments"), tr(lang, "observer_requests")],
     ]
     if nav:
@@ -3055,19 +3096,26 @@ async def handle_client_portal_text(
             tr(lang, "observer_vehicles"): "vehicles",
             tr(lang, "observer_payments"): "payments",
             tr(lang, "observer_requests"): "requests",
+            tr(lang, "observer_quality"): "quality",
         }
         if message_text in kind_by_button:
             await _show_observer_screen(update, user_states, user_id, lang, kind_by_button[message_text])
             return True
         page = int(state.get("observer_page") or 0)
         kind = text(state.get("observer_kind")) or "summary"
+        apartment_filter = text(state.get("observer_apartment_filter")) if kind == "quality" else ""
+        if kind == "quality":
+            apartment_match = re.fullmatch(r"(?:кв\.?\s*)?(\d+[A-Za-zА-Яа-яІЇЄҐіїєґ]?)", message_text.strip(), re.IGNORECASE)
+            if apartment_match:
+                await _show_observer_screen(update, user_states, user_id, lang, kind, 0, apartment_match.group(1))
+                return True
         if message_text == tr(lang, "observer_prev"):
-            await _show_observer_screen(update, user_states, user_id, lang, kind, max(0, page - 1))
+            await _show_observer_screen(update, user_states, user_id, lang, kind, max(0, page - 1), apartment_filter)
             return True
         if message_text == tr(lang, "observer_next"):
-            await _show_observer_screen(update, user_states, user_id, lang, kind, page + 1)
+            await _show_observer_screen(update, user_states, user_id, lang, kind, page + 1, apartment_filter)
             return True
-        await _show_observer_screen(update, user_states, user_id, lang, kind, page)
+        await _show_observer_screen(update, user_states, user_id, lang, kind, page, apartment_filter)
         return True
 
     # Link apartment.

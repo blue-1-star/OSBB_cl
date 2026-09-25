@@ -19,6 +19,7 @@ MODULE = "service_catalog_admin"
 ENTRY = "📚 Каталог услуг"
 HOME = "🏠 Главное меню"
 BACK = "⬅️ К каталогу"
+BACK_HIDDEN = "⬅️ К скрытым позициям"
 STEP_BACK = "↩️ Назад на шаг"
 ROUTE_ACCEPT = "✅ Этот маршрут подходит"
 ROUTE_CHANGE = "🔁 Выбрать другой маршрут"
@@ -26,6 +27,7 @@ NEW = "➕ Новый вид товара / услуги"
 PRICE = "💰 Изменить цену"
 PUBLISH = "✅ Опубликовать"
 UNPUBLISH = "⏸ Снять с публикации"
+HIDDEN = "⚪ Скрытые позиции"
 
 
 def kb(rows):
@@ -109,29 +111,57 @@ def _orderable_offers() -> list[dict]:
     ]
 
 
+def _published(row: dict) -> bool:
+    return row["item_status"] == "active" and int(row["resident_request_enabled"] or 0) == 1
+
+
+def _offer_button(row: dict, *, published: bool) -> str:
+    return f"{'🟢' if published else '⚪'} {row['service_item_name']} · {row['service_item_code']}"
+
+
 async def show_catalog_workspace(update: Update, states: dict, user_id: int) -> None:
     if not has_catalog_access(user_id):
         await update.message.reply_text("⛔ Нет права управлять каталогом услуг.")
         return
     state = _state(states, user_id, create=True)
     state.clear(); state.update({"_module": MODULE, "mode": "home"})
-    rows = _orderable_offers()
-    buttons = [[NEW]]
+    rows = sorted(_orderable_offers(), key=lambda row: str(row["service_item_name"]).casefold())
+    published_rows = [row for row in rows if _published(row)]
+    hidden_rows = [row for row in rows if not _published(row)]
+    buttons = []
     lines = [
         "📚 Каталог товаров и услуг", "",
         "Здесь только то, что житель может заказать. Парковка по месяцам и "
-        "исторические начисления в этот каталог не добавляются.", "", "Позиции:"
+        "исторические начисления в этот каталог не добавляются.", "",
+        "Нажмите услугу, чтобы изменить цену или снять её с публикации.",
+        "", "Опубликованы для жителей:"
     ]
     mapping = {}
-    for row in rows:
-        published = row["item_status"] == "active" and int(row["resident_request_enabled"] or 0) == 1
-        label = f"{'🟢' if published else '⚪'} {row['service_item_name']} · {row['service_item_code']}"
+    for row in published_rows:
+        label = _offer_button(row, published=True)
         mapping[label] = row["service_item_code"]
         buttons.append([label])
         price = row["current_price"] if row["current_price"] is not None else row["amount_default"]
-        lines.append(f"{'🟢' if published else '⚪'} {row['service_item_name']} — {price} {row['currency']}")
+        lines.append(f"🟢 {row['service_item_name']} — {price} {row['currency']}")
+    if not published_rows:
+        lines.append("Пока нет опубликованных позиций.")
+    hidden_button = f"{HIDDEN} ({len(hidden_rows)})"
+    buttons += [[NEW], [hidden_button], [HOME]]
     state["offers"] = mapping
-    buttons += [[HOME]]
+    state["hidden_button"] = hidden_button
+    await update.message.reply_text("\n".join(lines), reply_markup=kb(buttons))
+
+
+async def _show_hidden(update: Update, state: dict) -> None:
+    rows = sorted((row for row in _orderable_offers() if not _published(row)),
+                  key=lambda row: str(row["service_item_name"]).casefold())
+    state["mode"] = "hidden"
+    mapping = {_offer_button(row, published=False): row["service_item_code"] for row in rows}
+    state["hidden_offers"] = mapping
+    lines = ["⚪ Скрытые позиции", "", "Жителям они не показаны. Нажмите позицию, чтобы открыть её карточку и при необходимости опубликовать."]
+    if not rows:
+        lines.append("Скрытых позиций нет.")
+    buttons = [[label] for label in mapping] + [[BACK], [HOME]]
     await update.message.reply_text("\n".join(lines), reply_markup=kb(buttons))
 
 
@@ -139,18 +169,23 @@ async def _show_card(update: Update, state: dict, code: str) -> None:
     row = next((r for r in _orderable_offers() if r["service_item_code"] == code), None)
     if not row:
         await update.message.reply_text("Позиция не найдена."); return
+    if state.get("mode") in {"home", "hidden"}:
+        state["card_origin"] = state.get("mode")
+    elif state.get("mode") == "new_price":
+        state["card_origin"] = "home"
     state.update({"mode": "card", "item_code": code})
-    published = row["item_status"] == "active" and int(row["resident_request_enabled"] or 0) == 1
+    published = _published(row)
     price = row["current_price"] if row["current_price"] is not None else row["amount_default"]
     body = (
         f"📦 {row['service_item_name']}\n\n"
         f"Код: {code}\nКатегория: {row['category'] or '—'}\n"
         f"Маршрут: {row['profile_name'] or row['workflow_profile_code']}\n"
         f"Цена: {price} {row['currency']}\n"
-        f"Статус: {'опубликовано для жителей' if published else 'черновик'}"
+        f"Статус: {'опубликовано для жителей' if published else 'не показано жителям'}"
     )
     action = UNPUBLISH if published else PUBLISH
-    await update.message.reply_text(body, reply_markup=kb([[action, PRICE], [BACK], [HOME]]))
+    back = BACK_HIDDEN if state.get("card_origin") == "hidden" else BACK
+    await update.message.reply_text(body, reply_markup=kb([[action, PRICE], [back], [HOME]]))
 
 
 async def handle_service_catalog_text(update: Update, states: dict, user_id: int, message_text: str) -> bool:
@@ -165,7 +200,7 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
     if text == HOME:
         states.pop(user_id, None); return False
     mode = state.get("mode")
-    if text in {STEP_BACK, BACK}:
+    if text in {STEP_BACK, BACK, BACK_HIDDEN}:
         previous = {
             "new_catalog_name": ("new_service_code", "Код категории, например REMOTE:"),
             "new_item_code": ("new_catalog_name", "Название категории, например Пульты:"),
@@ -185,8 +220,12 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
             await _show_profile_confirmation(update, state); return True
         if mode == "price":
             await _show_card(update, state, state["item_code"]); return True
+        if mode == "card" and state.get("card_origin") == "hidden":
+            await _show_hidden(update, state); return True
         await show_catalog_workspace(update, states, user_id); return True
     if mode == "home":
+        if text == state.get("hidden_button"):
+            await _show_hidden(update, state); return True
         if text == NEW:
             state.update({"mode": "new_service_code", "draft": {}})
             await update.message.reply_text("Это создание нового вида товара/услуги, а не очередного месяца начисления.\n\nКод категории, например REMOTE:", reply_markup=kb([[BACK], [HOME]])); return True
@@ -194,15 +233,25 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
         if code:
             await _show_card(update, state, code); return True
         await update.message.reply_text("Выберите кнопку каталога."); return True
+    if mode == "hidden":
+        code = (state.get("hidden_offers") or {}).get(text)
+        if code:
+            await _show_card(update, state, code); return True
+        await update.message.reply_text("Выберите скрытую позицию кнопкой."); return True
     if mode == "card":
         code = state["item_code"]
         if text in {PUBLISH, UNPUBLISH}:
             try:
                 set_publication(actor_id=user_id, item_code=code, published=text == PUBLISH)
-                await update.message.reply_text("Состояние публикации изменено.")
+                await update.message.reply_text(
+                    "Услуга опубликована и снова показана жителям."
+                    if text == PUBLISH else
+                    "Услуга снята с публикации и больше не показана жителям. "
+                    "Ранее оформленные заказы сохранены."
+                )
             except Exception as exc:
                 await update.message.reply_text(f"⚠️ {exc}")
-            await _show_card(update, state, code); return True
+            await show_catalog_workspace(update, states, user_id); return True
         if text == PRICE:
             state["mode"] = "price"; await update.message.reply_text("Введите новую цену в грн, например 500:", reply_markup=kb([[BACK], [HOME]])); return True
         await update.message.reply_text("Выберите действие кнопкой."); return True

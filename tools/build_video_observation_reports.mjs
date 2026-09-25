@@ -104,7 +104,7 @@ overview.getRange("A5:B11").values = [
   ["Номеров в ночных наблюдениях", nightRows.length],
 ];
 overview.getRange("A5:B11").format.borders = thinBorder;
-overview.getRange("A13").values = [["Источник: результаты распознавания видео (32 файла) и снимок реестра автомобилей ОСББ."]];
+overview.getRange("A13").values = [[`Источник: результаты распознавания видео. Число файлов: ${source.sources.length}. Снимок реестра автомобилей ОСББ.`]];
 overview.getRange("A13").format = { font: { italic: true, color: "#595959" } };
 overview.mergeCells("A14:F15");
 overview.getRange("A14").values = [["Квартира и ФИО заполняются только при точном совпадении нормализованного номера с реестром. Марка — наиболее частая распознанная модель; при отсутствии или конфликте берётся марка из реестра, если она есть."]];
@@ -159,6 +159,6 @@ await fs.mkdir(path.dirname(outputPath), { recursive: true });
 const output = await SpreadsheetFile.exportXlsx(wb);
 await output.save(outputPath);
 for (const sheetName of ["Сводка", "Все номера", "Ночные наблюдения", "Найдено в БД", "Не найдено в БД"]) {
-  const image = await wb.render({ sheetName, autoCrop: "all", scale: 1, format: "png" });
+  const image = await wb.render({ sheetName, range: sheetName === "Сводка" ? "A1:F16" : "A1:F18", scale: 1, format: "png" });
   await fs.writeFile(`${outputPath}.${sheetName}.png`, new Uint8Array(await image.arrayBuffer()));
 }

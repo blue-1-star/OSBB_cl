@@ -15,6 +15,11 @@ from handlers.guard_workspace import (
     has_guard_workspace_access,
     show_guard_workspace,
 )
+from handlers.mobile_cash_claims import (
+    ENTRY as MOBILE_CASH_ENTRY,
+    handle_mobile_cash_claim_text,
+)
+from cash_claim_points_core import active_collector_for_telegram
 from handlers.service_orders_workspace import (
     handle_service_orders_text,
     has_service_workspace_access,
@@ -31,6 +36,13 @@ from handlers.inventory_transfers_workspace import (
     handle_inventory_text,
     has_inventory_access,
 )
+from handlers.data_quality_workspace import ENTRY as DATA_QUALITY_ENTRY, handle_data_quality_text
+from handlers.data_quality_proposal_workspace import (
+    ENTRY as QUALITY_SUGGEST_ENTRY, MY as QUALITY_MY, REVIEW as QUALITY_REVIEW,
+    handle_quality_proposal_text,
+)
+from access_control import has_permission
+from data_quality_proposals import is_super_admin
 from handlers.client_portal_v3 import (
     handle_client_portal_text,
     client_menu_keyboard,
@@ -65,6 +77,7 @@ for p in (OSBB_ROOT, PY_ROOT):
 
 from config import paths
 from resident_request_delivery import deliver_ready_resident_request_messages
+from service_order_notifications import deliver_ready_order_notifications
 
 if str(paths.SECRETS_DIR) not in sys.path:
     sys.path.insert(0, str(paths.SECRETS_DIR))
@@ -106,6 +119,7 @@ from Bots.db_access import (
     get_vehicles_by_status,
     format_vehicles_admin_list,
     get_apartment_card,
+    get_apartment_telegram_contacts,
     format_apartment_card,
     get_vehicle_by_id_for_apartment,
     format_vehicle_card_for_edit,
@@ -213,6 +227,8 @@ ADMIN_MENU = [
     ["📞 Телефонный доступ"],
     ["💳 Платежи"],
     ["📊 Отчёты"],
+    ["🧩 Пробелы в данных"],
+    ["✍️ Предложить исправление", "📝 Мои предложения"],
     ["⚙️ Настройки"],
     ["👥 Пользователи и роли"],
     ["👤 Клиентский режим"],
@@ -378,6 +394,8 @@ async def show_mode_menu(update: Update, lang: str):
     buttons = [[t["client_mode"]]]
     if has_guard_workspace_access(user_id, cashbox_code="O"):
         buttons.append(["🛡 Пост охраны O"])
+    if active_collector_for_telegram(user_id):
+        buttons.append([MOBILE_CASH_ENTRY])
     if has_service_workspace_access(user_id):
         buttons.append(["🔑 Оператор услуг"])
     if has_inventory_access(user_id):
@@ -386,6 +404,10 @@ async def show_mode_menu(update: Update, lang: str):
         buttons.append([SERVICE_CATALOG_ENTRY])
     if is_admin_user(user_id):
         buttons.append([t["admin_mode"]])
+    if has_permission(user_id, "data_quality_proposals", "SUGGEST") or is_admin_user(user_id):
+        buttons.append([QUALITY_SUGGEST_ENTRY, QUALITY_MY])
+    if is_super_admin(user_id):
+        buttons.append([QUALITY_REVIEW])
 
     await update.message.reply_text(
         t["mode"],
@@ -397,6 +419,7 @@ def has_work_mode(user_id: int) -> bool:
     return (
         is_admin_user(user_id)
         or has_guard_workspace_access(user_id, cashbox_code="O")
+        or active_collector_for_telegram(user_id) is not None
         or has_service_workspace_access(user_id)
         or has_inventory_access(user_id)
         or has_catalog_access(user_id)
@@ -439,16 +462,22 @@ async def show_client_menu(update: Update, lang: str):
     # Передаём user_id в приветствие
     welcome_text = client_welcome_text(lang, user_id)
     
+    rows = client_menu_keyboard(lang)
+    if active_collector_for_telegram(user_id):
+        rows = list(rows) + [[MOBILE_CASH_ENTRY]]
     await update.message.reply_text(
         welcome_text,
-        reply_markup=kb(client_menu_keyboard(lang)),
+        reply_markup=kb(rows),
     )
 
 
 async def show_admin_menu(update: Update):
+    rows = list(ADMIN_MENU)
+    if is_super_admin(update.effective_user.id):
+        rows.insert(-1, [QUALITY_REVIEW])
     await update.message.reply_text(
         "🔐 Админ-режим\n\nВыберите раздел:",
-        reply_markup=kb(ADMIN_MENU),
+        reply_markup=kb(rows),
     )
 
 
@@ -877,12 +906,12 @@ async def show_current_apartment_residents(update: Update, user_id: int):
 
     lines = [f"👥 Жильцы кв.{apartment_number}", ""]
 
-    if card["residents"]:
-        for first_name, last_name, username, status in card["residents"]:
-            name = " ".join(x for x in [first_name, last_name] if x) or "-"
-            username = f"@{username}" if username else "-"
-            status = status or "-"
-            lines.append(f"• {name} | {username} | {status}")
+    contacts = get_apartment_telegram_contacts(card)
+    if contacts:
+        for contact in contacts:
+            name = " ".join(x for x in [contact["first_name"], contact["last_name"]] if x) or "-"
+            username = f"@{contact['username']}" if contact["username"] else "-"
+            lines.append(f"• {name} | Telegram ID {contact['telegram_user_id']} | {username} | {contact['status'] or '-'}")
     else:
         lines.append("нет пользователей")
 
@@ -1115,6 +1144,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_mode_menu(update, lang)
         return
 
+    if await handle_quality_proposal_text(
+        update, user_states, user_id, text,
+        is_admin=is_admin_user(user_id), bot=context.bot,
+    ):
+        return
+
     # Physical-stock transfers have their own short wizard, independent of
     # the service-order, guard-cashier and administrator keyboards.
     if text == INVENTORY_ENTRY:
@@ -1147,6 +1182,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👤 Клиентский режим", "👤 Режим мешканця", "👤 User mode",
         "🔐 Админ-режим", "🔐 Адмін-режим", "🔐 Admin mode",
         "🛡 Пост охраны O",
+        MOBILE_CASH_ENTRY,
         "🔑 Оператор услуг", "🔑 Оператор послуг", "🔑 Service operator",
         "🔄 Сменить режим", "🔄 Змінити режим", "🔄 Switch mode",
     }
@@ -1471,6 +1507,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_mode_menu(update, lang)
         return
 
+    if await handle_mobile_cash_claim_text(update, user_states, user_id, text):
+        return
+
     # =========================
     # Каталог услуг: отдельный допуск SERVICE_CATALOG_MANAGER
     # =========================
@@ -1493,6 +1532,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =========================
     # Клиентский кабинет / заявки на пульты
     # =========================
+    quality_state = user_states.get(user_id)
+    if user_modes.get(user_id) == "admin" or (
+        isinstance(quality_state, dict) and quality_state.get("mode") == "data_quality"
+    ):
+        if await handle_data_quality_text(
+            update, user_states, user_id, text, back_markup=kb(ADMIN_MENU),
+        ):
+            return
+
     # В client-режиме блокирует старую RU-only обработку кнопок:
     # на каждом уровне принимаются только кнопки выбранного языка.
     # В admin-режиме обрабатывает только «Заявки на пульты».
@@ -1779,9 +1827,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "📊 Отчёты":
         await update.message.reply_text(
-            "📊 Отчёты\n\n"
-            "Здесь будут отчёты по ОСББ.",
-            reply_markup=kb(ADMIN_MENU),
+            "📊 Отчёты\n\nДоступен общий список пробелов в данных.",
+            reply_markup=kb([[DATA_QUALITY_ENTRY], ["⬅️ К админ-меню"]]),
         )
         return
 
@@ -1828,6 +1875,7 @@ async def _resident_request_delivery_loop(app: Application) -> None:
     while True:
         try:
             await deliver_ready_resident_request_messages(app.bot)
+            await deliver_ready_order_notifications(app.bot)
         except Exception as exc:
             print(f"Resident request delivery error: {exc}")
         await asyncio.sleep(15)
