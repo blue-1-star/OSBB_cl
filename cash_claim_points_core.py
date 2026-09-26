@@ -14,6 +14,7 @@ from service_orders_core import get_conn
 
 
 POINTS = (
+    ("BANK", "Банк — безналичная оплата", "BANK"),
     ("K1", "Консьерж 1-го подъезда", "CASHBOX"),
     ("K2", "Консьерж 2-го подъезда", "CASHBOX"),
     ("K3", "Консьерж 3-го подъезда", "CASHBOX"),
@@ -24,6 +25,14 @@ POINTS = (
     ("KAS1", "Кассир 1", "COLLECTOR_SLOT"),
     ("KAS2", "Кассир 2", "COLLECTOR_SLOT"),
 )
+
+
+def cash_account_label(conn, code):
+    """Expose the established KAS identity, not the internal assignment ledger."""
+    if str(code).startswith('MC') and str(code)[2:].isdigit():
+        row = conn.execute('SELECT point_code,person_name FROM cash_claim_custodians WHERE id=?', (int(str(code)[2:]),)).fetchone()
+        if row: return f"{row['point_code']} — {row['person_name']}"
+    return 'Банк' if code == 'BANK' else code
 
 
 def ensure_claim_points_schema(conn: sqlite3.Connection) -> None:
@@ -195,7 +204,9 @@ def list_claim_points(as_of: str | None = None, *, conn: sqlite3.Connection | No
         ):
             point = dict(row)
             code = point["point_code"]
-            if point["point_kind"] == "CASHBOX":
+            if point["point_kind"] == "BANK":
+                point['custodian'] = None
+            elif point["point_kind"] == "CASHBOX":
                 cashbox = conn.execute(
                     "SELECT is_active FROM cashboxes WHERE cashbox_code=?", (code,)
                 ).fetchone()

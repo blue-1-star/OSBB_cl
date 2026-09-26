@@ -523,6 +523,10 @@ def create_service_order(
 
         cur = conn.cursor()
         item = _service_item(cur, service_item_code)
+        # Every entry point (bot, console, cash reconciliation) uses this gate.
+        # Interests remain unrestricted; only actual order creation is checked.
+        from service_access_policy import ensure_service_order_allowed
+        access_decision = ensure_service_order_allowed(conn, apartment_number, service_item_code)
         workflow = get_service_workflow(cur, service_item_code)
 
         request_allowed = int(workflow.get("resident_request_enabled") or 0) == 1
@@ -698,10 +702,12 @@ def create_service_order(
             source_context=source_context,
             details=(
                 f"item={service_item_code}; profile={profile}; "
-                f"quantity={quantity}; amount={amount_due}"
+                f"quantity={quantity}; amount={amount_due}; "
+                f"policy={access_decision['decision']}; debt={access_decision['debt']['total']}"
             ),
         )
         result = recompute_order_status(cur, order_id)
+        result["access_policy"] = access_decision
         _audit_order(
             conn,
             actor_id=actor_id,

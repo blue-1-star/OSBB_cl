@@ -18,7 +18,7 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE_DIR = ROOT / "Data" / "raw" / "video_recognition"
+DEFAULT_SOURCE_DIR = ROOT / "data" / "raw" / "video_recognition"
 
 HEADER_ALIASES = {
     "row": {"#", "№", "row", "rownumber", "rowno", "number", "row№"},
@@ -228,7 +228,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     source_dir = args.source_dir.resolve()
-    files = sorted(path for path in source_dir.glob("*.xlsx") if not path.name.startswith("~$"))
+    files = sorted(path for path in source_dir.rglob("*.xlsx") if not path.name.startswith("~$"))
     all_rows, sources, errors = [], [], []
     for path in files:
         try:

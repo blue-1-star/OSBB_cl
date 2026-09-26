@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 import re
 import sqlite3
+import json
 from typing import Any
 
 from audit_logger import audit_log
@@ -18,6 +19,70 @@ from service_orders_core import get_conn, table_exists, text
 
 CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 EXISTING_CODE_RE = re.compile(r"^[A-Za-z0-9_]{3,64}$")
+POLICY_MODES = {"NONE": "Разрешить", "WARN": "Разрешить с предупреждением", "BLOCK": "Запретить при долге"}
+POLICY_SCOPES = {"NONE": "Не учитывать долги", "PARKING": "Парковка", "ACCESS": "Услуги доступа", "ALL_CASH_COLLECTABLE": "Все начисления"}
+
+
+def can_edit_access_policy(actor_id: int | str, conn=None) -> bool:
+    from access_control import list_user_roles
+    owns = conn is None
+    conn = conn or get_conn()
+    try:
+        now = now_db()
+        return any(r['role_code'] == 'SUPER_ADMIN' and int(r['is_active'] or 0)
+                   and (not r['valid_from'] or r['valid_from'] <= now)
+                   and (not r['valid_to'] or r['valid_to'] >= now)
+                   for r in list_user_roles(actor_id, conn=conn))
+    finally:
+        if owns: conn.close()
+
+
+def get_access_policy(item_code: str, conn=None) -> dict:
+    owns = conn is None
+    conn = conn or get_conn()
+    try:
+        row = conn.execute('SELECT c.* FROM service_catalog c JOIN service_items i ON i.service_code=c.service_code WHERE i.service_item_code=?', (item_code,)).fetchone()
+        if row is None: raise ValueError('Категория услуги не найдена.')
+        result = dict(row)
+        result['affected_items'] = [dict(r) for r in conn.execute('SELECT service_item_code,service_item_name FROM service_items WHERE service_code=? ORDER BY service_item_name', (row['service_code'],))]
+        return result
+    finally:
+        if owns: conn.close()
+
+
+def save_access_policy(*, actor_id, item_code, mode, scope, message='', reason,
+                       local_single_user=False, conn=None):
+    """Category-wide rule, audited; local console is explicitly single-user only."""
+    owns = conn is None
+    conn = conn or get_conn()
+    try:
+        if local_single_user:
+            import getpass
+            if str(actor_id) != f'local_mac:{getpass.getuser()}':
+                raise PermissionError('Неверный локальный исполнитель.')
+        elif not can_edit_access_policy(actor_id, conn):
+            raise PermissionError('Изменять условия заказа может только SUPER_ADMIN.')
+        if mode not in POLICY_MODES or scope not in POLICY_SCOPES:
+            raise ValueError('Неизвестный режим или область задолженности.')
+        if mode != 'NONE' and scope == 'NONE':
+            raise ValueError('Выберите, какие долги учитывать.')
+        if not text(reason): raise ValueError('Укажите основание изменения политики.')
+        old = get_access_policy(item_code, conn)
+        values = {'access_policy_enabled': int(mode != 'NONE'),
+                  'access_policy_mode': mode, 'access_policy_scope': scope if mode != 'NONE' else 'NONE',
+                  'access_policy_message': text(message)}
+        conn.execute('UPDATE service_catalog SET access_policy_enabled=?,access_policy_mode=?,access_policy_scope=?,access_policy_message=?,policy_updated_at=?,policy_updated_by=?,updated_at=? WHERE service_code=?',
+                     (values['access_policy_enabled'], mode, values['access_policy_scope'], text(message), now_db(), str(actor_id), now_db(), old['service_code']))
+        _audit(conn, actor_id, 'service_access_policy_changed', 'service_catalog', old['service_code'],
+               json.dumps({k: old.get(k) for k in values}, ensure_ascii=False),
+               json.dumps(values, ensure_ascii=False), text(reason))
+        if owns: conn.commit()
+        return get_access_policy(item_code, conn)
+    except Exception:
+        if owns: conn.rollback()
+        raise
+    finally:
+        if owns: conn.close()
 
 
 def now_db() -> str:

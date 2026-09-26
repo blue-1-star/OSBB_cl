@@ -9,6 +9,24 @@ from service_orders_core import get_conn, now_db
 from supplier_terms_core import order_preorder_context
 
 
+def paid_remote_confirmation_text(apartment, quantity, amount, context) -> str:
+    """Shared wording for Telegram delivery and manually forwarded messages."""
+    lines = [f"☑ Оплату підтверджено (кв. {apartment}, {int(quantity)} шт. — {float(amount):g} грн)."]
+    if context.get('batch_number'):
+        lines.append('📦 Партію сформовано. Передачу замовлення постачальнику виконує адміністратор.')
+    elif context.get('minimum'):
+        minimum = int(context['minimum'])
+        collected = int(context['quantity'])
+        if collected >= minimum:
+            lines.append(f'🎯 Мінімальну кількість ({minimum} шт.) зібрано! Очікуємо оформлення замовлення адміністратором.')
+        else:
+            lines.append(f'⏳ Зібрано {collected} із необхідних {minimum} шт. Очікуємо ще {minimum - collected} шт. для замовлення постачальнику.')
+    else:
+        lines.append('⏳ Мінімальна кількість для замовлення постачальнику ще уточнюється.')
+    lines.extend(['', 'Деталі: «📦 Мої замовлення» → «📋 Мої послуги».'])
+    return '\n'.join(lines)
+
+
 def ensure_order_notification_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         """CREATE TABLE IF NOT EXISTS service_order_notifications (
@@ -46,23 +64,13 @@ def enqueue_paid_order_confirmation(order_id: int, *,
             return None
         context = order_preorder_context(int(order_id), conn=conn)
         qty = int(float(row["quantity"]))
-        lines = ["✅ Оплату за нові пульти підтверджено", "",
-                 f"Квартира {row['apartment_number']} · {qty} шт.",
-                 f"Отримано: {amount:.2f} грн."]
-        if context["batch_number"]:
-            lines.append(f"Партія постачальника: {context['batch_number']}.")
-        elif context["minimum"]:
-            lines.append(f"Оплачений пакет зараз: {context['quantity']} із мінімальних {context['minimum']} шт.")
-            lines.append("Замовлення постачальнику ще не оформлено.")
-        else:
-            lines.append("Розмір мінімальної партії постачальника ще уточнюється.")
-        lines.extend(["", "Деталі: «📦 Мої замовлення» → «📋 Мої послуги»."])
+        message = paid_remote_confirmation_text(row['apartment_number'], qty, amount, context)
         ensure_order_notification_schema(conn)
         cur = conn.execute(
             """INSERT OR IGNORE INTO service_order_notifications
                (service_order_id,notification_kind,telegram_user_id,message_text,created_at)
                VALUES (?,'PAYMENT_CONFIRMED',?,?,?)""",
-            (int(order_id), str(row["telegram_user_id"]), "\n".join(lines), now_db()),
+            (int(order_id), str(row["telegram_user_id"]), message, now_db()),
         )
         if cur.rowcount:
             audit_log(

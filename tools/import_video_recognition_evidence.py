@@ -30,7 +30,7 @@ ACTOR = "video_recognition_import"
 
 
 def build_evidence(source_dir: Path) -> tuple[list[dict], str, int]:
-    files = sorted(path for path in source_dir.glob("*.xlsx") if not path.name.startswith("~$"))
+    files = sorted(path for path in source_dir.rglob("*.xlsx") if not path.name.startswith("~$"))
     observations: list[dict] = []
     for path in files:
         rows, _source = extract_file(path)
@@ -178,7 +178,7 @@ def apply(source_dir: Path) -> dict:
                 imported_at, imported_by, algorithm_version
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (signature, len(list(source_dir.glob("*.xlsx"))), observations_count, len(evidence), timestamp, ACTOR, ALGORITHM_VERSION),
+            (signature, len(list(source_dir.rglob("*.xlsx"))), observations_count, len(evidence), timestamp, ACTOR, ALGORITHM_VERSION),
         )
         cur.execute(
             """
@@ -210,7 +210,7 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Write the evidence cache to the main DB.")
     args = parser.parse_args()
     evidence, signature, observations = build_evidence(args.source_dir)
-    print(f"Source files: {len(list(args.source_dir.glob('*.xlsx')))}; observations: {observations}; unique standard plates: {len(evidence)}")
+    print(f"Source files: {len(list(args.source_dir.rglob('*.xlsx')))}; observations: {observations}; unique standard plates: {len(evidence)}")
     if not args.apply:
         print("Dry run only. Run with --apply to create/refresh the evidence cache.")
         return 0

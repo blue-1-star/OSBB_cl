@@ -896,6 +896,14 @@ def create_supplier_batch(
                 note=f"Включено в поставку {batch_number}.",
             )
         result = get_supplier_batch(batch_id, conn=conn)
+        # Both Telegram and console use the same supplier-document snapshot.
+        # Legacy batches without a chosen supplier remain unassigned, never guessed.
+        if table_exists(cur, 'service_item_suppliers') and cur.execute(
+            'SELECT 1 FROM service_item_suppliers WHERE service_item_code=? AND is_active=1',
+            (service_item_code,),
+        ).fetchone():
+            from supplier_procurement_core import create_purchase_document
+            create_purchase_document(conn, batch=result, actor=str(actor_id or 'system'))
         if owns:
             conn.commit()
         return result

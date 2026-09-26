@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 from access_control import has_permission
 from service_catalog_admin_core import create_offer, describe_profile, list_offers, list_profiles, set_publication, change_price
+from service_catalog_admin_core import POLICY_MODES, POLICY_SCOPES, get_access_policy, save_access_policy, can_edit_access_policy
 
 
 MODULE = "service_catalog_admin"
@@ -28,6 +29,9 @@ PRICE = "💰 Изменить цену"
 PUBLISH = "✅ Опубликовать"
 UNPUBLISH = "⏸ Снять с публикации"
 HIDDEN = "⚪ Скрытые позиции"
+EDIT = "✏️ Изменить существующую услугу"
+POLICY = "🔐 Условия заказа"
+POLICY_SAVE = "✅ Сохранить условия заказа"
 
 
 def kb(rows):
@@ -133,7 +137,7 @@ async def show_catalog_workspace(update: Update, states: dict, user_id: int) -> 
         "📚 Каталог товаров и услуг", "",
         "Здесь только то, что житель может заказать. Парковка по месяцам и "
         "исторические начисления в этот каталог не добавляются.", "",
-        "Нажмите услугу, чтобы изменить цену или снять её с публикации.",
+        "Для изменения цены или публикации нажмите «✏️ Изменить существующую услугу».",
         "", "Опубликованы для жителей:"
     ]
     mapping = {}
@@ -146,10 +150,28 @@ async def show_catalog_workspace(update: Update, states: dict, user_id: int) -> 
     if not published_rows:
         lines.append("Пока нет опубликованных позиций.")
     hidden_button = f"{HIDDEN} ({len(hidden_rows)})"
-    buttons += [[NEW], [hidden_button], [HOME]]
+    buttons += [[EDIT], [NEW], [hidden_button], [HOME]]
     state["offers"] = mapping
     state["hidden_button"] = hidden_button
     await update.message.reply_text("\n".join(lines), reply_markup=kb(buttons))
+
+
+async def _show_edit_picker(update: Update, state: dict) -> None:
+    """Explicit editing entry: published and hidden offers are both editable."""
+    rows = sorted(_orderable_offers(), key=lambda row: (
+        not _published(row), str(row["service_item_name"]).casefold()))
+    state["mode"] = "edit"
+    state["edit_offers"] = {
+        _offer_button(row, published=_published(row)): row["service_item_code"]
+        for row in rows
+    }
+    await update.message.reply_text(
+        "✏️ Изменить существующую услугу\n\n"
+        "Выберите услугу кнопкой внизу. В её карточке можно изменить цену "
+        "или публикацию.\n🟢 опубликована · ⚪ скрыта\n\n"
+        "В карточке также доступны условия заказа при задолженности.",
+        reply_markup=kb([[label] for label in state["edit_offers"]] + [[BACK], [HOME]]),
+    )
 
 
 async def _show_hidden(update: Update, state: dict) -> None:
@@ -169,7 +191,7 @@ async def _show_card(update: Update, state: dict, code: str) -> None:
     row = next((r for r in _orderable_offers() if r["service_item_code"] == code), None)
     if not row:
         await update.message.reply_text("Позиция не найдена."); return
-    if state.get("mode") in {"home", "hidden"}:
+    if state.get("mode") in {"home", "hidden", "edit"}:
         state["card_origin"] = state.get("mode")
     elif state.get("mode") == "new_price":
         state["card_origin"] = "home"
@@ -185,7 +207,7 @@ async def _show_card(update: Update, state: dict, code: str) -> None:
     )
     action = UNPUBLISH if published else PUBLISH
     back = BACK_HIDDEN if state.get("card_origin") == "hidden" else BACK
-    await update.message.reply_text(body, reply_markup=kb([[action, PRICE], [back], [HOME]]))
+    await update.message.reply_text(body, reply_markup=kb([[action, PRICE], [POLICY], [back], [HOME]]))
 
 
 async def handle_service_catalog_text(update: Update, states: dict, user_id: int, message_text: str) -> bool:
@@ -200,6 +222,45 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
     if text == HOME:
         states.pop(user_id, None); return False
     mode = state.get("mode")
+    if mode and mode.startswith('policy'):
+        if text in {BACK, STEP_BACK}:
+            await _show_card(update, state, state['item_code']); return True
+        if not can_edit_access_policy(user_id):
+            await update.message.reply_text('⛔ Изменять условия заказа может только SUPER_ADMIN.'); return True
+        draft_policy = state.setdefault('policy_draft', {})
+        if mode == 'policy_mode':
+            chosen = next((k for k,v in POLICY_MODES.items() if v == text), None)
+            if chosen is None:
+                await update.message.reply_text('Выберите режим кнопкой.'); return True
+            draft_policy['mode'] = chosen
+            if chosen == 'NONE':
+                draft_policy['scope'] = 'NONE'; state['mode'] = 'policy_message'
+                await update.message.reply_text('Введите сообщение жителю или —, чтобы оставить пустым.'); return True
+            state['mode'] = 'policy_scope'
+            await update.message.reply_text('Какие долги учитывать?', reply_markup=kb([[v] for k,v in POLICY_SCOPES.items() if k != 'NONE'] + [[BACK], [HOME]])); return True
+        if mode == 'policy_scope':
+            chosen = next((k for k,v in POLICY_SCOPES.items() if k != 'NONE' and v == text), None)
+            if chosen is None:
+                await update.message.reply_text('Выберите область кнопкой.'); return True
+            draft_policy['scope'] = chosen; state['mode'] = 'policy_message'
+            await update.message.reply_text('Введите сообщение жителю или — для стандартного сообщения.', reply_markup=kb([[BACK], [HOME]])); return True
+        if mode == 'policy_message':
+            draft_policy['message'] = '' if text == '—' else text
+            state['mode'] = 'policy_reason'
+            await update.message.reply_text('Основание изменения (например, решение правления и дата):'); return True
+        if mode == 'policy_reason':
+            draft_policy['reason'] = text; state['mode'] = 'policy_confirm'
+            await update.message.reply_text(f"Режим: {POLICY_MODES[draft_policy['mode']]}\nДолги: {POLICY_SCOPES[draft_policy['scope']]}\nСообщение: {draft_policy['message'] or 'стандартное'}\nОснование: {text}\nИзменится правило всей категории, не только выбранной позиции.", reply_markup=kb([[POLICY_SAVE], [BACK], [HOME]])); return True
+        if mode == 'policy_confirm':
+            if text != POLICY_SAVE:
+                await update.message.reply_text('Сохраните условия или вернитесь к карточке.'); return True
+            try:
+                save_access_policy(actor_id=user_id, item_code=state['item_code'], **draft_policy)
+                await update.message.reply_text('Условия заказа сохранены. Изменение записано в аудит.')
+                await _show_card(update, state, state['item_code'])
+            except Exception as exc:
+                await update.message.reply_text(f'⚠️ {exc}')
+            return True
     if text in {STEP_BACK, BACK, BACK_HIDDEN}:
         previous = {
             "new_catalog_name": ("new_service_code", "Код категории, например REMOTE:"),
@@ -222,8 +283,12 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
             await _show_card(update, state, state["item_code"]); return True
         if mode == "card" and state.get("card_origin") == "hidden":
             await _show_hidden(update, state); return True
+        if mode == "card" and state.get("card_origin") == "edit":
+            await _show_edit_picker(update, state); return True
         await show_catalog_workspace(update, states, user_id); return True
     if mode == "home":
+        if text == EDIT:
+            await _show_edit_picker(update, state); return True
         if text == state.get("hidden_button"):
             await _show_hidden(update, state); return True
         if text == NEW:
@@ -233,6 +298,11 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
         if code:
             await _show_card(update, state, code); return True
         await update.message.reply_text("Выберите кнопку каталога."); return True
+    if mode == "edit":
+        code = (state.get("edit_offers") or {}).get(text)
+        if code:
+            await _show_card(update, state, code); return True
+        await update.message.reply_text("Выберите услугу кнопкой внизу."); return True
     if mode == "hidden":
         code = (state.get("hidden_offers") or {}).get(text)
         if code:
@@ -240,6 +310,16 @@ async def handle_service_catalog_text(update: Update, states: dict, user_id: int
         await update.message.reply_text("Выберите скрытую позицию кнопкой."); return True
     if mode == "card":
         code = state["item_code"]
+        if text == POLICY:
+            policy = get_access_policy(code)
+            enabled = int(policy.get('access_policy_enabled') or 0)
+            current = policy.get('access_policy_mode') if enabled else 'NONE'
+            affected = '\n'.join(f"• {r['service_item_name']} ({r['service_item_code']})" for r in policy['affected_items'])
+            await update.message.reply_text(f"🔐 Условия заказа · {policy['service_code']}\nСейчас: {POLICY_MODES.get(current, current)}\nДолги: {POLICY_SCOPES.get(policy.get('access_policy_scope'), '—')}\nСообщение: {policy.get('access_policy_message') or 'стандартное'}\n\nПравило общее для:\n{affected}\n\nНамерения не блокируются. Проверка действует при создании заказа.")
+            if not can_edit_access_policy(user_id):
+                await update.message.reply_text('Изменение доступно только SUPER_ADMIN.'); return True
+            state.update(mode='policy_mode', policy_draft={})
+            await update.message.reply_text('Выберите новый режим:', reply_markup=kb([[v] for v in POLICY_MODES.values()] + [[BACK], [HOME]])); return True
         if text in {PUBLISH, UNPUBLISH}:
             try:
                 set_publication(actor_id=user_id, item_code=code, published=text == PUBLISH)

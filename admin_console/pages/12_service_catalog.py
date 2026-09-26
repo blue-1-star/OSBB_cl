@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import getpass
 from pathlib import Path
 
 import pandas as pd
@@ -13,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from service_catalog_admin_core import change_price, create_offer, describe_profile, list_offers, list_profiles, set_publication
+from service_catalog_admin_core import POLICY_MODES, POLICY_SCOPES, get_access_policy, save_access_policy
 
 
 ACTOR = "STREAMLIT_CATALOG_MANAGER"
@@ -152,6 +154,33 @@ if not selected_rows or not 0 <= selected_rows[0] < len(offers):
     st.stop()
 selected = offers[selected_rows[0]]
 selected_code = selected["service_item_code"]
+
+with st.expander('🔐 Условия заказа — политика задолженности', expanded=False):
+    policy = get_access_policy(selected_code)
+    st.warning('Локальный однопользовательский режим без персонального входа. В боте изменять правило может только SUPER_ADMIN. Не используйте этот доступ в общей консоли.')
+    st.write(f"Правило категории **{policy['service_code']}** распространяется на:")
+    st.write('; '.join(f"{r['service_item_name']} ({r['service_item_code']})" for r in policy['affected_items']))
+    st.caption('Намерения не блокируются. Правило проверяется при создании заказа; отдельная проверка перед выдачей пока не реализована.')
+    modes = list(POLICY_MODES)
+    current_mode = policy.get('access_policy_mode') if int(policy.get('access_policy_enabled') or 0) else 'NONE'
+    scopes = list(POLICY_SCOPES)
+    with st.form(f'catalog_policy_{selected_code}'):
+        policy_mode = st.selectbox('При задолженности', modes, index=modes.index(current_mode) if current_mode in modes else 0, format_func=POLICY_MODES.get)
+        policy_scope = st.selectbox('Какие долги учитывать', scopes, index=scopes.index(policy.get('access_policy_scope')) if policy.get('access_policy_scope') in scopes else 0, format_func=POLICY_SCOPES.get)
+        policy_message = st.text_area('Сообщение жителю (пустое — стандартное)', value=policy.get('access_policy_message') or '')
+        policy_reason = st.text_input('Основание изменения', placeholder='Решение правления / дата')
+        policy_confirm = st.checkbox('Подтверждаю изменение правила для всех перечисленных позиций')
+        if st.form_submit_button('Сохранить условия заказа'):
+            try:
+                if not policy_confirm:
+                    raise ValueError('Подтвердите изменение общего правила категории.')
+                save_access_policy(actor_id=f'local_mac:{getpass.getuser()}', item_code=selected_code,
+                                   mode=policy_mode, scope=policy_scope, message=policy_message,
+                                   reason=policy_reason, local_single_user=True)
+                st.session_state['catalog_publication_notice'] = 'Условия заказа сохранены с аудитом.'
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
 
 st.markdown(f"### {selected['service_item_name']}")
 left, right = st.columns(2)

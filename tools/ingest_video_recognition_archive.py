@@ -44,7 +44,10 @@ def main() -> int:
             if path.is_absolute() or ".." in path.parts or not path.name or path.name.startswith("~$"):
                 raise ValueError(f"Unsafe or temporary Excel entry: {item.filename}")
             data = archive.read(item)
-            target = destination / path.name
+            matches = list(destination.rglob(path.name))
+            if len(matches) > 1:
+                raise ValueError(f"Ambiguous existing source: {path.name}")
+            target = matches[0] if matches else destination / path.name
             if target.exists():
                 if digest(target.read_bytes()) == digest(data):
                     unchanged.append(path.name)

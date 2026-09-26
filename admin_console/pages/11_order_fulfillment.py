@@ -20,6 +20,7 @@ from service_cash_claims_core import confirm_claim_cash, transfer_collector_cash
 from service_interest_intake_core import record_external_interest, record_cash_handover_claim
 from resident_identity_core import apartment_telegram_accounts, link_interest_telegram_recipient
 from supplier_terms_core import current_supplier_minimum, order_preorder_context, set_supplier_minimum
+from cash_claim_points_core import cash_account_label
 
 
 st.set_page_config(page_title="Исполнение заказов", page_icon="📦", layout="wide")
@@ -315,7 +316,9 @@ try:
                 else:
                     receivers = ["C"] + [p["point_code"] for p in list_claim_points(conn=conn)
                                            if p["point_kind"] == "COLLECTOR_SLOT"]
-                receiver_labels = {"O": "O — охрана", "C": "C — центральная касса"}
+                if not claim['payment_id'] and claim['claimed_cash_handover']:
+                    receivers = list(dict.fromkeys(receivers + ['BANK']))
+                receiver_labels = {"O": "O — охрана", "C": "C — центральная касса", "BANK": "Банк — подтверждение по выписке"}
                 receiver_labels.update({p["point_code"]: f"{p['point_name']} — {p['custodian']}"
                                         for p in list_claim_points(conn=conn)
                                         if p["point_kind"] == "COLLECTOR_SLOT"})
@@ -332,8 +335,9 @@ try:
                     )
                     evidence = st.text_input(
                         "Основание фактического приёма *",
-                        placeholder="Номер бумажной квитанции, ведомости или акта передачи",
+                        placeholder="Для банка — уникальный ID операции из выписки; для наличных — квитанция/акт",
                     )
+                    bank_date = st.date_input('Дата операции по выписке (только для банка)', max_value=date.today())
                     actual_amount = st.number_input(
                         "Фактически получено, UAH", min_value=0.01,
                         value=float(claim["claimed_amount"] if claim["claimed_amount"] is not None else claim["amount_due_snapshot"]),
@@ -357,10 +361,11 @@ try:
                                 interest_id=int(claim["id"]), receiving_point=receiving_point,
                                 actor=confirming_actor, evidence=evidence,
                                 actual_amount=actual_amount,
+                                transaction_date=bank_date.isoformat() if receiving_point == 'BANK' else None,
                             )
                             st.session_state["cash_claim_confirmed_notice"] = (
                                 f"{result['interest_number']}: принято {result['amount']:.2f} UAH "
-                                f"в {result['cashbox_code']}; квитанция {result['receipt_number']}; "
+                                f"в {cash_account_label(conn,result['cashbox_code'])}; квитанция {result['receipt_number']}; "
                                 + (f"заказ {result['order_number']}." if result['order_number'] else
                                    "сумма расходится, заказ не создан — нужна сверка.")
                             )
@@ -387,7 +392,7 @@ try:
                     selected_box_code = st.selectbox(
                         "Кто сдаёт наличные", list(boxes_by_code),
                         format_func=lambda code: (
-                            f"{boxes_by_code[code]['cashbox_name']} · {code} · "
+                            f"{cash_account_label(conn,code)} · "
                             f"остаток {boxes_by_code[code]['current_balance']:.2f} UAH"
                         ),
                     )
@@ -491,7 +496,42 @@ try:
                             f"Неподтверждённые намерения ({open_quantity} шт.) в оплаченный пакет не входят.")
                 else:
                     st.success(f"Оплачено {paid_quantity} шт. — минимум {minimum} достигнут. "
-                               "Пакет предзаказов готов к оформлению поставщику, но ещё не является заказом поставщику.")
+                               "Задача админу: продолжить сбор или передать заказ поставщику и оплатить его.")
+                if st.button('📋 Показать лист ожидания и состояние денег', key=f'supplier_readiness_{selected_item}'):
+                    st.session_state[f'show_supplier_readiness_{selected_item}'] = True
+                if st.session_state.get(f'show_supplier_readiness_{selected_item}'):
+                    from supplier_readiness_core import supplier_waiting_list
+                    waiting = supplier_waiting_list(conn, selected_item)
+                    st.dataframe(pd.DataFrame(waiting), hide_index=True, use_container_width=True)
+                    cash_total = sum(r['Наличные'] for r in waiting)
+                    bank_total = sum(r['Банк'] for r in waiting)
+                    st.write(f'Учтено по листу: наличные **{cash_total:.2f} грн**, банк **{bank_total:.2f} грн**.')
+                    st.caption('Кассы приёма — место первоначального поступления денег, не их текущий остаток. Деньги могли быть переданы в C или израсходованы.')
+                    balances = [dict(r) for r in conn.execute('SELECT cashbox_code,cashbox_name,current_balance FROM cashboxes WHERE is_active=1 AND ABS(current_balance)>0.005 AND cashbox_code<>\'BANK\' ORDER BY cashbox_code')]
+                    from supplier_readiness_core import waiting_cash_by_account
+                    funding=waiting_cash_by_account(conn,selected_item)
+                    for balance in balances:
+                        balance['cashbox_code'] = cash_account_label(conn,balance['cashbox_code'])
+                        balance['Оплаты по выбранной позиции (при приёме)'] = funding.get(balance['cashbox_code'],0)
+                    st.markdown('**Текущие общие остатки касс**')
+                    if balances:
+                        st.dataframe(pd.DataFrame(balances), hide_index=True, use_container_width=True)
+                    else:
+                        st.info('Ненулевых остатков касс нет.')
+                    st.caption('Это общие остатки, не зарезервированные исключительно под пульты. Банковский остаток по этим платежам не вычисляется: показаны только поступления.')
+                    with st.form(f'form_supplier_order_{selected_item}'):
+                        st.markdown(f'**Сформировать заказ по состоянию на {date.today().isoformat()} — {paid_quantity} шт.**')
+                        st.caption('Включаются только оплаченные заказы вне партии. Закупочная сумма берётся из условий назначенного поставщика, не из оплат жителей.')
+                        confirm_document=st.checkbox('Подтверждаю состав партии и формирование документа')
+                        if st.form_submit_button('📄 Сформировать заказ для отправки поставщику',disabled=paid_quantity<=0):
+                            try:
+                                if not confirm_document or not session_actor.strip(): raise ValueError('Укажите оператора сессии и подтвердите состав.')
+                                from service_preorders_core import create_supplier_batch
+                                from supplier_procurement_core import create_purchase_document
+                                batch=create_supplier_batch(service_item_code=selected_item,actor_id=session_actor,conn=conn)
+                                document=create_purchase_document(conn,batch=batch,actor=session_actor)
+                                conn.commit(); st.rerun()
+                            except Exception as exc: conn.rollback(); st.error(str(exc))
                 announcement = (
                     f"📦 Нові пульти: зафіксовано попередній попит на {demand_quantity} шт. "
                     f"(намірів без підтвердженої оплати — {open_quantity} шт.; "
@@ -505,6 +545,16 @@ try:
                 st.caption("Объявление автоматически не публикуется.")
             else:
                 st.info("Минимальная партия ещё не задана для этой позиции.")
+            if table_exists(conn,'supplier_purchase_orders'):
+                from supplier_procurement_core import ensure_schema
+                ensure_schema(conn)
+                conn.commit()
+                documents=[dict(r) for r in conn.execute('SELECT * FROM supplier_purchase_orders WHERE service_item_code=? ORDER BY id DESC',(selected_item,))]
+                if documents:
+                    with st.expander('📤 Заказы поставщику — отправка и ответы',expanded=True):
+                        chosen=st.selectbox('Сформированный заказ',documents,format_func=lambda d:f"{d['document_number']} · {d['quantity']:g} шт. · {d['delivery_status']}",key=f'purchase_select_{selected_item}')
+                        from admin_console.utils.supplier_document_ui import show_supplier_document
+                        show_supplier_document(conn,chosen,session_actor)
             no_telegram = [r for r in selected_interests
                            if selected_item == "REMOTE_NEW"
                            if r["interest_status"] == "PAID_ORDER_CREATED"
@@ -543,16 +593,10 @@ try:
                                 except Exception as exc:
                                     st.error(str(exc))
                         context = order_preorder_context(int(row["service_order_id"]), conn=conn)
-                        manual_text = (
-                            f"✅ Оплату за нові пульти підтверджено. Кв. {row['apartment_number']}: "
-                            f"{int(row['quantity'])} шт., отримано {float(row['amount_due_snapshot']):.2f} грн. "
-                            + (f"Партія постачальника: {context['batch_number']}."
-                               if context["batch_number"] else
-                               f"Оплачений пакет зараз — {context['quantity']} із мінімальних {context['minimum']} шт. "
-                               "Замовлення постачальнику ще не оформлено."
-                               if context["minimum"] else
-                               "Мінімальна партія постачальника ще уточнюється.")
-                        )
+                        from service_order_notifications import paid_remote_confirmation_text
+                        manual_text = paid_remote_confirmation_text(
+                            row['apartment_number'], row['quantity'],
+                            row['amount_due_snapshot'], context)
                         st.code(manual_text, language=None)
             if table_exists(conn, "service_order_notifications"):
                 notice_rows = [dict(row) for row in conn.execute(

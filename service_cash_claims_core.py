@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from audit_logger import audit_log
 from cash_claim_points_core import active_collector_for_telegram, custodian_at
-from cashier_v2_core import calc_cashbox_balance, create_cash_receipt, insert_dynamic
+from cashier_v2_core import calc_cashbox_balance, create_cash_receipt, create_bank_payment, insert_dynamic, ensure_cash_telegram_fields
 from service_orders_core import create_service_order, get_conn, link_payment_to_order, text
 from service_preorders_core import PAID_ORDER_CREATED, get_service_interest, now_db
 
@@ -20,6 +20,7 @@ from service_preorders_core import PAID_ORDER_CREATED, get_service_interest, now
 def confirm_claim_cash(*, interest_id: int, receiving_point: str, actor: str,
                        evidence: str, actual_amount: float | None = None,
                        collector_telegram_id: int | None = None,
+                       transaction_date: str | None = None,
                        conn: sqlite3.Connection | None = None) -> dict:
     """Book actual cash and promote the interest only on an exact-price match.
 
@@ -56,9 +57,17 @@ def confirm_claim_cash(*, interest_id: int, receiving_point: str, actor: str,
             raise ValueError("Фактически полученная сумма должна быть положительной.")
         today = date.today().isoformat()
         claimed_point = text(claim["claimed_cashbox"]).upper()
-        if claimed_point.startswith("KAS") and receiving_point not in {claimed_point, "C"}:
+        if claimed_point.startswith("KAS") and receiving_point not in {claimed_point, "C", "BANK"}:
             raise ValueError("Заявлена передача другому сборщику; подтвердите её у указанного лица или в C.")
-        if receiving_point == "O":
+        if receiving_point == "BANK":
+            if collector_telegram_id is not None:
+                raise PermissionError('Банковскую оплату подтверждает админ по выписке, не мобильный сборщик.')
+            if not transaction_date:
+                raise ValueError('Укажите дату банковской операции из выписки.')
+            date.fromisoformat(transaction_date)
+            cashbox = 'BANK'
+            custodian_name = 'Банк (подтверждено выпиской)'
+        elif receiving_point == "O":
             if claimed_point != "O":
                 raise ValueError("На посту O можно подтвердить только заявление о передаче в O.")
             cashbox = "O"
@@ -107,7 +116,18 @@ def confirm_claim_cash(*, interest_id: int, receiving_point: str, actor: str,
             raise ValueError("Квартира намерения не найдена.")
         source = (f"Намерение {interest['interest_number']}; заявлено: {claimed_point}; "
                   f"фактически принял: {custodian_name}; основание: {evidence}")
-        receipt = create_cash_receipt(
+        if receiving_point == 'BANK':
+            receipt = create_bank_payment(conn.cursor(), apartment=dict(unit),
+                transaction_ref=evidence, transaction_date=transaction_date,
+                period_code=None, service={'service_code': interest['service_code'] or interest['service_item_code'],
+                'service_item_code': interest['service_item_code'], 'service_type': 'ONE_TIME'},
+                amount=amount, payer_text=source, operator_id=actor)
+            receipt['receipt_number'] = f'Банк: {evidence}'
+            ensure_cash_telegram_fields(conn.cursor())
+            conn.execute('UPDATE payments SET resident_account_id=?,telegram_user_id=? WHERE id=?',
+                         (interest['resident_account_id'],interest['telegram_user_id'],receipt['payment_id']))
+        else:
+          receipt = create_cash_receipt(
             conn.cursor(), apartment=dict(unit), cashbox_code=cashbox,
             receipt_date=today, period_code=None,
             service={"service_code": interest["service_code"] or interest["service_item_code"],
@@ -156,7 +176,7 @@ def confirm_claim_cash(*, interest_id: int, receiving_point: str, actor: str,
         )
         linked = link_payment_to_order(
             order_id=int(order["id"]), payment_id=int(receipt["payment_id"]),
-            amount=due, actor_id=None, note=f"Наличные по {interest['interest_number']}", conn=conn,
+            amount=due, actor_id=None, note=f"Оплата {cashbox} по {interest['interest_number']}", conn=conn,
         )
         from phone_barrier_access_service import promote_paid_phone_barrier_access_interest
         promote_paid_phone_barrier_access_interest(

@@ -1,0 +1,856 @@
+[
+  {
+    "old_path": "data/raw/video_recognition/Night_23-24.05.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/Night_23-24.05.2026.xlsx",
+    "source_file": "Night_23-24.05.2026.xlsx",
+    "bytes": 11488,
+    "sha256": "762cb7ac304b464b97bf7bafb63e5949873144226b3156aa198fb1576d130d0b"
+  },
+  {
+    "old_path": "data/raw/video_recognition/Parking_24A 2026 reports.zip",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/Parking_24A 2026 reports.zip",
+    "source_file": "Parking_24A 2026 reports.zip",
+    "bytes": 11587639,
+    "sha256": "dfe6bf1938a3b885f45b6f5c755d14013361eea2c79bff8cea541ab9ad352f53"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_01.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_01.07.2026.xlsx",
+    "source_file": "day_01.07.2026.xlsx",
+    "bytes": 7494,
+    "sha256": "bf46392ccff974c8b5b55602cf219d8767dc338f35449ce23b4447bbd8abd47d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_01.08.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_01.08.2026.xlsx",
+    "source_file": "day_01.08.2026.xlsx",
+    "bytes": 7663,
+    "sha256": "8893942c07eed33a7d36edda05a064082ad3ea69df194e40bff895dacb04feae"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_01_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_01_06_2026.xlsx",
+    "source_file": "day_01_06_2026.xlsx",
+    "bytes": 15915,
+    "sha256": "a88f7be3b459998101ffe8c47ca292ddfba935b23dfc61a799708dd1ebb63302"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_02.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_02.07.2026.xlsx",
+    "source_file": "day_02.07.2026.xlsx",
+    "bytes": 15617,
+    "sha256": "511ddf4cec854d61ee3a05ee24124da902639ecdd928f0c587e30cedda94e867"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_02_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_02_06_2026.xlsx",
+    "source_file": "day_02_06_2026.xlsx",
+    "bytes": 11914,
+    "sha256": "37ea013d34db6f1f7df6a8dd730040724a5ae17ead9a8f1b18a018152efdad7e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_03_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_03_06_2026.xlsx",
+    "source_file": "day_03_06_2026.xlsx",
+    "bytes": 12565,
+    "sha256": "e2dfba8b309524cded4b90b4a4aef79891afd881b4c2c514086219464a8907e5"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_04.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_04.07.2026.xlsx",
+    "source_file": "day_04.07.2026.xlsx",
+    "bytes": 15980,
+    "sha256": "c661f4d6bf6077b1361935c29d5039a2530e6aafec3cae26312e2b8c8ae3a8b1"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_04_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_04_06_2026.xlsx",
+    "source_file": "day_04_06_2026.xlsx",
+    "bytes": 10998,
+    "sha256": "21889b36e0d91e05f1cd9fdea85ec53112a44a8847a092b836c6b62bb1612a9d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_05.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_05.06.2026.xlsx",
+    "source_file": "day_05.06.2026.xlsx",
+    "bytes": 15476,
+    "sha256": "bf5f7b646d72795f4516fcf4e0f0bf241d95a5c2668237466c0765645e50cd64"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_05.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_05.07.2026.xlsx",
+    "source_file": "day_05.07.2026.xlsx",
+    "bytes": 16512,
+    "sha256": "4e9ec1c71214d5cb938c985c7bd59100d19dd0ac72a698f53775fecfedd53b11"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_06.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_06.06.2026.xlsx",
+    "source_file": "day_06.06.2026.xlsx",
+    "bytes": 10584,
+    "sha256": "c4f3449c5f8bf7816530db94e6ee4c1df418d6a41b3e54ace77ac5310c1fb027"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_06.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_06.07.2026.xlsx",
+    "source_file": "day_06.07.2026.xlsx",
+    "bytes": 16418,
+    "sha256": "f67e6911e0585ff86f1086b42c9eee982634eb09286e1ac531b5536f59011d1d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_07.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_07.06.2026.xlsx",
+    "source_file": "day_07.06.2026.xlsx",
+    "bytes": 7696,
+    "sha256": "447d5be92cec382557f31449c291a60b423502b89294357bdc14f3dfc6c4a9c2"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_07.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_07.07.2026.xlsx",
+    "source_file": "day_07.07.2026.xlsx",
+    "bytes": 7400,
+    "sha256": "b51019af66c9fca412ecabe6fbf1e04853d5ebe4a5d1ae5aecf99e2dfc973de4"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_08.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_08.07.2026.xlsx",
+    "source_file": "day_08.07.2026.xlsx",
+    "bytes": 15927,
+    "sha256": "905432e9d8e14ce6154821a1d429b4a0eedde8a84b3e9068b0217238be358916"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_09.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_09.06.2026.xlsx",
+    "source_file": "day_09.06.2026.xlsx",
+    "bytes": 7607,
+    "sha256": "e9a8c991284a55f864177f3fd161d5d47685db933c996ae5ee911ea42d644caf"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_10.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_10.06.2026.xlsx",
+    "source_file": "day_10.06.2026.xlsx",
+    "bytes": 7815,
+    "sha256": "712408d0f10509dbe59beab6d4678adec7542c1f5e53d5b65bdccd29a2028600"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_11.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_11.06.2026.xlsx",
+    "source_file": "day_11.06.2026.xlsx",
+    "bytes": 10971,
+    "sha256": "88bebbf793746edee0041011d408c3483f37c24a02ccdf05954ab9e29d097938"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_11.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_11.07.2026.xlsx",
+    "source_file": "day_11.07.2026.xlsx",
+    "bytes": 8081,
+    "sha256": "33fe865a046f853ebea805aefdc6e11dd667344ccd8e8de0033e143c9a2b4f0b"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_13.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_13.06.2026.xlsx",
+    "source_file": "day_13.06.2026.xlsx",
+    "bytes": 7596,
+    "sha256": "24a709710ee7471e4430be654d2c3c7746f678d7a161c9a36e1d5b92b5edc9cc"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_13.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_13.07.2026.xlsx",
+    "source_file": "day_13.07.2026.xlsx",
+    "bytes": 7870,
+    "sha256": "b236b570f9d4d7ab3261c6bb457a88dde7d3d1e742c5f6d0560f8c86197520e4"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_14.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_14.06.2026.xlsx",
+    "source_file": "day_14.06.2026.xlsx",
+    "bytes": 16354,
+    "sha256": "4749a271afb45ee9256e3685e87b9c4913a993611f00fcfd52454fb96dfe1a3e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_14.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_14.07.2026.xlsx",
+    "source_file": "day_14.07.2026.xlsx",
+    "bytes": 7262,
+    "sha256": "92952f8dc3c75c44b5e6abfb8694dd9a94623bc9a91afb6a733ae6060329fd64"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_15.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_15.06.2026.xlsx",
+    "source_file": "day_15.06.2026.xlsx",
+    "bytes": 7793,
+    "sha256": "6469100c5d673109b94cbb52ffc413d768fd3a4532d91fc8d8a5b9d285147054"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_16.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_16.06.2026.xlsx",
+    "source_file": "day_16.06.2026.xlsx",
+    "bytes": 7995,
+    "sha256": "ee0cce7d234ac2f6d9948d00036f14da6e1cb6170a98b5bef4ed505ee9b88eb1"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_16.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_16.07.2026.xlsx",
+    "source_file": "day_16.07.2026.xlsx",
+    "bytes": 7830,
+    "sha256": "4c7b3ba42f934d02a7a579ce9e71cec6c7246bafe4ecfe9d897e4ab145bbac88"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_17.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_17.06.2026.xlsx",
+    "source_file": "day_17.06.2026.xlsx",
+    "bytes": 7847,
+    "sha256": "322fdda23a424e6493f31c51574acf65dfe628eaa3187053d2ee3158a0b5f1ea"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_17.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_17.07.2026.xlsx",
+    "source_file": "day_17.07.2026.xlsx",
+    "bytes": 7703,
+    "sha256": "4cde4e3107b1bbafb9d45e39d4c20620a18e5bf989421ce5a6ecd14645de2b7a"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_18.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_18.07.2026.xlsx",
+    "source_file": "day_18.07.2026.xlsx",
+    "bytes": 7740,
+    "sha256": "b576dbee48bd123245a851338847264e9ee3439a026890d61fc8323cf10b7620"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_19.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_19.06.2026.xlsx",
+    "source_file": "day_19.06.2026.xlsx",
+    "bytes": 7490,
+    "sha256": "e720c671448d2a24d275a91c7392ca0d290551804cc7e7e03a8a7bb104815c37"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_19.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_19.07.2026.xlsx",
+    "source_file": "day_19.07.2026.xlsx",
+    "bytes": 7869,
+    "sha256": "639deb4dbb5288228391a803260270efd7ded0ce36ca452f208c0d28a3ddd4bb"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_20.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_20.06.2026.xlsx",
+    "source_file": "day_20.06.2026.xlsx",
+    "bytes": 7668,
+    "sha256": "3766efc48707bffea3cffff66644c347e1bacc5a1d946b27e5576c1f4d0cc6e7"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_20.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_20.07.2026.xlsx",
+    "source_file": "day_20.07.2026.xlsx",
+    "bytes": 7691,
+    "sha256": "16e5bcd5c4b888b1a7cfca4ae79a840a34a4c20526a1761736325f61b0d3707f"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_21.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_21.06.2026.xlsx",
+    "source_file": "day_21.06.2026.xlsx",
+    "bytes": 7877,
+    "sha256": "2c33415564d34dae91847bc5506a6d43d1d04ef5fcaea7f7af9745b18fc52e29"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_21.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_21.07.2026.xlsx",
+    "source_file": "day_21.07.2026.xlsx",
+    "bytes": 7493,
+    "sha256": "ac948e068b18f1eb293bb2a51b23cba33a8847d4af2cb8543d7bd26e1ea53e2e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_22.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_22.06.2026.xlsx",
+    "source_file": "day_22.06.2026.xlsx",
+    "bytes": 8125,
+    "sha256": "0158334c98ce62fba69aabb3c771c275360a9a4b74079321af800240cc87434c"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_22.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_22.07.2026.xlsx",
+    "source_file": "day_22.07.2026.xlsx",
+    "bytes": 7308,
+    "sha256": "0b877fb17e22a51ba82d348a26c51550ef1f0f117458a96222f6cd8cc7a7a127"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_23.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_23.06.2026.xlsx",
+    "source_file": "day_23.06.2026.xlsx",
+    "bytes": 8052,
+    "sha256": "986da6c53eb21b990957d7252830223cebe85a3aa02e22298f6100aa79b7d67a"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_23.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_23.07.2026.xlsx",
+    "source_file": "day_23.07.2026.xlsx",
+    "bytes": 7934,
+    "sha256": "f884f804fae5681b118c23c8a45c343f0c045fc6f178a21c88d0a01807b50ba9"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_24.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_24.06.2026.xlsx",
+    "source_file": "day_24.06.2026.xlsx",
+    "bytes": 7113,
+    "sha256": "d2eb55d159a1b11b3293c7fe2cc577b591997a259da8912f322dcedacd991479"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_24.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_24.07.2026.xlsx",
+    "source_file": "day_24.07.2026.xlsx",
+    "bytes": 7370,
+    "sha256": "123212086576971eef1c24c44845c19054f4578e811d10642e2a1743adc63244"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_24_05_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_24_05_2026.xlsx",
+    "source_file": "day_24_05_2026.xlsx",
+    "bytes": 6839,
+    "sha256": "a0775625402f737ef363cd83d24c2d1f9806260f78583ef3cef3aa954deb0645"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_25.07.2026_part1.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_25.07.2026_part1.xlsx",
+    "source_file": "day_25.07.2026_part1.xlsx",
+    "bytes": 6830,
+    "sha256": "417c6ffd0eae8f1224d2c14a795e996bfdaef7e16ba8e19c79eebcff6ae5ee2e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_26.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_26.06.2026.xlsx",
+    "source_file": "day_26.06.2026.xlsx",
+    "bytes": 15645,
+    "sha256": "d55c8907b282699c8d2e2fcc373583d3d581b73d2dd0f4f7387f2d8407c7fd41"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_26.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_26.07.2026.xlsx",
+    "source_file": "day_26.07.2026.xlsx",
+    "bytes": 8028,
+    "sha256": "b5bbad321a100111de2ebe64acf30b6eaf1574686c3bb940e3ab240b5a2fd894"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_27.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_27.06.2026.xlsx",
+    "source_file": "day_27.06.2026.xlsx",
+    "bytes": 16269,
+    "sha256": "4f77d19783604838af705ed908f75c37bfdce7c04b734f3d38763264ef4188b7"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_27.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_27.07.2026.xlsx",
+    "source_file": "day_27.07.2026.xlsx",
+    "bytes": 7414,
+    "sha256": "8ec005ef26dd0ec2e87caf1c1fceba3fa31ea05406dae7aa7e4a3d4beb043478"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_28.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_28.06.2026.xlsx",
+    "source_file": "day_28.06.2026.xlsx",
+    "bytes": 7986,
+    "sha256": "02813309299c7de2786faa61d6a09ba57adf3bef349592810aeb77b8a49bb47c"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_29.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_29.06.2026.xlsx",
+    "source_file": "day_29.06.2026.xlsx",
+    "bytes": 16472,
+    "sha256": "c8f83eeab8c7e3ff537126516315de0679603cb910219e9084272a41390e7821"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_29_05_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_29_05_2026.xlsx",
+    "source_file": "day_29_05_2026.xlsx",
+    "bytes": 7289,
+    "sha256": "2c2d65f3095b9394a002c258b5fb94a55d38a26de2ba54af65b2c64a8b600e53"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_30.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_30.06.2026.xlsx",
+    "source_file": "day_30.06.2026.xlsx",
+    "bytes": 7917,
+    "sha256": "fefd885686c72a6d6dbcd303aeebd555451a4c817ef747fcad497e53465e84dd"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_30.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_30.07.2026.xlsx",
+    "source_file": "day_30.07.2026.xlsx",
+    "bytes": 7724,
+    "sha256": "87066c8933e282b3448ddc1276507a6904077d81623a49bc2815a391b230d360"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_31.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_31.07.2026.xlsx",
+    "source_file": "day_31.07.2026.xlsx",
+    "bytes": 7525,
+    "sha256": "a4ce22d421cc3c67675521182737bf6f3dc8b0e4b2c56b64a13dc2bbf510ca0e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/day_31_05_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/day_31_05_2026.xlsx",
+    "source_file": "day_31_05_2026.xlsx",
+    "bytes": 15456,
+    "sha256": "01e2dfd91c099c768d239d8d437500ab4ab780bec32d3ad15a47b3b251aaaf53"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_01.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_01.07.2026.xlsx",
+    "source_file": "night_01.07.2026.xlsx",
+    "bytes": 8472,
+    "sha256": "e787b41708595b0ac0b1a6d5b8b27ad6411ec465077660e9ab85024d1532d05b"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_01.08.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_01.08.2026.xlsx",
+    "source_file": "night_01.08.2026.xlsx",
+    "bytes": 8085,
+    "sha256": "51514756510595b988caf7ff504628444134ca8f4575cf8a3734e0182f06a2ed"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_01_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_01_06_2026.xlsx",
+    "source_file": "night_01_06_2026.xlsx",
+    "bytes": 15732,
+    "sha256": "022cd76fa5c8c8a996289ac7e0e7b5e296e9670f52aa6aaff8584be8efb5de1b"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_02.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_02.07.2026.xlsx",
+    "source_file": "night_02.07.2026.xlsx",
+    "bytes": 8418,
+    "sha256": "b2250d45a1d36e3b8f4dc56ed1ec7c2c127d07464683baa650e272c27ca2707e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_02.08.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_02.08.2026.xlsx",
+    "source_file": "night_02.08.2026.xlsx",
+    "bytes": 7774,
+    "sha256": "c60e0fd35db582e15f13cb9f6c3e6bc81a41086979970ebc7abf414c6e27c28d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_02_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_02_06_2026.xlsx",
+    "source_file": "night_02_06_2026.xlsx",
+    "bytes": 13035,
+    "sha256": "9c99dfe644fede95401c68ac0d0a5e8fe9ccb705fd6482a78a5ec4f58c227552"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_03.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_03.06.2026.xlsx",
+    "source_file": "night_03.06.2026.xlsx",
+    "bytes": 8489,
+    "sha256": "71c9803957b6c3d4300b85d6a39d7683ac152ebcc4c5b51f97fbcf72f839723f"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_03.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_03.07.2026.xlsx",
+    "source_file": "night_03.07.2026.xlsx",
+    "bytes": 8414,
+    "sha256": "c609c9b0a413dca64fe2403f9b32ae12c6bc46ffcf2afd712ee76bf1f708d3d3"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_04.08.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_04.08.2026.xlsx",
+    "source_file": "night_04.08.2026.xlsx",
+    "bytes": 8560,
+    "sha256": "70e8f9fc45a86badca8e77bd3178b7f66d12a7c974945711b705ea46cc1bbb4b"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_04_06_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_04_06_2026.xlsx",
+    "source_file": "night_04_06_2026.xlsx",
+    "bytes": 16585,
+    "sha256": "1a7129928be95e9f45a6f0fc748f50107bd2ef13fc2c74d00711fa79da842fdb"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_05.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_05.06.2026.xlsx",
+    "source_file": "night_05.06.2026.xlsx",
+    "bytes": 11790,
+    "sha256": "50935cb0831cd6c2ccf5e57931df42645a968a2e5a43faf66b95e4547544d5fc"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_05.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_05.07.2026.xlsx",
+    "source_file": "night_05.07.2026.xlsx",
+    "bytes": 8111,
+    "sha256": "0233e8c8f41c4affb4c8e102a6a962d12227e0578271d8e4d43fe3f58645f507"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_05.08.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_05.08.2026.xlsx",
+    "source_file": "night_05.08.2026.xlsx",
+    "bytes": 8044,
+    "sha256": "9d6e15579d7da12b89bb6520f3978f8921ffdd1b647068cad447ea080c69e773"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_06.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_06.06.2026.xlsx",
+    "source_file": "night_06.06.2026.xlsx",
+    "bytes": 8022,
+    "sha256": "ae92605930ea9efa8e75199a7d39f27a5b44aa2fea13efd9c115d7360138ae09"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_06.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_06.07.2026.xlsx",
+    "source_file": "night_06.07.2026.xlsx",
+    "bytes": 8533,
+    "sha256": "cc7d29189a359bc921d2a9ef03a5e149767b21d7dcf1f027ff887194e4dcfa28"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_06.08.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_06.08.2026.xlsx",
+    "source_file": "night_06.08.2026.xlsx",
+    "bytes": 8461,
+    "sha256": "6eeeaaeaab74c1f0e2d55c88b51dcf1543dbd1333ac0876262437fdf58f0a8b0"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_07.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_07.06.2026.xlsx",
+    "source_file": "night_07.06.2026.xlsx",
+    "bytes": 8049,
+    "sha256": "e5c0cedc2fb427b3281ecbd08d128158d09788d87723b316cb530035f7b3a4ea"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_07.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_07.07.2026.xlsx",
+    "source_file": "night_07.07.2026.xlsx",
+    "bytes": 8541,
+    "sha256": "2d863cc502b9a8e5e2f6aee070bc65501f0ed3157cbecd5630a5d0e59521ab99"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_08.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_08.06.2026.xlsx",
+    "source_file": "night_08.06.2026.xlsx",
+    "bytes": 8618,
+    "sha256": "f4e3641fa94ae25828dce6bb9b3f3b69221cfbc9cba9a2925af27c22bfb069c3"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_09.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_09.06.2026.xlsx",
+    "source_file": "night_09.06.2026.xlsx",
+    "bytes": 8641,
+    "sha256": "4bf2b8a2e76df3065d9654dd62feb8b6aa65b794875530bab52b014eeaa8f057"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_09.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_09.07.2026.xlsx",
+    "source_file": "night_09.07.2026.xlsx",
+    "bytes": 8474,
+    "sha256": "66515522aada849c41cd7b571f3caadca935c5510d0d9fa260395db4831c3f32"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_10.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_10.06.2026.xlsx",
+    "source_file": "night_10.06.2026.xlsx",
+    "bytes": 8508,
+    "sha256": "594347504f45dbd1e91076cb21ad7fbeebe833644744a0c0b25e22a64c4b397d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_10.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_10.07.2026.xlsx",
+    "source_file": "night_10.07.2026.xlsx",
+    "bytes": 8517,
+    "sha256": "319a755562b64557ea469d9123e311cd14a87fad5c16b5f1bb5480f470becb13"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_11.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_11.06.2026.xlsx",
+    "source_file": "night_11.06.2026.xlsx",
+    "bytes": 8334,
+    "sha256": "b8d85ee80cd27df3cc383fb97533759e65c9f549cc8f95e4ef56b9a2029c6a0f"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_11.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_11.07.2026.xlsx",
+    "source_file": "night_11.07.2026.xlsx",
+    "bytes": 8522,
+    "sha256": "508dcee8299a56c583aa0eba1df91ac8fbfc7cb26fb24979657e64f620f85e40"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_12.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_12.06.2026.xlsx",
+    "source_file": "night_12.06.2026.xlsx",
+    "bytes": 7366,
+    "sha256": "824ea3a409f4a6e32137d2fc999896824d9ebdee3c73bf46dceac7f297b8d443"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_12.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_12.07.2026.xlsx",
+    "source_file": "night_12.07.2026.xlsx",
+    "bytes": 8483,
+    "sha256": "e6ada5cc5e4f8d5f3687bbe5048c6e41b93ea2cf28577e96d3f79c7f0359825d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_13.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_13.06.2026.xlsx",
+    "source_file": "night_13.06.2026.xlsx",
+    "bytes": 8369,
+    "sha256": "cf799ca7371dd8ba0795be3b30686b79ab8fb334c79f33ba21c11640b899a96a"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_13.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_13.07.2026.xlsx",
+    "source_file": "night_13.07.2026.xlsx",
+    "bytes": 8556,
+    "sha256": "8a4b60426b687e62dcaee4ae427861cb5449e5224adb0dceb2e8f93fb8595f5b"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_14.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_14.06.2026.xlsx",
+    "source_file": "night_14.06.2026.xlsx",
+    "bytes": 7777,
+    "sha256": "c3687c4061dd21cfa68298cc56bb4f7bcbdb338ea441e231b447caeba1739f59"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_14.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_14.07.2026.xlsx",
+    "source_file": "night_14.07.2026.xlsx",
+    "bytes": 8769,
+    "sha256": "0ba7d42cf6f553b9bec09fdee7e12d62a87032af7f58192c01c7a5b01dcc4427"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_15.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_15.06.2026.xlsx",
+    "source_file": "night_15.06.2026.xlsx",
+    "bytes": 8018,
+    "sha256": "14eacc7255256853350611cedeb1804035ffd099f453f96308ff8790ffe7b656"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_15.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_15.07.2026.xlsx",
+    "source_file": "night_15.07.2026.xlsx",
+    "bytes": 8815,
+    "sha256": "9da40e2dcaaa2f9c8af85a2b7b53339193f57d2b1a8368c9e697019cc93cdcb4"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_16.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_16.06.2026.xlsx",
+    "source_file": "night_16.06.2026.xlsx",
+    "bytes": 8103,
+    "sha256": "d99d53ced859616898ae14c5590028aa35a19e033ead2ccbbac2d05ef791e515"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_16.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_16.07.2026.xlsx",
+    "source_file": "night_16.07.2026.xlsx",
+    "bytes": 13138,
+    "sha256": "a2033b31f337ebc06447e90202c32db0f066d9c8ca7fa05fc0e3e60f046df836"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_17.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_17.06.2026.xlsx",
+    "source_file": "night_17.06.2026.xlsx",
+    "bytes": 8306,
+    "sha256": "21fd0d629dfb2792228ddcf92c1903061e1b2bee7d71c5dab0f17cf3a21492c2"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_17.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_17.07.2026.xlsx",
+    "source_file": "night_17.07.2026.xlsx",
+    "bytes": 8939,
+    "sha256": "00b256baf9b0850389a79220c00d0aa76f10e8fd24c5d9a7929305b59ba085f0"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_18.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_18.06.2026.xlsx",
+    "source_file": "night_18.06.2026.xlsx",
+    "bytes": 8088,
+    "sha256": "71e2f63ac39eec28f1ba7a3cdea8cbe2d5fc388197aabb000279279e6b416c7c"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_18.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_18.07.2026.xlsx",
+    "source_file": "night_18.07.2026.xlsx",
+    "bytes": 9602,
+    "sha256": "766d10f6a68b8e98c32c424ec6836a7afa35ffa6bc2ca0d56720ae2cf7f5307e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_19.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_19.06.2026.xlsx",
+    "source_file": "night_19.06.2026.xlsx",
+    "bytes": 7859,
+    "sha256": "172735e8f6ddcc05f658f0aa804275494e422e2e9b0e4d4f2e05643d2b19bf21"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_19.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_19.07.2026.xlsx",
+    "source_file": "night_19.07.2026.xlsx",
+    "bytes": 8491,
+    "sha256": "ac8d5705f9cc2a8eba0afbcd2f7e91aca0ce4375c480b78a1d52f982f8fda492"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_20.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_20.06.2026.xlsx",
+    "source_file": "night_20.06.2026.xlsx",
+    "bytes": 8330,
+    "sha256": "15194e47f642e08cead94c1c63940d01e0125f091c00bf9cc99cb617a7a9430c"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_20.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_20.07.2026.xlsx",
+    "source_file": "night_20.07.2026.xlsx",
+    "bytes": 8820,
+    "sha256": "d92142a88cfc9dfcd3a8668e98257f42b717491955852a5bbbba901551840729"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_21.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_21.06.2026.xlsx",
+    "source_file": "night_21.06.2026.xlsx",
+    "bytes": 8030,
+    "sha256": "1054a02c20bce55665502603fad16810f90d1e2594ce068915695b6653efa7f2"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_21.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_21.07.2026.xlsx",
+    "source_file": "night_21.07.2026.xlsx",
+    "bytes": 8907,
+    "sha256": "9a1b3fde8c45e22a19bf99b707bc5501bde58af4349e173fa37f0e332a7a228e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_22.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_22.06.2026.xlsx",
+    "source_file": "night_22.06.2026.xlsx",
+    "bytes": 8392,
+    "sha256": "12d3ad69e44b4daa92888beb012b1bc22dfc5313a8ff69c9493e1440b82fe35d"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_22.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_22.07.2026.xlsx",
+    "source_file": "night_22.07.2026.xlsx",
+    "bytes": 8359,
+    "sha256": "d32fbab7a940d0fc96e9906cfda0612a0f9fff9118c6ab3b3b8f8dabd4d68441"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_23.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_23.06.2026.xlsx",
+    "source_file": "night_23.06.2026.xlsx",
+    "bytes": 8699,
+    "sha256": "663fdb8e331e4841e7ea4549afe68911f04db7e18869269f16d1cf892de66903"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_23.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_23.07.2026.xlsx",
+    "source_file": "night_23.07.2026.xlsx",
+    "bytes": 8597,
+    "sha256": "a4fb64a6d9dea93691ad4649d2f21c2e93fc2dde9e7a564d26e0866737e5dad8"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_24.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_24.06.2026.xlsx",
+    "source_file": "night_24.06.2026.xlsx",
+    "bytes": 16938,
+    "sha256": "7e44a1d6806e629565f848c6b04a5d815b5e9d23ad09960747ba8664a20171f0"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_24.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_24.07.2026.xlsx",
+    "source_file": "night_24.07.2026.xlsx",
+    "bytes": 8969,
+    "sha256": "ef7015064d14c9ea0b1153e3b8c4eecea02f7c8f10303eb3b10ae57648538f00"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_25.05.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_25.05.2026.xlsx",
+    "source_file": "night_25.05.2026.xlsx",
+    "bytes": 8330,
+    "sha256": "a6ff16576d478b231a5bfaaec2f84db74a925207dabbcc6441c2323dbbde969e"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_25.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_25.06.2026.xlsx",
+    "source_file": "night_25.06.2026.xlsx",
+    "bytes": 8674,
+    "sha256": "fd8d433772c07bc19fde316c9b2732bdc0c0d7b9da1df852dc26e1c718da97f1"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_25.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_25.07.2026.xlsx",
+    "source_file": "night_25.07.2026.xlsx",
+    "bytes": 8456,
+    "sha256": "3817d750b9a34f23f4377858c2b6e27921e14d371803767786563d191af08b9a"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_26.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_26.06.2026.xlsx",
+    "source_file": "night_26.06.2026.xlsx",
+    "bytes": 8138,
+    "sha256": "9956a61f7cd01944b988a34573ec398de28ff80c7fd2adf6bf1bb4344a291459"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_26.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_26.07.2026.xlsx",
+    "source_file": "night_26.07.2026.xlsx",
+    "bytes": 8632,
+    "sha256": "a58416921e2fe4be3159a98ad5cb13c98f2b15a4e20cf5b9f7cc37013b0b25a4"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_26_05_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_26_05_2026.xlsx",
+    "source_file": "night_26_05_2026.xlsx",
+    "bytes": 13053,
+    "sha256": "35df5464196be8c704e426193955764167bc408b7aad73d19f22a171975ce94c"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_27.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_27.06.2026.xlsx",
+    "source_file": "night_27.06.2026.xlsx",
+    "bytes": 8353,
+    "sha256": "801cb27eeb2d470b5cd3ed62752ccc495f2859895e07df67d1c6b259c8ebb903"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_27.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_27.07.2026.xlsx",
+    "source_file": "night_27.07.2026.xlsx",
+    "bytes": 8667,
+    "sha256": "4b428ba8aafb4ca9a9caac0c64385a38657e73f0c541dbc4ec7c9621b0653356"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_28.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_28.06.2026.xlsx",
+    "source_file": "night_28.06.2026.xlsx",
+    "bytes": 8248,
+    "sha256": "90b8e9d9b742c7ff6fa54b82b7bbb7057684b832f7087c98d9fccd85a4a7b745"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_29.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_29.06.2026.xlsx",
+    "source_file": "night_29.06.2026.xlsx",
+    "bytes": 8130,
+    "sha256": "d6b9a89e9149805102938be139f1b12ae3c3f871093e1e7c346973fba74b892a"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_30.06.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_30.06.2026.xlsx",
+    "source_file": "night_30.06.2026.xlsx",
+    "bytes": 8859,
+    "sha256": "5fce25cf46d6e94e4139a19d520dd46eaecc8b8a9f5f09f0ac82d8cdf016bf11"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_30.07.2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_30.07.2026.xlsx",
+    "source_file": "night_30.07.2026.xlsx",
+    "bytes": 8091,
+    "sha256": "7c446067d47359a6fe185e420c592a162780706a713374fb2d92bfffe0a21108"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_30_05_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_30_05_2026.xlsx",
+    "source_file": "night_30_05_2026.xlsx",
+    "bytes": 17042,
+    "sha256": "37eb1e3f6dd08651b7eb2cd5210f75f354c96ea2f0978364fe18e7401a1ff142"
+  },
+  {
+    "old_path": "data/raw/video_recognition/night_31_05_2026.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/night_31_05_2026.xlsx",
+    "source_file": "night_31_05_2026.xlsx",
+    "bytes": 15797,
+    "sha256": "c2cb2cd68a5336693ff0659bc11e093cbb4a6a57b3b2fb35d4158d8f3b9a8eec"
+  },
+  {
+    "old_path": "data/raw/video_recognition/vehicle_data_day_31_05_2026_video_part2_only.xlsx",
+    "new_path": "data/raw/video_recognition/archive/2026-09-26/vehicle_data_day_31_05_2026_video_part2_only.xlsx",
+    "source_file": "vehicle_data_day_31_05_2026_video_part2_only.xlsx",
+    "bytes": 6255,
+    "sha256": "54354c89f77218cc7a2ed777fdf8374b521dd1ae244386577d922b3f4080f3f9"
+  }
+]
