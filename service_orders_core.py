@@ -1121,6 +1121,7 @@ def create_remote_asset(
     apartment_id: int | None = None,
     apartment_number: str = "",
     actor_id: int | str | None = None,
+    post_code: str = 'O',
     note: str = "",
     conn: sqlite3.Connection | None = None,
 ) -> dict:
@@ -1166,11 +1167,12 @@ def create_remote_asset(
                 apartment_id, apartment_number, post_code,
                 actor_id, note, created_at
             )
-            VALUES (?, 'ASSET_REGISTERED', ?, ?, ?, 'O', ?, ?, ?)
+            VALUES (?, 'ASSET_REGISTERED', ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 asset_id, text(inventory_status), apartment_id,
                 text(apartment_number) or None,
+                text(post_code) or 'O',
                 str(actor_id) if actor_id is not None else "system",
                 text(note) or None, now_db(),
             ),

@@ -21,11 +21,25 @@ from service_interest_intake_core import record_external_interest, record_cash_h
 from resident_identity_core import apartment_telegram_accounts, link_interest_telegram_recipient
 from supplier_terms_core import current_supplier_minimum, order_preorder_context, set_supplier_minimum
 from cash_claim_points_core import cash_account_label
+import supplier_procurement_core
+if not hasattr(supplier_procurement_core,'LIFECYCLE_RESPONSE_NOTIFICATIONS'):
+    from importlib import reload
+    reload(supplier_procurement_core)
+import supplier_readiness_core
+
+# Streamlit reruns the page but may retain an older imported helper module.
+# Refresh only when that cached module predates the required API.
+if not hasattr(supplier_readiness_core, 'waiting_cash_by_account'):
+    from importlib import reload
+    supplier_readiness_core = reload(supplier_readiness_core)
+supplier_waiting_list = supplier_readiness_core.supplier_waiting_list
+waiting_cash_by_account = supplier_readiness_core.waiting_cash_by_account
 
 
 st.set_page_config(page_title="Исполнение заказов", page_icon="📦", layout="wide")
 st.title("📦 Исполнение заказов")
-session_actor = st.sidebar.text_input("Оператор этой сессии", key="order_fulfillment_actor")
+from admin_console.utils.session_actor import session_actor as get_session_actor
+session_actor = get_session_actor()
 st.sidebar.caption("Админ-консоль пока без персонального входа. Это имя записывается в журнал действий.")
 
 
@@ -500,7 +514,6 @@ try:
                 if st.button('📋 Показать лист ожидания и состояние денег', key=f'supplier_readiness_{selected_item}'):
                     st.session_state[f'show_supplier_readiness_{selected_item}'] = True
                 if st.session_state.get(f'show_supplier_readiness_{selected_item}'):
-                    from supplier_readiness_core import supplier_waiting_list
                     waiting = supplier_waiting_list(conn, selected_item)
                     st.dataframe(pd.DataFrame(waiting), hide_index=True, use_container_width=True)
                     cash_total = sum(r['Наличные'] for r in waiting)
@@ -508,7 +521,6 @@ try:
                     st.write(f'Учтено по листу: наличные **{cash_total:.2f} грн**, банк **{bank_total:.2f} грн**.')
                     st.caption('Кассы приёма — место первоначального поступления денег, не их текущий остаток. Деньги могли быть переданы в C или израсходованы.')
                     balances = [dict(r) for r in conn.execute('SELECT cashbox_code,cashbox_name,current_balance FROM cashboxes WHERE is_active=1 AND ABS(current_balance)>0.005 AND cashbox_code<>\'BANK\' ORDER BY cashbox_code')]
-                    from supplier_readiness_core import waiting_cash_by_account
                     funding=waiting_cash_by_account(conn,selected_item)
                     for balance in balances:
                         balance['cashbox_code'] = cash_account_label(conn,balance['cashbox_code'])
@@ -526,9 +538,12 @@ try:
                         if st.form_submit_button('📄 Сформировать заказ для отправки поставщику',disabled=paid_quantity<=0):
                             try:
                                 if not confirm_document or not session_actor.strip(): raise ValueError('Укажите оператора сессии и подтвердите состав.')
-                                from service_preorders_core import create_supplier_batch
+                                from admin_console.utils.supplier_batch_adapter import create_local_supplier_batch
                                 from supplier_procurement_core import create_purchase_document
-                                batch=create_supplier_batch(service_item_code=selected_item,actor_id=session_actor,conn=conn)
+                                import getpass
+                                batch=create_local_supplier_batch(service_item_code=selected_item,
+                                    actor_id=f'local_mac:{getpass.getuser()}',
+                                    note=f'Оператор сессии: {session_actor}',conn=conn)
                                 document=create_purchase_document(conn,batch=batch,actor=session_actor)
                                 conn.commit(); st.rerun()
                             except Exception as exc: conn.rollback(); st.error(str(exc))

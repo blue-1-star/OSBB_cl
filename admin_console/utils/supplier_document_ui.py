@@ -12,9 +12,12 @@ def show_supplier_document(conn, document, actor):
     st.download_button('📄 Скачать заказ для отправки',document['document_text'],file_name=f"{document['document_number']}.txt",key=f'{key}_download')
     if document['delivery_status'] != 'SENT':
         st.caption('Автоматический канал пока не подключён. Отправьте документ вручную и зафиксируйте факт; эта кнопка сама сообщение поставщику не отправляет.')
+        supplier=conn.execute('SELECT name,email,phone FROM suppliers WHERE id=?',(document['supplier_id'],)).fetchone()
+        st.write(f"Поставщик: **{supplier['name'] if supplier else 'не найден'}**")
+        channel=st.selectbox('Как отправлен', ['EMAIL','TELEGRAM','VIBER','PAPER','OTHER'],key=f'{key}_channel')
+        default_destination=(supplier['email'] if channel=='EMAIL' else supplier['phone'] if channel=='VIBER' else supplier['name'] if channel=='PAPER' else '') if supplier else ''
         with st.form(f'{key}_dispatch'):
-            channel=st.selectbox('Как отправлен', ['EMAIL','TELEGRAM','VIBER','PAPER','OTHER'])
-            destination=st.text_input('Адресат / контакт поставщика')
+            destination=st.text_input('Адресат / контакт поставщика',value=default_destination or '',key=f'{key}_destination_{channel}')
             evidence=st.text_input('Ссылка / ID сообщения / подтверждение передачи')
             confirmed=st.checkbox('Документ действительно отправлен поставщику')
             if st.form_submit_button('📤 Зафиксировать отправку заказа'):
@@ -28,10 +31,11 @@ def show_supplier_document(conn, document, actor):
             received=st.date_input('Дата ответа',max_value=date.today())
             response=st.text_area('Ответ поставщика')
             quantity=st.number_input('Подтверждено к поставке, шт.',min_value=1,value=int(document['quantity']))
-            expected=st.date_input('Ожидаемая дата поставки')
+            expected=st.date_input('Дата поставки, сообщённая поставщиком',value=None)
             reference=st.text_input('Ссылка на ответ / номер подтверждения')
             if st.form_submit_button('Сохранить ответ поставщика'):
                 try:
+                    if expected is None: raise ValueError('Укажите дату из ответа поставщика; автоматически она не назначается.')
                     record_supplier_response(conn,document_id=document['id'],actor=actor,response=response,quantity=quantity,expected_date=expected.isoformat(),received_date=received.isoformat(),reference=reference)
                     conn.commit(); st.rerun()
                 except Exception as exc: conn.rollback(); st.error(str(exc))
@@ -40,4 +44,6 @@ def show_supplier_document(conn, document, actor):
             latest=replies[0]
             st.info(f"Поставка {latest['quantity']:g} шт. ожидается {latest['expected_delivery_date']}.")
             st.dataframe(pd.DataFrame(replies),hide_index=True,width='stretch')
-    st.caption('К оплате — закупочная сумма документа. Оплата поставщику и фактическое поступление товаров здесь не проводятся.')
+    st.caption('К оплате — закупочная сумма документа. Получение партии не требует предварительной оплаты поставщику.')
+    from admin_console.utils.supplier_lifecycle_ui import show_lifecycle
+    show_lifecycle(conn,document,actor)

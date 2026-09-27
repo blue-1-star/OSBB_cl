@@ -8,6 +8,7 @@
 
 import sys
 import platform
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -83,6 +84,15 @@ class ProjectPaths:
         # ДОКУМЕНТАЦИЯ
         # ==================================================
         self.DOCS_DIR = self.PROJECT_ROOT / "Docs"
+        # OSBB originals are separate from developer documentation. Configure
+        # a local/synced directory or a mounted cloud volume on each host.
+        # No guessed OneDrive path and no directory creation during import.
+        documents_root = os.environ.get("OSBB_DOCUMENTS_ROOT", "").strip()
+        onedrive_root = os.environ.get('OneDrive', '').strip()
+        if not onedrive_root:
+            onedrive_root = str(self.home / 'OneDrive')
+        self.OSBB_DOCUMENTS_ROOT = (Path(documents_root).expanduser() if documents_root
+                                    else Path(onedrive_root) / 'OSBB' / 'Docs')
 
     def ensure_directories(self):
         """Создаёт недостающие рабочие папки (не трогает git/секреты)."""

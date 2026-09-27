@@ -12,6 +12,7 @@ import sqlite3
 
 
 LOCATIONS = {"CS": "Центральный склад", "O": "Пост охраны O", "K": "Консьерж K"}
+LOCATIONS.update({f'K{i}':f'Консьерж {i}' for i in range(1,7)})
 
 
 def now_db() -> str:
@@ -55,6 +56,9 @@ def ensure_inventory_schema(conn: sqlite3.Connection) -> None:
     ]
     for sql in statements:
         conn.execute(sql)
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='cash_claim_points'").fetchone():
+        for row in conn.execute("SELECT point_code,point_name FROM cash_claim_points WHERE point_kind='COLLECTOR_SLOT' AND is_active=1"):
+            LOCATIONS[row[0]]=row[1]
     for code, name in LOCATIONS.items():
         conn.execute(
             "INSERT OR IGNORE INTO inventory_locations(location_code,location_name) VALUES (?,?)",

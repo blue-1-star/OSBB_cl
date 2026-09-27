@@ -804,12 +804,21 @@ def create_supplier_batch(
     actor_id: int | str | None,
     supplier_name: str = "",
     note: str = "",
+    local_single_user: bool = False,
     conn: sqlite3.Connection | None = None,
 ) -> dict:
     """Aggregate all currently paid, unbatched orders of one remote type."""
     owns = conn is None
     conn = conn or get_conn()
     try:
+        permission_actor = actor_id
+        if local_single_user:
+            import getpass
+            if str(actor_id) != f'local_mac:{getpass.getuser()}':
+                raise PermissionError('Неверный исполнитель локальной консоли.')
+            # Explicit trusted local adapter; never enabled by Telegram handlers.
+            # Keep the real local identity in the batch and additional audit.
+            permission_actor = None
         ensure_simplified_service_schema(conn)
         cur = conn.cursor()
         orders = _rows(
@@ -878,8 +887,9 @@ def create_supplier_batch(
             confirm_order_step(
                 order_id=int(order["id"]),
                 step_code="SUPPLIER_BATCH_ASSIGNED",
-                actor_id=actor_id,
-                note=f"Включено в заказ поставщику {batch_number}: {quantity} шт.",
+                actor_id=permission_actor,
+                actor_role='LOCAL_SINGLE_USER' if local_single_user else '',
+                note=f"Включено в заказ поставщику {batch_number}: {quantity} шт.; исполнитель {actor_id}.",
                 source_context="supplier_batch",
                 conn=conn,
             )
@@ -896,6 +906,13 @@ def create_supplier_batch(
                 note=f"Включено в поставку {batch_number}.",
             )
         result = get_supplier_batch(batch_id, conn=conn)
+        if local_single_user:
+            from audit_logger import audit_log
+            audit_log(conn=conn, operator_id=str(actor_id), user_id=str(actor_id),
+                      actor_type='local_single_user', action_type='supplier_batch_created_local',
+                      table_name='remote_supplier_batches', row_id=batch_id,
+                      field_name='batch_status', old_value='', new_value=BATCH_ORDERED,
+                      source_context='local_supplier_console', comment=note or batch_number, commit=False)
         # Both Telegram and console use the same supplier-document snapshot.
         # Legacy batches without a chosen supplier remain unassigned, never guessed.
         if table_exists(cur, 'service_item_suppliers') and cur.execute(
@@ -1164,6 +1181,7 @@ def issue_new_remotes_from_batch(
                 ownership_type="OSBB_STOCK",
                 inventory_status="RECEIVED",
                 condition_status="NEW",
+                post_code=source_location_code,
                 apartment_id=int(order["apartment_id"]) if order.get("apartment_id") is not None else None,
                 apartment_number=text(order.get("apartment_number")),
                 actor_id=actor_id,

@@ -43,6 +43,7 @@ from handlers.data_quality_proposal_workspace import (
 )
 from access_control import has_permission
 from data_quality_proposals import is_super_admin
+from handlers.document_inbox import ENTRY as DOCUMENT_ENTRY, show_upload_help, receive_document
 from handlers.client_portal_v3 import (
     handle_client_portal_text,
     client_menu_keyboard,
@@ -215,6 +216,7 @@ CLIENT_MENU_RU = [
 ]
 
 ADMIN_MENU = [
+    [DOCUMENT_ENTRY],
     ["🏠 Квартиры", "🏢 Помещения"],
     ["👥 Пользователи"],
     ["🚗 Автомобили"],
@@ -1066,6 +1068,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     text = (update.message.text or "").strip()
+    if text == DOCUMENT_ENTRY:
+        await show_upload_help(update,is_admin_user)
+        return
 
     lang = user_languages.get(user_id, "ru")
 
@@ -1906,6 +1911,9 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    async def attachment_handler(update, context):
+        await receive_document(update,context,is_admin_user)
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, attachment_handler))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
     )
