@@ -674,9 +674,8 @@ def _order_card(order: dict, *, title: str, resident_view: bool = False, lang: s
     phone_summary = _phone_access_summary_for_order(order.get("id"))
     lines = [
         title, "",
-        f"№: {order.get('order_number')}",
-        f"Квартира: {order.get('apartment_number') or '-'}",
         f"Услуга: {order.get('service_name_snapshot') or order.get('service_item_code')}",
+        f"Квартира: {order.get('apartment_number') or '-'}",
     ]
     if phone_summary:
         points = phone_summary.get("points") or phone_summary.get("subscription_points") or []
@@ -726,6 +725,10 @@ def _order_card(order: dict, *, title: str, resident_view: bool = False, lang: s
                 lines.append("Замовлення постачальнику ще не оформлено.")
             else:
                 lines.append("Мінімальну партію постачальника ще не вказано.")
+    if resident_view and order.get("order_number"):
+        lines += ["", f"Довідковий код замовлення: {order['order_number']}"]
+    elif order.get("order_number"):
+        lines.insert(2, f"№: {order['order_number']}")
     return "\n".join(lines)
 
 def _interest_card(interest: dict, lang: str) -> str:
@@ -738,9 +741,8 @@ def _interest_card(interest: dict, lang: str) -> str:
     phone_summary = _phone_access_summary_for_interest(interest.get("id"))
     lines = [
         "📄 Намір на послугу", "",
-        f"№: {interest.get('interest_number')}",
-        f"Квартира: {interest.get('apartment_number') or '-'}",
         f"Послуга: {interest.get('service_name_snapshot') or interest.get('service_item_code')}",
+        f"Квартира: {interest.get('apartment_number') or '-'}",
     ]
     if phone_summary:
         points = phone_summary.get("points") or []
@@ -759,6 +761,8 @@ def _interest_card(interest: dict, lang: str) -> str:
         f"Сума: {money(interest.get('amount_due_snapshot'))} {interest.get('currency') or 'UAH'}",
         f"Статус: {status_label}",
     ]
+    if interest.get("interest_number"):
+        lines += ["", f"Довідковий код наміру: {interest['interest_number']}"]
     return "\n".join(lines)
 
 

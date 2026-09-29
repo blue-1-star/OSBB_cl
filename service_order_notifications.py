@@ -15,6 +15,7 @@ def paid_remote_confirmation_text(apartment, quantity, amount, context) -> str:
     if context.get('batch_number'):
         lines.append('📦 Партію сформовано. Передачу замовлення постачальнику виконує адміністратор.')
     elif context.get('minimum'):
+        lines.append('📋 Ваше оплачене замовлення включено до збору партії.')
         minimum = int(context['minimum'])
         collected = int(context['quantity'])
         if collected >= minimum:

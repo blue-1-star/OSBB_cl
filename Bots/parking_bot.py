@@ -37,6 +37,10 @@ from handlers.inventory_transfers_workspace import (
     has_inventory_access,
 )
 from handlers.data_quality_workspace import ENTRY as DATA_QUALITY_ENTRY, handle_data_quality_text
+from handlers.video_reports_workspace import (
+    MISSING as VIDEO_MISSING_ENTRY, FOUND as VIDEO_FOUND_ENTRY,
+    PUBLIC_ENTRY as PUBLIC_VIDEO_ENTRY, handle_video_reports_text, handle_public_video_text,
+)
 from handlers.data_quality_proposal_workspace import (
     ENTRY as QUALITY_SUGGEST_ENTRY, MY as QUALITY_MY, REVIEW as QUALITY_REVIEW,
     handle_quality_proposal_text,
@@ -393,7 +397,7 @@ async def show_mode_menu(update: Update, lang: str):
     t = TEXTS[lang]
     user_id = update.effective_user.id
 
-    buttons = [[t["client_mode"]]]
+    buttons = [[t["client_mode"]], [PUBLIC_VIDEO_ENTRY]]
     if has_guard_workspace_access(user_id, cashbox_code="O"):
         buttons.append(["🛡 Пост охраны O"])
     if active_collector_for_telegram(user_id):
@@ -1149,6 +1153,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_mode_menu(update, lang)
         return
 
+    # Public video reports are available before apartment confirmation and
+    # independent of the resident/operator/admin workspaces.
+    if await handle_public_video_text(
+        update, user_states, user_id, text,
+        back_to_modes=lambda: show_mode_menu(update, lang),
+    ):
+        return
+
     if await handle_quality_proposal_text(
         update, user_states, user_id, text,
         is_admin=is_admin_user(user_id), bot=context.bot,
@@ -1545,6 +1557,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update, user_states, user_id, text, back_markup=kb(ADMIN_MENU),
         ):
             return
+    if user_modes.get(user_id) == "admin" or (
+        isinstance(quality_state, dict) and quality_state.get("mode") == "video_reports"
+    ):
+        if await handle_video_reports_text(
+            update, user_states, user_id, text, back_markup=kb(ADMIN_MENU),
+        ):
+            return
 
     # В client-режиме блокирует старую RU-only обработку кнопок:
     # на каждом уровне принимаются только кнопки выбранного языка.
@@ -1832,8 +1851,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "📊 Отчёты":
         await update.message.reply_text(
-            "📊 Отчёты\n\nДоступен общий список пробелов в данных.",
-            reply_markup=kb([[DATA_QUALITY_ENTRY], ["⬅️ К админ-меню"]]),
+            "📊 Отчёты\n\nВыберите отчёт.",
+            reply_markup=kb([[VIDEO_MISSING_ENTRY], [VIDEO_FOUND_ENTRY],
+                             [DATA_QUALITY_ENTRY], ["⬅️ К админ-меню"]]),
         )
         return
 

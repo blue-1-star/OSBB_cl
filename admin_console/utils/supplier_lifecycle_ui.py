@@ -27,17 +27,31 @@ def show_lifecycle(conn,document,actor):
     if not residents: return
     order_id=st.selectbox('Заказ жителя',[r['id'] for r in residents],format_func=lambda i:next(f"Кв. {r['apartment_number']} · {r['quantity']} шт." for r in residents if r['id']==i),key=f'resident_issue_{bid}')
     row=next(r for r in residents if r['id']==order_id)
-    points=list(dict.fromkeys([row['pickup_point']]+[f'K{i}' for i in range(1,7)]+['O','CS']))
-    if 'BANK' in points: points.remove('BANK')
+    # A current point is not the list of available points: include every active
+    # inventory destination, including all KAS collector slots.
+    from inventory_transfer_core import ensure_inventory_schema
+    ensure_inventory_schema(conn)
+    points=[r[0] for r in conn.execute(
+        "SELECT location_code FROM inventory_locations WHERE is_active=1 "
+        "AND location_code NOT IN ('BANK','K') ORDER BY location_code")]
+    current_point=row['pickup_point'] if row['pickup_point'] in points else 'CS'
     with st.form(f'pickup_{order_id}'):
-        point=st.selectbox('Точка выдачи',points)
+        point=st.selectbox('Точка выдачи',points,index=points.index(current_point))
         st.caption('По умолчанию — место сдачи денег. Банк не является точкой выдачи; выберите её отдельно.')
         if st.form_submit_button('Сохранить точку выдачи'):
             try: set_pickup(conn,order_id=order_id,point=point,actor=actor); conn.commit(); st.rerun()
             except Exception as exc: conn.rollback(); st.error(str(exc))
     if row['link_status']=='READY':
         point=row['pickup_point'] if row['pickup_point']!='BANK' else 'CS'
-        if point!='CS':
+        stock=conn.execute('''SELECT COALESCE(SUM(b.quantity),0) FROM inventory_balances b
+            JOIN inventory_lots l ON l.id=b.lot_id
+            WHERE l.source_kind='REMOTE_SUPPLIER_BATCH' AND l.source_id=?
+              AND b.location_code=?''',(bid,point)).fetchone()[0]
+        if int(stock or 0)>=int(row['quantity']):
+            st.success(f"К выдаче готово: {row['quantity']} шт. партии {batch['batch_number']} находятся в {point}.")
+        else:
+            st.warning(f"В {point} доступно {int(stock or 0)} из {row['quantity']} шт. для этого заказа. Сначала завершите складскую передачу.")
+        if point!='CS' and int(stock or 0)<int(row['quantity']):
             from inventory_transfer_core import send_transfer,confirm_transfer
             with st.expander('🚚 Передача пультов со склада в выбранную точку'):
                 with st.form(f'transfer_send_{order_id}'):
@@ -65,7 +79,7 @@ def show_lifecycle(conn,document,actor):
         with st.form(f'issue_{order_id}'):
             evidence=st.text_input('Подтверждение передачи жителю')
             checked=st.checkbox('Пульты фактически выданы жителю')
-            if st.form_submit_button('✅ Зафиксировать выдачу'):
+            if st.form_submit_button('✅ Зафиксировать выдачу',disabled=int(stock or 0)<int(row['quantity'])):
                 try:
                     if not checked: raise ValueError('Подтвердите выдачу.')
                     issue_local(conn,order_id=order_id,point=row['pickup_point'] if row['pickup_point']!='BANK' else 'CS',actor=actor,evidence=evidence)

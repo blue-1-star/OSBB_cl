@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from admin_console.utils.db import get_conn
 from data_quality_report import RULES, build_quality_issues, quality_summary
 from data_quality_proposals import create_proposal, list_proposals, reply_to_clarification
+from video_registry_reports import video_period, video_registry_rows
 
 
 st.set_page_config(page_title="Отчёты", page_icon="📊", layout="wide")
@@ -26,7 +27,8 @@ st.title("📊 Отчёты")
 
 report_name = st.selectbox(
     "Отчёт",
-    ["🚗 Все автомобили", "📅 Автомобили, добавленные за период", "🧩 Пробелы в данных"],
+    ["🚗 Все автомобили", "📅 Автомобили, добавленные за период",
+     "🎥 Видео: не найдены в реестре", "🎥 Видео: найдены в реестре", "🧩 Пробелы в данных"],
 )
 
 
@@ -173,6 +175,20 @@ elif report_name == "📅 Автомобили, добавленные за пе
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
+
+elif report_name.startswith("🎥 Видео:"):
+    found = report_name == "🎥 Видео: найдены в реестре"
+    conn = get_conn()
+    try:
+        period = video_period(conn)
+        rows = video_registry_rows(conn, found=found)
+    finally:
+        conn.close()
+    st.subheader(report_name)
+    st.caption(f"Период съёмок: {period}. Точное совпадение нормализованного номера с текущим реестром.")
+    st.metric("Уникальных номеров", len(rows))
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.caption("Сортировка: по убыванию числа появлений. Марка — наиболее частая модель из видео; при её отсутствии у найденного номера показана модель реестра.")
 
 elif report_name == "🧩 Пробелы в данных":
     st.subheader("🧩 Пробелы в данных")

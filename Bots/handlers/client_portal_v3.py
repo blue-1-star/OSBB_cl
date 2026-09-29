@@ -65,6 +65,7 @@ def client_menu_keyboard(lang: str) -> list[list[str]]:
 
     # A resident's "Main menu" remains the resident menu. Switching to guard
     # or operator is explicit and does not change the account's authorization.
+    result.append(["🎥 Открытые видеоотчёты"])
     result.append(["🔄 Сменить режим"])
     return result
 

@@ -3,6 +3,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 from supplier_procurement_core import record_manual_dispatch, record_supplier_response
+from ui_dates import display_date
 
 def show_supplier_document(conn, document, actor):
     key=f"purchase_{document['id']}"
@@ -28,10 +29,10 @@ def show_supplier_document(conn, document, actor):
                 except Exception as exc: conn.rollback(); st.error(str(exc))
     with st.expander('📨 Ответ поставщика / ожидаемая поставка'):
         with st.form(f'{key}_reply'):
-            received=st.date_input('Дата ответа',max_value=date.today())
+            received=st.date_input('Дата ответа',max_value=date.today(),format='DD.MM.YYYY')
             response=st.text_area('Ответ поставщика')
             quantity=st.number_input('Подтверждено к поставке, шт.',min_value=1,value=int(document['quantity']))
-            expected=st.date_input('Дата поставки, сообщённая поставщиком',value=None)
+            expected=st.date_input('Дата поставки, сообщённая поставщиком',value=None,format='DD.MM.YYYY')
             reference=st.text_input('Ссылка на ответ / номер подтверждения')
             if st.form_submit_button('Сохранить ответ поставщика'):
                 try:
@@ -42,8 +43,15 @@ def show_supplier_document(conn, document, actor):
         replies=[dict(r) for r in conn.execute('SELECT received_at,response_text,quantity,expected_delivery_date,supplier_reference,recorded_by FROM supplier_order_responses WHERE purchase_order_id=? ORDER BY id DESC',(document['id'],))]
         if replies:
             latest=replies[0]
-            st.info(f"Поставка {latest['quantity']:g} шт. ожидается {latest['expected_delivery_date']}.")
-            st.dataframe(pd.DataFrame(replies),hide_index=True,width='stretch')
+            st.info(f"Поставка {latest['quantity']:g} шт. ожидается {display_date(latest['expected_delivery_date'])}.")
+            st.dataframe(pd.DataFrame([{
+                'Дата ответа': display_date(r['received_at']),
+                'Ответ поставщика': r['response_text'],
+                'Количество, шт.': r['quantity'],
+                'Ожидаемая поставка': display_date(r['expected_delivery_date']),
+                'Подтверждение': r['supplier_reference'],
+                'Записал': r['recorded_by'],
+            } for r in replies]),hide_index=True,width='stretch')
     st.caption('К оплате — закупочная сумма документа. Получение партии не требует предварительной оплаты поставщику.')
     from admin_console.utils.supplier_lifecycle_ui import show_lifecycle
     show_lifecycle(conn,document,actor)

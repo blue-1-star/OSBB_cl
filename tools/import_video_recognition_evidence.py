@@ -25,7 +25,7 @@ from config import paths
 from tools.standardize_video_recognition import DEFAULT_SOURCE_DIR, extract_file
 
 
-ALGORITHM_VERSION = "video-evidence-v1"
+ALGORITHM_VERSION = "video-evidence-v3-report-model"
 ACTOR = "video_recognition_import"
 
 
@@ -57,6 +57,7 @@ def build_evidence(source_dir: Path) -> tuple[list[dict], str, int]:
             ordered = models.most_common()
             consensus_model, matching = ordered[0]
             tied = len(ordered) > 1 and ordered[1][1] == matching
+            report_model = "" if tied else ordered[0][0]
             agreement = matching / total_models
             if tied:
                 consensus_model = ""
@@ -68,17 +69,22 @@ def build_evidence(source_dir: Path) -> tuple[list[dict], str, int]:
                 status = "CONSENSUS"
             else:
                 status = "DOMINANT_REVIEW"
+        else:
+            report_model = ""
         display_plate = Counter(row["plate"] for row in rows).most_common(1)[0][0]
         dates = sorted({row["video_date"] for row in rows if row["video_date"]})
         evidence.append({
             "plate_normalized": plate,
             "display_plate": display_plate,
             "consensus_model": consensus_model,
+            "report_model": report_model,
             "matching_observations": matching,
             "model_observations": total_models,
             "model_agreement": agreement,
             "evidence_status": status,
             "observation_count": len(rows),
+            "night_count": sum(row["recording_period"] == "NIGHT" for row in rows),
+            "day_count": sum(row["recording_period"] == "DAY" for row in rows),
             "first_seen_date": dates[0] if dates else None,
             "last_seen_date": dates[-1] if dates else None,
             "source_files_json": json.dumps(sorted({row["source_file"] for row in rows}), ensure_ascii=False),
@@ -99,11 +105,14 @@ def apply(source_dir: Path) -> dict:
                 plate_normalized TEXT PRIMARY KEY,
                 display_plate TEXT NOT NULL,
                 consensus_model TEXT,
+                report_model TEXT,
                 matching_observations INTEGER NOT NULL,
                 model_observations INTEGER NOT NULL,
                 model_agreement REAL,
                 evidence_status TEXT NOT NULL,
                 observation_count INTEGER NOT NULL,
+                night_count INTEGER NOT NULL DEFAULT 0,
+                day_count INTEGER NOT NULL DEFAULT 0,
                 first_seen_date TEXT,
                 last_seen_date TEXT,
                 source_files_json TEXT NOT NULL,
@@ -132,6 +141,9 @@ def apply(source_dir: Path) -> dict:
             ("registry_vehicle_id", "INTEGER"),
             ("registry_model", "TEXT"),
             ("registry_model_relation", "TEXT"),
+            ("night_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("day_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("report_model", "TEXT"),
         ):
             if column not in existing_columns:
                 cur.execute(f"ALTER TABLE video_plate_evidence ADD COLUMN {column} {definition}")
@@ -158,13 +170,15 @@ def apply(source_dir: Path) -> dict:
         cur.executemany(
             """
             INSERT INTO video_plate_evidence(
-                plate_normalized, display_plate, consensus_model, matching_observations,
+                plate_normalized, display_plate, consensus_model, report_model, matching_observations,
                 model_observations, model_agreement, evidence_status, observation_count,
+                night_count, day_count,
                 first_seen_date, last_seen_date, source_files_json, source_signature,
                 registry_vehicle_id, registry_model, registry_model_relation, imported_at, algorithm_version
             ) VALUES (
-                :plate_normalized, :display_plate, :consensus_model, :matching_observations,
+                :plate_normalized, :display_plate, :consensus_model, :report_model, :matching_observations,
                 :model_observations, :model_agreement, :evidence_status, :observation_count,
+                :night_count, :day_count,
                 :first_seen_date, :last_seen_date, :source_files_json, :source_signature,
                 :registry_vehicle_id, :registry_model, :registry_model_relation, :imported_at, :algorithm_version
             )

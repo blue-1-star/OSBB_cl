@@ -192,7 +192,8 @@ def create_purchase_document(conn, *, batch, actor):
     price = snapshot['unit_price']
     amount = f"{qty * price:.2f} {snapshot['currency']}" if price is not None else 'цена требует согласования'
     contract_text = f"{contract['contract_number'] or 'без номера'} — {contract['subject']}" if contract else 'не указан'
-    body = f"Заказ ОСББ {number}\nПо состоянию на: {now_db()}\nПоставщик: {snapshot['name']}\nДоговор: {contract_text}\nПозиция: {batch['service_name_snapshot']} ({batch['service_item_code']})\nКоличество: {qty} шт.\nК оплате поставщику: {amount}\nУсловия: {snapshot['delivery_terms'] or 'не указаны'}\n"
+    from ui_dates import display_date
+    body = f"Заказ ОСББ {number}\nПо состоянию на: {display_date(now_db())}\nПоставщик: {snapshot['name']}\nДоговор: {contract_text}\nПозиция: {batch['service_name_snapshot']} ({batch['service_item_code']})\nКоличество: {qty} шт.\nК оплате поставщику: {amount}\nУсловия: {snapshot['delivery_terms'] or 'не указаны'}\n"
     if snapshot.get('requested_delivery_date'):
         body+=f"Желаемая дата поставки: {snapshot['requested_delivery_date']} (ещё не подтверждена поставщиком)\n"
     cur = conn.execute('''INSERT INTO supplier_purchase_orders(document_number,supplier_id,contract_id,supplier_batch_id,service_item_code,quantity,unit_price,currency,document_text,snapshot_json,created_by,created_at)
@@ -268,4 +269,5 @@ def record_supplier_response(conn, *, document_id, actor, response, quantity, ex
     batch=conn.execute('SELECT supplier_batch_id FROM supplier_purchase_orders WHERE id=?',(document_id,)).fetchone()
     if batch and batch[0]:
         from supplier_lifecycle_core import notify_batch
-        notify_batch(conn,batch[0],f'SUPPLIER_DATE_{cur.lastrowid}',f'Постачальник повідомив: очікувана дата поставки — {expected_date}.')
+        from ui_dates import display_date
+        notify_batch(conn,batch[0],f'SUPPLIER_DATE_{cur.lastrowid}',f'Постачальник повідомив: очікувана дата поставки — {display_date(expected_date)}.')

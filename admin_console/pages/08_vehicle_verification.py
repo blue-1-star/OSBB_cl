@@ -502,7 +502,12 @@ if not ready:
     st.info("Очередь верификации ещё не подготовлена. Сначала нужно применить миграцию партии задач.")
     st.stop()
 
-status_label = st.selectbox("Статус", ["Новые", "В работе", "Решённые", "Все"])
+_dashboard_status = st.session_state.pop("dashboard_verification_status", None)
+_status_options = ["Новые", "В работе", "Решённые", "Все"]
+status_label = st.selectbox(
+    "Статус", _status_options,
+    index=_status_options.index(_dashboard_status) if _dashboard_status in _status_options else 0,
+)
 status_map = {"Новые": "new", "В работе": "in_progress", "Решённые": "resolved", "Все": "Все"}
 tasks = load_tasks(status_map[status_label])
 st.metric("Задач в выборке", len(tasks))

@@ -18,6 +18,8 @@ from admin_console.utils.db import get_conn
 st.set_page_config(page_title="Платежи", layout="wide")
 st.title("💰 Платежи")
 
+_dashboard_view = st.session_state.pop("dashboard_payment_view", None)
+
 # ==========================================
 # БОКОВАЯ ПАНЕЛЬ — ФИЛЬТРЫ
 # ==========================================
@@ -29,10 +31,12 @@ with st.sidebar:
         "Режим просмотра",
         [
             "📋 Все платежи",
+            "🏗 Благоустройство",
             "🏠 По квартире",
             "🚗 По автомобилю",
             "📅 По дате",
-        ]
+        ],
+        index=1 if _dashboard_view == "🏗 Благоустройство" else 0,
     )
     
     if view_mode == "🏠 По квартире":
@@ -42,8 +46,8 @@ with st.sidebar:
         plate = st.text_input("Номер автомобиля", placeholder="например: AA8098MM")
         
     elif view_mode == "📅 По дате":
-        date_from = st.date_input("С даты")
-        date_to = st.date_input("По дату")
+        date_from = st.date_input("С даты", format="DD.MM.YYYY")
+        date_to = st.date_input("По дату", format="DD.MM.YYYY")
 
 
 # ==========================================
@@ -101,6 +105,19 @@ if view_mode == "📋 Все платежи":
     """
     df = execute_query(sql)
     show_result(df, "Все платежи")
+
+
+elif view_mode == "🏗 Благоустройство":
+    sql = """
+        SELECT p.id, p.payment_date AS дата, p.apartment_number AS квартира,
+               p.amount AS сумма, p.currency AS валюта, p.payment_method AS способ,
+               p.cashbox_code AS касса, p.comment AS комментарий
+        FROM payments p
+        WHERE p.base_service_code = 'IMPROVEMENT'
+        ORDER BY p.payment_date DESC, p.id DESC
+    """
+    df = execute_query(sql)
+    show_result(df, "Сбор на благоустройство")
 
 
 elif view_mode == "🏠 По квартире" and apartment:

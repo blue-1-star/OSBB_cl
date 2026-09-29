@@ -417,8 +417,8 @@ def _plate_distance(left: str, right: str) -> int:
     return previous[-1]
 
 
-def vehicle_plate_clarification_hint(request: dict, payload: dict) -> str | None:
-    """Prepare a resident question only when registry/video evidence conflicts."""
+def vehicle_plate_video_evidence(request: dict, payload: dict) -> dict | None:
+    """Find the closest corroborated video plate for a resident correction."""
     if request.get("task_type") != "RESIDENT_VEHICLE_UPDATE" or not request.get("vehicle_id"):
         return None
     proposed = proposal_plate(request, payload)
@@ -451,9 +451,17 @@ def vehicle_plate_clarification_hint(request: dict, payload: dict) -> str | None
                 score = (distance, -int(row["observation_count"] or 0))
                 if best is None or score < best[0]:
                     best = (score, dict(row))
-        if not best:
-            return None
-        evidence = best[1]
+        return best[1] if best else None
+    finally:
+        conn.close()
+
+
+def vehicle_plate_clarification_hint(request: dict, payload: dict) -> str | None:
+    """Prepare a resident question only when registry/video evidence conflicts."""
+    evidence = vehicle_plate_video_evidence(request, payload)
+    if evidence:
+        proposed = proposal_plate(request, payload)
+        current, _ = normalize_plate((payload.get("current") or {}).get("license_plate"))
         return (
             "Уточните, пожалуйста, госномер автомобиля. "
             f"В реестре сейчас указан {current}, в вашем предложении — {proposed}. "
@@ -461,8 +469,7 @@ def vehicle_plate_clarification_hint(request: dict, payload: dict) -> str | None
             f"{evidence['plate_normalized']} ({evidence['consensus_model'] or 'модель не определена'}). "
             "Подтвердите правильный номер или напишите другой."
         )
-    finally:
-        conn.close()
+    return None
 
 
 def vehicle_add_recommendation(request: dict, payload: dict) -> dict:
@@ -642,8 +649,8 @@ def save_confirmed_plate(request: dict, confirmed_plate: str, note: str) -> None
             "SELECT * FROM operator_task_queue WHERE id=? AND origin='RESIDENT_PORTAL'", (request["id"],)
         ).fetchone()
         vehicle = cur.execute("SELECT * FROM vehicles WHERE id=?", (vehicle_id,)).fetchone()
-        if not task or not vehicle or task["status"] != "IN_PROGRESS":
-            raise RuntimeError("Сначала возьмите актуальную заявку в работу.")
+        if not task or not vehicle or task["status"] not in {"PENDING", "IN_PROGRESS", "NEEDS_CLARIFICATION"}:
+            raise RuntimeError("Заявка уже не открыта для решения.")
         duplicate = cur.execute(
             "SELECT id FROM vehicles WHERE license_plate_normalized=? AND id != ?", (normalized, vehicle_id)
         ).fetchone()
@@ -677,7 +684,7 @@ def save_confirmed_plate(request: dict, confirmed_plate: str, note: str) -> None
             """,
             (timestamp, str(vehicle_id), old_plate, normalized, close_note, task["telegram_user_id"]),
         )
-        audit_status_change(cur, request["id"], "IN_PROGRESS", "RESOLVED", close_note)
+        audit_status_change(cur, request["id"], task["status"], "RESOLVED", close_note)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -699,8 +706,8 @@ def save_confirmed_vehicle_field(request: dict, field: str, confirmed_value: str
         cur.execute("BEGIN IMMEDIATE")
         task = cur.execute("SELECT * FROM operator_task_queue WHERE id=?", (request["id"],)).fetchone()
         vehicle = cur.execute("SELECT * FROM vehicles WHERE id=?", (vehicle_id,)).fetchone()
-        if not task or not vehicle or task["status"] != "IN_PROGRESS":
-            raise RuntimeError("Сначала возьмите актуальную заявку в работу.")
+        if not task or not vehicle or task["status"] not in {"PENDING", "IN_PROGRESS", "NEEDS_CLARIFICATION"}:
+            raise RuntimeError("Заявка уже не открыта для решения.")
         payload = json.loads(task["payload_json"] or "{}")
         if field not in (payload.get("proposed") or {}):
             raise RuntimeError("Выбранное поле отсутствует в структурированном заявлении жителя.")
@@ -750,7 +757,22 @@ def save_confirmed_vehicle_field(request: dict, field: str, confirmed_value: str
                 """UPDATE vehicles SET parking_time=?, review_status='VERIFIED_OPERATOR', updated_at=?, updated_by=?
                    WHERE id=?""", (value, timestamp, ACTOR, vehicle_id),
             )
-        close_note = note.strip() or f"Оператор подтвердил поле {field}: {new_value}."
+        resident_field_names = {
+            "license_plate": "державний номер",
+            "car_model": "марку / модель",
+            "car_color": "колір",
+            "parking_time": "режим паркування",
+        }
+        field_name = resident_field_names[field]
+        if str(old_value or "").strip() == str(new_value):
+            close_note = f"Для автомобіля #{vehicle_id} підтверджено {field_name}: {new_value}."
+        else:
+            close_note = (
+                f"Для автомобіля #{vehicle_id} змінено {field_name}: "
+                f"{old_value or 'не було вказано'} → {new_value}."
+            )
+        if note.strip():
+            close_note += f" Коментар оператора: {note.strip()}"
         cur.execute(
             """UPDATE operator_task_queue SET status='RESOLVED', updated_at=?, closed_at=?, close_note=? WHERE id=?""",
             (timestamp, timestamp, close_note, request["id"]),
@@ -764,7 +786,7 @@ def save_confirmed_vehicle_field(request: dict, field: str, confirmed_value: str
             """,
             (timestamp, str(vehicle_id), field, str(old_value or ""), str(new_value), close_note, task["telegram_user_id"]),
         )
-        audit_status_change(cur, request["id"], "IN_PROGRESS", "RESOLVED", close_note)
+        audit_status_change(cur, request["id"], task["status"], "RESOLVED", close_note)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -2122,7 +2144,9 @@ plate_clarification = vehicle_plate_clarification_hint(request, payload)
 if plate_clarification and request.get("status") in {"PENDING", "IN_PROGRESS", "NEEDS_CLARIFICATION"}:
     st.warning("🟡 Автоматическая проверка нашла противоречие между заявкой, реестром и видео-наблюдениями.")
     st.write(plate_clarification)
-    if st.button("✉️ Отправить подготовленный вопрос жителю", type="primary", key=f"plate_clarification_{request['id']}"):
+    if request.get("status") == "NEEDS_CLARIFICATION":
+        st.caption("Вопрос уже отправлен жителю. Повторная отправка не требуется; оператор может решить заявку по проверенным данным ниже.")
+    elif st.button("✉️ Отправить подготовленный вопрос жителю", key=f"plate_clarification_{request['id']}"):
         try:
             send_clarification_to_resident(request, plate_clarification)
             st.success("Вопрос поставлен в очередь Telegram. Заявка ожидает ответа жителя.")
@@ -2146,7 +2170,7 @@ if request.get("task_type") == "RESIDENT_VEHICLE_UPDATE" and request.get("vehicl
         f"житель указал — **{proposed_value or '—'}**."
     )
     st.caption("Значение жителя — предложение, а не автоматическое изменение реестра.")
-    if request.get("status") == "IN_PROGRESS":
+    if request.get("status") in {"PENDING", "IN_PROGRESS", "NEEDS_CLARIFICATION"}:
         if field == "parking_time":
             confirmed_value = st.selectbox(
                 "Подтверждённый режим парковки", ["Day", "Night", "Inactive"],
@@ -2154,24 +2178,44 @@ if request.get("task_type") == "RESIDENT_VEHICLE_UPDATE" and request.get("vehicl
                 key=f"resident_request_confirmed_{field}_{request['id']}",
             )
         else:
+            if field == "license_plate":
+                video_evidence = vehicle_plate_video_evidence(request, payload)
+                plate_options = {}
+                if video_evidence:
+                    plate_options[f"Видео: {video_evidence['plate_normalized']} ({video_evidence['observation_count']} наблюдений)"] = video_evidence['plate_normalized']
+                if proposed_value:
+                    plate_options[f"Предложение жителя: {proposed_value}"] = proposed_value
+                if current_value:
+                    plate_options[f"Текущий реестр: {current_value}"] = current_value
+                plate_options["Ввести другой проверенный номер"] = ""
+                source = st.selectbox(
+                    "Источник проверяемого номера", list(plate_options),
+                    key=f"resident_request_plate_source_{request['id']}",
+                )
+                st.caption("Видео — подсказка, а не доказательство принадлежности автомобиля этой квартире.")
+                suggested_value = plate_options[source]
+            else:
+                suggested_value = str(proposed_value or "")
             confirmed_value = st.text_input(
-                f"Подтверждённое значение: {labels[field]}", value=str(proposed_value or ""),
-                key=f"resident_request_confirmed_{field}_{request['id']}",
+                f"Подтверждённое значение: {labels[field]}", value=suggested_value,
+                key=f"resident_request_confirmed_{field}_{request['id']}_{source if field == 'license_plate' else 'proposal'}",
             )
         operator_note = st.text_input(
-            "Комментарий оператору / жителю", value=f"{labels[field].capitalize()} проверен(а) оператором.",
+            "Дополнительный комментарий жителю (необязательно)", value="",
             key=f"resident_request_resolution_{request['id']}",
         )
-        if st.button("✅ Сохранить подтверждённое значение", type="primary"):
+        confirmed_by_operator = st.checkbox(
+            f"Я проверил(а) значение «{confirmed_value}» для автомобиля #{request['vehicle_id']} квартиры {request.get('apartment_number') or '—'}.",
+            key=f"resident_request_operator_confirm_{request['id']}_{field}_{confirmed_value}",
+        )
+        if st.button("✅ Сохранить проверенное значение и закрыть заявку", type="primary", disabled=not confirmed_by_operator,
+                     key=f"resident_request_save_confirmed_{request['id']}"):
             try:
                 save_confirmed_vehicle_field(request, field, confirmed_value, operator_note)
                 st.success("Значение сохранено, заявка закрыта; операция записана в аудит.")
                 st.rerun()
             except RuntimeError as exc:
                 st.error(str(exc))
-    elif request.get("status") == "PENDING":
-        st.caption("Шаг 1: нажмите «Взять в работу и перейти к решению». Реестр пока не меняется.")
-
     if request.get("status") in {"PENDING", "IN_PROGRESS", "NEEDS_CLARIFICATION"}:
         st.markdown("**Если предложение не принимается**")
         rejection_note = st.text_area(

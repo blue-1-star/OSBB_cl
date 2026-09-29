@@ -18,6 +18,7 @@ if (not hasattr(supplier_procurement_core,'assign_supplier_to_batch') or
 from supplier_procurement_core import ensure_schema, create_supplier, add_contract, bind_supplier, create_purchase_document, assign_supplier_to_batch
 from supplier_procurement_core import update_supplier_record, update_contract_record
 from admin_console.utils.supplier_batch_adapter import create_local_supplier_batch
+from ui_dates import display_date
 
 st.set_page_config(page_title='Поставщики',page_icon='🤝',layout='wide')
 st.title('🤝 Поставщики и закупки')
@@ -64,7 +65,7 @@ with st.expander('✏️ Редактировать данные поставщ�
 st.caption('Договоры и партии ниже связываются с выбранным контрагентом — повторно вводить его название не нужно.')
 st.write({label:selected_supplier.get(field) or '—' for field,label in [('name','Поставщик'),('contact_person','Контактное лицо'),('phone','Телефон'),('email','Email'),('tax_id','ЕГРПОУ / налоговый номер')]})
 contracts=[dict(r) for r in conn.execute('SELECT * FROM supplier_contracts WHERE supplier_id=?',(sid,))]
-st.dataframe(pd.DataFrame(contracts),hide_index=True,width='stretch')
+st.dataframe(pd.DataFrame([{**r,'valid_from':display_date(r['valid_from']),'valid_to':display_date(r['valid_to'])} for r in contracts]),hide_index=True,width='stretch')
 if contracts:
     with st.expander('✏️ Редактировать сведения договора',expanded=False):
         chosen_id=st.selectbox('Сохранённый договор',[r['id'] for r in contracts],format_func=lambda i:next(f"{r['contract_number'] or 'Без номера'} — {r['subject']}" for r in contracts if r['id']==i),key=f'edit_contract_choice_{sid}')
@@ -73,8 +74,8 @@ if contracts:
         with st.form(f'edit_contract_{chosen_id}'):
             contract_values={'contract_number':st.text_input('Номер договора',value=current['contract_number'] or ''),
                 'subject':st.text_area('Предмет договора *',value=current['subject']),
-                'valid_from':st.text_input('Начало срока',value=current['valid_from'] or '',placeholder='ДД.ММ.ГГГГ'),
-                'valid_to':st.text_input('Окончание срока',value=current['valid_to'] or '',placeholder='Пусто, если не указано'),
+                'valid_from':st.text_input('Начало срока',value=display_date(current['valid_from']) if current['valid_from'] else '',placeholder='ДД.ММ.ГГГГ'),
+                'valid_to':st.text_input('Окончание срока',value=display_date(current['valid_to']) if current['valid_to'] else '',placeholder='Пусто, если не указано'),
                 'note':st.text_area('Примечание к договору',value=current['note'] or '')}
             if st.form_submit_button('Сохранить изменения договора'):
                 try:

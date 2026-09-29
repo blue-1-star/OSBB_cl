@@ -118,9 +118,9 @@ col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 with col1:
     filter_code = st.selectbox("Текущая касса", ["Все"] + ALL_FILTER_CODES, index=(ALL_FILTER_CODES.index("O") + 1))
 with col2:
-    date_from = st.date_input("С даты", value=None)
+    date_from = st.date_input("С даты", value=None, format="DD.MM.YYYY")
 with col3:
-    date_to = st.date_input("По дату", value=None)
+    date_to = st.date_input("По дату", value=None, format="DD.MM.YYYY")
 with col4:
     apartment_filter = st.text_input("Квартира (точное совпадение, опционально)", placeholder="например: 105")
 

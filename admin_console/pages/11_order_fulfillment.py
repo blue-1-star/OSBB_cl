@@ -21,6 +21,7 @@ from service_interest_intake_core import record_external_interest, record_cash_h
 from resident_identity_core import apartment_telegram_accounts, link_interest_telegram_recipient
 from supplier_terms_core import current_supplier_minimum, order_preorder_context, set_supplier_minimum
 from cash_claim_points_core import cash_account_label
+from ui_dates import display_date, display_row_dates
 import supplier_procurement_core
 if not hasattr(supplier_procurement_core,'LIFECYCLE_RESPONSE_NOTIFICATIONS'):
     from importlib import reload
@@ -29,11 +30,22 @@ import supplier_readiness_core
 
 # Streamlit reruns the page but may retain an older imported helper module.
 # Refresh only when that cached module predates the required API.
-if not hasattr(supplier_readiness_core, 'waiting_cash_by_account'):
+if getattr(supplier_readiness_core, 'ORDER_REGISTER_VERSION', 0) < 3:
     from importlib import reload
     supplier_readiness_core = reload(supplier_readiness_core)
 supplier_waiting_list = supplier_readiness_core.supplier_waiting_list
 waiting_cash_by_account = supplier_readiness_core.waiting_cash_by_account
+supplier_order_register = supplier_readiness_core.supplier_order_register
+
+
+def notice_state(notice, telegram_user_id):
+    if notice:
+        if notice['delivery_status'] == 'SENT':
+            return f"Отправлено {display_date(notice['sent_at'], with_time=True)}"
+        if notice['delivery_status'] == 'FAILED':
+            return f"Ошибка: {notice['delivery_error'] or 'нет подробностей'}"
+        return f"В очереди с {display_date(notice['created_at'], with_time=True)}"
+    return 'Нет Telegram ID — передать вручную' if not telegram_user_id else 'Не поставлено в очередь'
 
 
 st.set_page_config(page_title="Исполнение заказов", page_icon="📦", layout="wide")
@@ -84,18 +96,47 @@ try:
                 )]
                 if assignments:
                     with st.expander("История назначений"):
-                        st.dataframe(pd.DataFrame(assignments), hide_index=True, use_container_width=True)
+                        st.dataframe(pd.DataFrame([display_row_dates(r, 'valid_from', 'valid_to') for r in assignments]), hide_index=True, use_container_width=True)
             for slot in collector_slots:
                 collector_slot, collector_label = slot["point_code"], slot["point_name"]
                 assigned = current[collector_slot]
                 if assigned:
+                    account_rows = [dict(row) for row in conn.execute(
+                        """SELECT CAST(telegram_user_id AS TEXT) AS telegram_user_id,
+                                  TRIM(COALESCE(telegram_first_name,'') || ' ' || COALESCE(telegram_last_name,'')) AS person_name,
+                                  telegram_username AS username
+                           FROM resident_accounts WHERE telegram_user_id IS NOT NULL
+                           UNION ALL
+                           SELECT CAST(telegram_user_id AS TEXT), display_name, NULL
+                           FROM bot_admins WHERE telegram_user_id IS NOT NULL AND is_active=1"""
+                    )]
+                    if table_exists(conn, 'staff_principals'):
+                        account_rows.extend(dict(row) for row in conn.execute(
+                            """SELECT CAST(telegram_user_id AS TEXT) AS telegram_user_id,
+                                      display_name AS person_name, NULL AS username
+                               FROM staff_principals
+                               WHERE telegram_user_id IS NOT NULL AND is_active=1"""
+                        ))
+                    accounts = {}
+                    for account in account_rows:
+                        accounts.setdefault(account['telegram_user_id'], account)
+                    linked_id = str(assigned.get('telegram_user_id') or '')
+                    exact_matches = [key for key, account in accounts.items()
+                                     if account['person_name'].strip().casefold() == assigned['person_name'].strip().casefold()]
+                    preferred_id = linked_id if linked_id in accounts else exact_matches[0] if len(exact_matches) == 1 else None
+                    ordered_ids = list(dict.fromkeys(exact_matches + list(accounts)))
                     with st.form(f"collector_telegram_{collector_slot}"):
-                        tg_id = st.text_input(
-                            f"{collector_label} · {assigned['person_name']} · Telegram ID",
-                            value=assigned.get("telegram_user_id") or "",
-                            help="Только этот Telegram-пользователь увидит поступления данного назначения в боте.",
-                        )
-                        bind_submit = st.form_submit_button("Сохранить привязку к боту")
+                        st.write(f"**{collector_label} — {assigned['person_name']}**")
+                        if linked_id:
+                            st.caption(f"Сейчас привязан Telegram ID {linked_id}.")
+                        tg_id = st.selectbox(
+                            "Аккаунт Telegram", ordered_ids, index=ordered_ids.index(preferred_id) if preferred_id else None,
+                            format_func=lambda key: f"{accounts[key]['person_name'] or 'Без имени'} · @{accounts[key]['username'] or '—'} · ID {key}",
+                            placeholder="Выберите аккаунт из базы", key=f"collector_account_{collector_slot}",
+                        ) if ordered_ids else None
+                        if len(exact_matches) == 1 and not linked_id:
+                            st.caption("Найдено одно точное совпадение ФИО. Проверьте аккаунт и подтвердите.")
+                        bind_submit = st.form_submit_button("Подтвердить привязку к боту", disabled=not tg_id or tg_id == linked_id)
                     if bind_submit:
                         try:
                             bind_collector_telegram(point_code=collector_slot,
@@ -112,7 +153,7 @@ try:
                             key=f"collector_name_{collector_slot}",
                         )
                     with date_col:
-                        collector_day = st.date_input("Дата начала нового назначения / последний день при снятии", key=f"collector_date_{collector_slot}")
+                        collector_day = st.date_input("Дата начала нового назначения / последний день при снятии", key=f"collector_date_{collector_slot}", format="DD.MM.YYYY")
                     with button_col:
                         st.write("")
                         collector_submit = st.form_submit_button("Сохранить")
@@ -126,20 +167,20 @@ try:
                                     point_code=collector_slot, person_name=collector_name,
                                     valid_from=collector_day.isoformat(), assigned_by=session_actor,
                                 )
-                                st.success(f"{collector_label}: {collector_name.strip()} с {collector_day.isoformat()}.")
+                                st.success(f"{collector_label}: {collector_name.strip()} с {collector_day:%d.%m.%Y}.")
                                 st.rerun()
                         elif assigned:
                             end_collector_assignment(
                                 point_code=collector_slot, last_day=collector_day.isoformat(), ended_by=session_actor,
                             )
-                            st.success(f"{collector_label}: полномочия завершены {collector_day.isoformat()}.")
+                            st.success(f"{collector_label}: полномочия завершены {collector_day:%d.%m.%Y}.")
                             st.rerun()
                         else:
                             st.info("ФИО не указано; назначение не менялось.")
                     except Exception as exc:
                         st.error(str(exc))
 
-        with st.expander("➕ Внести сообщение жителя из другого канала"):
+        with st.expander("➕ Внести заказ незарегистрированного в боте жителя"):
             st.caption("Слова о передаче денег сохраняются как сообщение, не как подтверждённый платёж.")
             intake_apartment = st.text_input("Квартира, названная отправителем", key="intake_apartment_lookup")
             unit_matches = [row[0] for row in conn.execute(
@@ -173,7 +214,7 @@ try:
                     intake_sender = st.text_input("Имя / контакт отправителя (если известен)")
                 with a3:
                     intake_reference = st.text_input("Ссылка / ID сообщения (если есть)")
-                intake_message_date = st.date_input("Дата исходного сообщения", max_value=date.today())
+                intake_message_date = st.date_input("Дата исходного сообщения", max_value=date.today(), format="DD.MM.YYYY")
                 intake_message = st.text_area("Исходный текст сообщения *", placeholder="Хочу 2 пульта, деньги сдал консьержу")
                 intake_claimed_cash = st.checkbox("Отправитель утверждает, что передал деньги")
                 claim_points = list_claim_points(conn=conn, include_historical_collectors=True)
@@ -251,7 +292,7 @@ try:
                     f"{row['claimed_cashbox']} · {float(row['claimed_amount'] if row['claimed_amount'] is not None else row['amount_due_snapshot']):.2f}"
                     if row["claimed_cash_handover"] else "не указана"
                 ),
-                "Когда заявлено": row["message_received_at"],
+                "Когда заявлено": display_date(row["message_received_at"]),
                 "Источник": row["source_channel"] or "—",
             } for row in cash_claims]), hide_index=True, use_container_width=True,
                 on_select="rerun", selection_mode="single-row",
@@ -351,7 +392,7 @@ try:
                         "Основание фактического приёма *",
                         placeholder="Для банка — уникальный ID операции из выписки; для наличных — квитанция/акт",
                     )
-                    bank_date = st.date_input('Дата операции по выписке (только для банка)', max_value=date.today())
+                    bank_date = st.date_input('Дата операции по выписке (только для банка)', max_value=date.today(), format="DD.MM.YYYY")
                     actual_amount = st.number_input(
                         "Фактически получено, UAH", min_value=0.01,
                         value=float(claim["claimed_amount"] if claim["claimed_amount"] is not None else claim["amount_due_snapshot"]),
@@ -400,7 +441,11 @@ try:
             if transfer_notice := st.session_state.pop("mobile_cash_transfer_notice", None):
                 st.success(transfer_notice)
             if mobile_boxes:
-                st.dataframe(pd.DataFrame(mobile_boxes), hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame([{
+                    'Сборщик': cash_account_label(conn,row['cashbox_code']),
+                    'Название кассы': row['cashbox_name'],
+                    'Остаток, грн': row['current_balance'],
+                } for row in mobile_boxes]), hide_index=True, use_container_width=True)
                 boxes_by_code = {row["cashbox_code"]: row for row in mobile_boxes}
                 with st.form("mobile_cash_transfer"):
                     selected_box_code = st.selectbox(
@@ -476,7 +521,7 @@ try:
                     "Намерение": r["interest_number"], "Квартира": r["apartment_number"],
                     "Кол-во": r["quantity"], "Сумма": f"{float(r['amount_due_snapshot']):.2f} {r['currency']}",
                     "Статус": r["interest_status"], "Уведомление об оплате": r["payment_notice_number"] or "—",
-                    "Заказ": str(r["service_order_id"]) if r["service_order_id"] else "—", "Получено": r["created_at"],
+                    "Заказ": str(r["service_order_id"]) if r["service_order_id"] else "—", "Получено": display_date(r["created_at"], with_time=True),
                     "Источник": r["source_channel"] or "Бот",
                     "Сообщение": r["original_message"] or r["resident_comment"] or "—",
                     "Заявление о передаче": "да" if r["claimed_cash_handover"] else "—",
@@ -503,18 +548,40 @@ try:
             minimum = int(term["minimum_quantity"]) if term else None
             st.markdown("#### Условие поставщика — минимальная партия")
             if minimum:
-                st.write(f"Действующий минимум: **{minimum} шт.** · установлен {term['valid_from'][:10]}.")
+                st.write(f"Действующий минимум: **{minimum} шт.** · установлен {display_date(term['valid_from'])}.")
+                register = supplier_order_register(conn, selected_item)
+                if register:
+                    st.markdown('**Заказы и уведомления — от оплаты до выдачи**')
+                    st.caption('После формирования партии заказ уходит из сбора следующей партии, но остаётся здесь до завершения выдачи и в истории.')
+                    st.dataframe(pd.DataFrame([{
+                        'Партия': r['batch_number'] or 'Сбор новой партии',
+                        'Квартира': r['apartment_number'], 'Количество': r['quantity'],
+                        'Наличные, грн': r['cash'], 'Банк, грн': r['bank'],
+                        'Где приняты деньги': r['cash_points'] or ('Банк' if r['bank'] else '—'),
+                        'Оплата записана': display_date(r['payment_recorded_at'], with_time=True),
+                        'Ответ об оплате': notice_state(r['payment_notice'], r['telegram_user_id']) if r['service_order_id'] else 'Заказ не оплачен',
+                        'Включено в партию': display_date(r['batch_linked_at'], with_time=True),
+                        'Заказ поставщику отправлен': display_date(r['supplier_sent_at'], with_time=True),
+                        'Поставщик ответил': display_date(r['supplier_replied_at']),
+                        'Ожидаемая поставка': display_date(r['expected_delivery_date']),
+                        'Сообщение о дате поставки': (
+                            notice_state(r['supplier_date_notice'],r['telegram_user_id'])
+                            if r['expected_delivery_date'] else 'Дата ещё не сообщена поставщиком'),
+                        'Статус партии': r['batch_status'] or '—',
+                        'Статус заказа': r['order_status'] or r['interest_status'],
+                    } for r in register]), hide_index=True, use_container_width=True)
                 shortfall = max(minimum - paid_quantity, 0)
                 if shortfall:
-                    st.info(f"Оплачено {paid_quantity} из {minimum} шт.; до минимума не хватает {shortfall} шт. "
-                            f"Неподтверждённые намерения ({open_quantity} шт.) в оплаченный пакет не входят.")
+                    st.info(f"Для следующей партии оплачено {paid_quantity} из {minimum} шт.; до минимума не хватает {shortfall} шт. "
+                            f"Уже оформленные партии показаны выше. Неподтверждённые намерения ({open_quantity} шт.) в оплаченный пакет не входят.")
                 else:
-                    st.success(f"Оплачено {paid_quantity} шт. — минимум {minimum} достигнут. "
+                    st.success(f"Для следующей партии оплачено {paid_quantity} шт. — минимум {minimum} достигнут. "
                                "Задача админу: продолжить сбор или передать заказ поставщику и оплатить его.")
-                if st.button('📋 Показать лист ожидания и состояние денег', key=f'supplier_readiness_{selected_item}'):
+                if st.button('📋 Показать сбор следующей партии и состояние денег', key=f'supplier_readiness_{selected_item}'):
                     st.session_state[f'show_supplier_readiness_{selected_item}'] = True
                 if st.session_state.get(f'show_supplier_readiness_{selected_item}'):
                     waiting = supplier_waiting_list(conn, selected_item)
+                    st.caption('Здесь только ещё не включённые в партию намерения и заказы. Состав оформленных партий остаётся в реестре выше.')
                     st.dataframe(pd.DataFrame(waiting), hide_index=True, use_container_width=True)
                     cash_total = sum(r['Наличные'] for r in waiting)
                     bank_total = sum(r['Банк'] for r in waiting)
@@ -532,7 +599,7 @@ try:
                         st.info('Ненулевых остатков касс нет.')
                     st.caption('Это общие остатки, не зарезервированные исключительно под пульты. Банковский остаток по этим платежам не вычисляется: показаны только поступления.')
                     with st.form(f'form_supplier_order_{selected_item}'):
-                        st.markdown(f'**Сформировать заказ по состоянию на {date.today().isoformat()} — {paid_quantity} шт.**')
+                        st.markdown(f'**Сформировать заказ по состоянию на {date.today():%d.%m.%Y} — {paid_quantity} шт.**')
                         st.caption('Включаются только оплаченные заказы вне партии. Закупочная сумма берётся из условий назначенного поставщика, не из оплат жителей.')
                         confirm_document=st.checkbox('Подтверждаю состав партии и формирование документа')
                         if st.form_submit_button('📄 Сформировать заказ для отправки поставщику',disabled=paid_quantity<=0):
@@ -623,7 +690,7 @@ try:
                 )]
                 if notice_rows:
                     with st.expander("📨 Доставка подтверждений в бот"):
-                        st.dataframe(pd.DataFrame(notice_rows), hide_index=True, use_container_width=True)
+                        st.dataframe(pd.DataFrame([display_row_dates(r, 'sent_at') for r in notice_rows]), hide_index=True, use_container_width=True)
             with st.expander("✏️ Изменить условие поставщика"):
                 with st.form(f"supplier_minimum_{selected_item}"):
                     new_minimum = st.number_input("Минимум, шт.", min_value=1,
@@ -648,11 +715,70 @@ try:
                            ORDER BY id DESC""", (selected_item,),
                     )]
                     if history:
-                        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
+                        st.dataframe(pd.DataFrame([display_row_dates(r, 'valid_from', 'valid_to') for r in history]), hide_index=True, use_container_width=True)
         else:
             st.info("Позиции услуг и намерения пока отсутствуют.")
     else:
         st.info("Таблица намерений ещё не создана.")
+
+    st.subheader("📦 Партии поставки")
+    batches = [dict(row) for row in conn.execute(
+        """SELECT id,batch_number,service_item_code,service_name_snapshot,
+                  quantity_requested,quantity_received,quantity_issued,batch_status,ordered_at,received_at
+           FROM remote_supplier_batches ORDER BY id DESC"""
+    )] if table_exists(conn, "remote_supplier_batches") else []
+    if batches:
+        batch_choice = st.selectbox(
+            "Показать партию", [None] + [row['id'] for row in batches],
+            format_func=lambda bid: "Все партии — сводный остаток" if bid is None else next(
+                f"{row['batch_number']} · {row['service_name_snapshot']}" for row in batches if row['id'] == bid),
+            key="fulfillment_batch_filter",
+        )
+        shown_batches = [row for row in batches if batch_choice is None or row['id'] == batch_choice]
+        st.dataframe(pd.DataFrame([{
+            'Партия': row['batch_number'], 'Позиция': row['service_name_snapshot'],
+            'Заказано': row['quantity_requested'], 'Получено': row['quantity_received'],
+            'Выдано': row['quantity_issued'], 'Остаток': row['quantity_received'] - row['quantity_issued'],
+            'Статус': row['batch_status'], 'Дата заказа': display_date(row['ordered_at']),
+            'Дата поступления': display_date(row['received_at']),
+        } for row in shown_batches]), hide_index=True, use_container_width=True)
+        batch_orders = [dict(row) for row in conn.execute(
+            """SELECT b.batch_number,o.apartment_number,l.quantity,l.issued_quantity,
+                      l.link_status,o.telegram_user_id,
+                      COALESCE(p.point_code,x.claimed_cashbox,'CS') AS pickup_point
+               FROM remote_supplier_batch_links l
+               JOIN remote_supplier_batches b ON b.id=l.supplier_batch_id
+               JOIN service_orders o ON o.id=l.service_order_id
+               LEFT JOIN service_order_interests i ON i.service_order_id=o.id
+               LEFT JOIN service_interest_intake x ON x.interest_id=i.id
+               LEFT JOIN service_order_pickup_plans p ON p.service_order_id=o.id
+               WHERE (? IS NULL OR b.id=?) ORDER BY b.id DESC,o.apartment_number""",
+            (batch_choice,batch_choice),
+        )] if table_exists(conn, 'service_order_pickup_plans') else []
+        if batch_orders:
+            st.caption('Учётный лист заказчиков и точек выдачи. Telegram ID нужен для адресных уведомлений.')
+            st.dataframe(pd.DataFrame([{
+                'Партия': row['batch_number'], 'Квартира': row['apartment_number'],
+                'К выдаче': row['quantity'], 'Выдано': row['issued_quantity'],
+                'Точка выдачи': row['pickup_point'], 'Telegram ID': row['telegram_user_id'] or '—',
+                'Статус': row['link_status'],
+            } for row in batch_orders]), hide_index=True, use_container_width=True)
+            by_pickup = {}
+            for row in batch_orders:
+                key = (row['batch_number'], row['pickup_point'])
+                totals = by_pickup.setdefault(key, {'orders': 0, 'quantity': 0, 'issued': 0})
+                totals['orders'] += 1
+                totals['quantity'] += row['quantity']
+                totals['issued'] += row['issued_quantity']
+            st.caption('Разбивка учётного листа по точкам выдачи')
+            st.dataframe(pd.DataFrame([{
+                'Партия': batch, 'Точка': point, 'Заказов': totals['orders'],
+                'К выдаче': totals['quantity'], 'Выдано': totals['issued'],
+            } for (batch,point),totals in sorted(by_pickup.items())]),
+                hide_index=True, use_container_width=True)
+    else:
+        batch_choice = None
+        st.info('Партии поставки пока не сформированы.')
 
     st.subheader("📦 Остатки и передачи")
     if table_exists(conn, "inventory_balances"):
@@ -661,7 +787,8 @@ try:
                       b.quantity, l.service_item_code
                FROM inventory_balances b JOIN inventory_lots l ON l.id=b.lot_id
                LEFT JOIN remote_supplier_batches s ON s.id=l.source_id
-               WHERE b.quantity>0 ORDER BY b.location_code, s.batch_number"""
+               WHERE b.quantity>0 AND (? IS NULL OR l.source_id=?)
+               ORDER BY b.location_code, s.batch_number""", (batch_choice,batch_choice)
         )]
         pending_transfers = [dict(row) for row in conn.execute(
             """SELECT t.id, s.batch_number, t.from_location_code, t.to_location_code,
@@ -669,11 +796,22 @@ try:
                       t.reported_by, t.reported_at, t.note, t.sent_by, t.sent_at
                FROM inventory_transfers t JOIN inventory_lots l ON l.id=t.lot_id
                LEFT JOIN remote_supplier_batches s ON s.id=l.source_id
-               WHERE t.transfer_status IN ('SENT','DISPUTED') ORDER BY t.id DESC"""
+               WHERE t.transfer_status IN ('SENT','DISPUTED')
+                 AND (? IS NULL OR l.source_id=?) ORDER BY t.id DESC""", (batch_choice,batch_choice)
         )]
         st.caption("ЦС — центральный склад; O — охрана; K — консьерж. В пути — списано у отправителя, но не принято получателем.")
         if balances:
             st.dataframe(pd.DataFrame(balances), hide_index=True, use_container_width=True)
+            if batch_choice is None:
+                by_point = {}
+                for row in balances:
+                    key = (row['service_item_code'], row['location_code'])
+                    by_point[key] = by_point.get(key, 0) + row['quantity']
+                st.caption('Сводно по всем партиям')
+                st.dataframe(pd.DataFrame([{
+                    'Позиция': item, 'Точка': point, 'Остаток, шт.': quantity,
+                } for (item,point),quantity in sorted(by_point.items())]),
+                    hide_index=True, use_container_width=True)
         else:
             st.info("Учтённых остатков пока нет.")
         st.markdown("**В пути и с расхождениями**")
@@ -797,7 +935,7 @@ try:
         (int(selected_id),),
     ).fetchall()
     st.dataframe(pd.DataFrame([{
-        "Когда": row["created_at"],
+        "Когда": display_date(row["created_at"], with_time=True),
         "Событие": row["event_code"],
         "Было": row["from_status"] or "—",
         "Стало": row["to_status"] or "—",
@@ -820,7 +958,7 @@ try:
             (int(selected_id),),
         ).fetchall()
         if remote_rows:
-            st.dataframe(pd.DataFrame([dict(row) for row in remote_rows]), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame([display_row_dates(row, 'created_at') for row in remote_rows]), hide_index=True, use_container_width=True)
         else:
             st.caption("Для этого исполнения нет технических движений пульта.")
 

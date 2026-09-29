@@ -42,6 +42,7 @@ for folder in (OSBB_ROOT, PY_ROOT):
 from config import paths, USE_TEST_DB
 from access_control import has_permission
 from data_quality_report import build_quality_issues, quality_summary
+from video_registry_reports import video_period, video_registry_rows
 from utils import normalize_plate as _registry_normalize_plate
 
 try:
@@ -84,6 +85,8 @@ I18N = {
         "observer_payments": "💰 Последние оплаты",
         "observer_requests": "📨 Заявки жителей",
         "observer_quality": "🧩 Пробелы в данных",
+        "observer_video_missing": "🎥 Видео: не найдены",
+        "observer_video_found": "🎥 Видео: найдены",
         "observer_denied": "У вас нет роли наблюдателя ОСББ.",
         "observer_prev": "⬅️ Раньше",
         "observer_next": "➡️ Далее",
@@ -303,6 +306,8 @@ I18N = {
         "observer_payments": "💰 Останні оплати",
         "observer_requests": "📨 Заявки мешканців",
         "observer_quality": "🧩 Прогалини в даних",
+        "observer_video_missing": "🎥 Відео: не знайдені",
+        "observer_video_found": "🎥 Відео: знайдені",
         "observer_denied": "У вас немає ролі спостерігача ОСББ.",
         "observer_prev": "⬅️ Раніше",
         "observer_next": "➡️ Далі",
@@ -522,6 +527,8 @@ I18N = {
         "observer_payments": "💰 Recent payments",
         "observer_requests": "📨 Resident requests",
         "observer_quality": "🧩 Data gaps",
+        "observer_video_missing": "🎥 Video: not registered",
+        "observer_video_found": "🎥 Video: registered",
         "observer_denied": "You do not have the OSBB observer role.",
         "observer_prev": "⬅️ Newer",
         "observer_next": "➡️ Older",
@@ -1186,6 +1193,26 @@ def _observer_data(kind: str, page: int, lang: str = "ru", apartment_filter: str
     conn = get_conn()
     try:
         cur = conn.cursor()
+        if kind in {"video_missing", "video_found"}:
+            found = kind == "video_found"
+            rows = video_registry_rows(conn, found=found)
+            period = video_period(conn)
+            selected = rows[offset:offset + limit + 1]
+            more, selected = len(selected) > limit, selected[:limit]
+            if lang == "uk":
+                header = f"Зйомки: {period}. Номерів: {len(rows)}. За спаданням кількості."
+            elif lang == "en":
+                header = f"Recorded: {period}. Plates: {len(rows)}. Most frequent first."
+            else:
+                header = f"Съёмки: {period}. Номеров: {len(rows)}. По убыванию частоты."
+            body = [header, ""] if page == 0 else []
+            for row in selected:
+                if found:
+                    body.append(f"• {row['Номер']} · {row['Количество']} · кв.{row['Квартира']} · "
+                                f"{row['ФИО']} · {row['Марка']} · {row['Ночь / День']}")
+                else:
+                    body.append(f"• {row['Номер']} · {row['Количество']} · {row['Марка']} · {row['Ночь / День']}")
+            return "\n".join(body), more
         if kind == "quality":
             issues = build_quality_issues(conn)
             if apartment_filter:
@@ -1343,6 +1370,8 @@ async def _show_observer_screen(
             "payments": tr(lang, "observer_payments"),
             "requests": tr(lang, "observer_requests"),
             "quality": tr(lang, "observer_quality"),
+            "video_missing": tr(lang, "observer_video_missing"),
+            "video_found": tr(lang, "observer_video_found"),
         }[kind]
         search_hint = (
             "\n\nЧтобы найти квартиру, отправьте её номер, например 160."
@@ -1363,6 +1392,7 @@ async def _show_observer_screen(
         [tr(lang, "observer_summary")],
         [tr(lang, "observer_apartments"), tr(lang, "observer_vehicles")],
         [tr(lang, "observer_quality")],
+        [tr(lang, "observer_video_missing"), tr(lang, "observer_video_found")],
         [tr(lang, "observer_payments"), tr(lang, "observer_requests")],
     ]
     if nav:
@@ -2522,7 +2552,7 @@ async def show_client_portal(update: Update, user_states: dict, user_id: int, la
         # Отправляем приветствие + сообщение о том, что квартира не привязана
         await update.message.reply_text(
             f"{welcome_message}\n\n{tr(lang, 'no_unit')}",
-            reply_markup=kb([[tr(lang, "claim_home")], [tr(lang, "home")]]),
+            reply_markup=kb([[tr(lang, "claim_home")], ["🎥 Открытые видеоотчёты"], [tr(lang, "home")]]),
         )
         return
 
@@ -3097,6 +3127,8 @@ async def handle_client_portal_text(
             tr(lang, "observer_payments"): "payments",
             tr(lang, "observer_requests"): "requests",
             tr(lang, "observer_quality"): "quality",
+            tr(lang, "observer_video_missing"): "video_missing",
+            tr(lang, "observer_video_found"): "video_found",
         }
         if message_text in kind_by_button:
             await _show_observer_screen(update, user_states, user_id, lang, kind_by_button[message_text])
