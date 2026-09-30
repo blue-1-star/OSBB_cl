@@ -3,6 +3,7 @@ import sys
 import asyncio
 
 from telegram import Update, ReplyKeyboardMarkup
+from telegram.error import Conflict, InvalidToken
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 # from Bots.handlers.vehicle_verification import handle_vehicle_verification_text
@@ -81,6 +82,7 @@ for p in (OSBB_ROOT, PY_ROOT):
         sys.path.insert(0, str(p))
 
 from config import paths
+from bot_security_watch import alert_local, watch, write_event
 from resident_request_delivery import deliver_ready_resident_request_messages
 from service_order_notifications import deliver_ready_order_notifications
 
@@ -1910,16 +1912,28 @@ async def start_resident_request_delivery(app: Application) -> None:
     app.bot_data["resident_request_delivery_task"] = asyncio.create_task(
         _resident_request_delivery_loop(app), name="resident-request-message-delivery"
     )
+    app.bot_data["bot_security_watch_task"] = asyncio.create_task(
+        watch(app.bot), name="bot-security-watch"
+    )
 
 
 async def stop_resident_request_delivery(app: Application) -> None:
-    task = app.bot_data.pop("resident_request_delivery_task", None)
-    if task:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    for key in ("resident_request_delivery_task", "bot_security_watch_task"):
+        task = app.bot_data.pop(key, None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+
+async def bot_security_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    error = context.error
+    if isinstance(error, (Conflict, InvalidToken)):
+        kind = "CONFLICT" if isinstance(error, Conflict) else "UNAUTHORIZED"
+        write_event(kind)
+        alert_local(f"Telegram API: {kind}; проверьте единственный запуск и токен")
 
 
 def main():
@@ -1937,9 +1951,16 @@ def main():
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
     )
+    app.add_error_handler(bot_security_error_handler)
 
     print("OSBB bot started.")
-    app.run_polling()
+    try:
+        app.run_polling()
+    except (Conflict, InvalidToken) as exc:
+        kind = "CONFLICT" if isinstance(exc, Conflict) else "UNAUTHORIZED"
+        write_event(kind)
+        alert_local(f"Telegram API: {kind}; проверьте единственный запуск и токен")
+        raise
 
 
 if __name__ == "__main__":
