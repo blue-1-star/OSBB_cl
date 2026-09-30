@@ -4,6 +4,8 @@ __pycache__/
 venv/
 *.diff
 *.log
+*.session
+*.session-journal
 
 # отчёты dev_infrastructure — генерируются заново, не храним в истории
 osbb_triage_report.*
