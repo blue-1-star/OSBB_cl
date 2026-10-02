@@ -4,6 +4,7 @@ __pycache__/
 venv/
 *.diff
 *.log
+*.log.lock
 *.session
 *.session-journal
 data/security/bot_profile_baseline.json

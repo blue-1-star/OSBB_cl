@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections import deque
 import json
+import os
 import platform
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,6 +26,9 @@ EXPECTED_NAME = "Parking 24A GS"
 BASELINE_FILE = paths.PROJECT_ROOT / "data" / "security" / "bot_profile_baseline.json"
 LOG_FILE = paths.PROJECT_ROOT / "data" / "logs" / "bot_security.log"
 CHECK_INTERVAL_SECONDS = 300
+KEEP_OK = 2
+KEEP_TEST = 2
+KEEP_OTHER = 50
 _LINK = re.compile(r"(?i)(?:https?://[^\s<>\"']+|t\.me/[^\s<>\"']+|@[A-Za-z][A-Za-z0-9_]{4,})")
 
 
@@ -38,10 +44,64 @@ def _safe_error(exc: Exception, token: str = "") -> str:
 
 
 def write_event(kind: str, details: dict | None = None, *, log_file: Path = LOG_FILE) -> None:
+    """Append an event and automatically prune routine entries."""
+    _update_log(log_file, {"at": _utc_now(), "kind": kind, "details": details or {}})
+
+
+def prune_log(*, log_file: Path = LOG_FILE) -> None:
+    """Prune an existing log without inventing a new security check."""
+    if log_file.is_file():
+        _update_log(log_file)
+
+
+def _update_log(log_file: Path, event: dict | None = None) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    event = {"at": _utc_now(), "kind": kind, "details": details or {}}
-    with log_file.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+    lock_path = log_file.with_name(log_file.name + ".lock")
+    with lock_path.open("a+b") as lock_handle:
+        if os.name == "posix":
+            import fcntl
+            fcntl.flock(lock_handle, fcntl.LOCK_EX)
+        try:
+            events = recent_events(log_file=log_file, limit=None)
+            if event is not None:
+                events.append(event)
+            today = _utc_now()[:10]
+            normal = [item for item in events if item.get("kind") == "OK"
+                      and str(item.get("at", ""))[:10] == today][-KEEP_OK:]
+            tests = [item for item in events if item.get("kind") == "SELF_TEST_ALERT"
+                     and str(item.get("at", ""))[:10] == today][-KEEP_TEST:]
+            other = [item for item in events if item.get("kind") not in {"OK", "SELF_TEST_ALERT"}][-KEEP_OTHER:]
+            keep_ids = {id(item) for item in normal + tests + other}
+            retained = [item for item in events if id(item) in keep_ids]
+            temp_name = None
+            try:
+                with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=log_file.parent,
+                                                 prefix=".bot_security_", suffix=".tmp", delete=False) as handle:
+                    temp_name = handle.name
+                    for item in retained:
+                        handle.write(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n")
+                os.replace(temp_name, log_file)
+            finally:
+                if temp_name and os.path.exists(temp_name):
+                    os.unlink(temp_name)
+        finally:
+            if os.name == "posix":
+                fcntl.flock(lock_handle, fcntl.LOCK_UN)
+
+
+def recent_events(*, log_file: Path = LOG_FILE, limit: int | None = 100) -> list[dict]:
+    """Read recent journal entries for the admin UI; skip malformed lines."""
+    if not log_file.is_file():
+        return []
+    with log_file.open(encoding="utf-8") as handle:
+        lines = deque(handle, maxlen=limit) if limit is not None else handle.readlines()
+    events = []
+    for line in lines:
+        try:
+            events.append(json.loads(line))
+        except (ValueError, TypeError):
+            continue
+    return events
 
 
 def alert_local(reason: str) -> None:
@@ -135,6 +195,24 @@ def differences(current: dict, baseline: dict | None) -> dict:
     return issues
 
 
+def self_test(*, baseline_path: Path = BASELINE_FILE, log_file: Path = LOG_FILE,
+              notify: bool = True) -> dict:
+    """Exercise detection and local alerts without calling or changing Telegram."""
+    baseline = load_baseline(baseline_path)
+    if not baseline:
+        raise RuntimeError(f"Сначала создайте эталон: {baseline_path}")
+    simulated = dict(baseline)
+    simulated["name"] = "ПРОВЕРКА ТРЕВОГИ — НЕ НАСТОЯЩЕЕ ИМЯ"
+    simulated["about"] = "Тестовая подмена: https://t.me/NotOurBot"
+    issues = differences(simulated, baseline)
+    if "changed_name" not in issues or "foreign_links_in_about" not in issues:
+        raise RuntimeError("Самопроверка не обнаружила смоделированную подмену.")
+    write_event("SELF_TEST_ALERT", issues, log_file=log_file)
+    if notify:
+        alert_local("САМОПРОВЕРКА: имитация подмены профиля")
+    return issues
+
+
 async def check_once(bot, *, baseline_path: Path = BASELINE_FILE,
                      log_file: Path = LOG_FILE, notify: bool = True) -> dict:
     try:
@@ -146,6 +224,8 @@ async def check_once(bot, *, baseline_path: Path = BASELINE_FILE,
         write_event("ALERT", issues, log_file=log_file)
         if notify:
             alert_local(", ".join(issues))
+    else:
+        write_event("OK", log_file=log_file)
     return issues
 
 
@@ -157,6 +237,8 @@ async def watch(bot, *, interval: int = CHECK_INTERVAL_SECONDS) -> None:
         fingerprint = json.dumps(issues, ensure_ascii=False, sort_keys=True)
         if issues and fingerprint != previous:
             alert_local(", ".join(issues))
+        elif not issues and previous is None:
+            print("✅ OSBB security: публичный профиль и вебхук проверены; отклонений нет.", flush=True)
         elif not issues and previous and previous != "{}":
             write_event("RECOVERED")
             print("OSBB bot security profile restored.", flush=True)
@@ -202,13 +284,21 @@ async def _cli(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Проверка безопасности Telegram-бота OSBB")
-    parser.add_argument("action", choices=("show", "enroll", "check", "watch"))
+    parser.add_argument("action", choices=("show", "enroll", "check", "watch", "self-test", "prune"))
     parser.add_argument("--interval", type=int, default=CHECK_INTERVAL_SECONDS,
                         help="Интервал проверок в секундах для watch (по умолчанию 300)")
     args = parser.parse_args()
     if args.interval < 30:
         parser.error("Интервал должен быть не меньше 30 секунд.")
     try:
+        if args.action == "prune":
+            prune_log()
+            print("Журнал безопасности очищен: сохранены две последние штатные проверки за сегодня и инциденты.")
+            return 0
+        if args.action == "self-test":
+            self_test()
+            print("✅ Самопроверка обнаружила подмену и записала SELF_TEST_ALERT; Telegram не менялся.")
+            return 0
         return asyncio.run(_cli(args))
     except KeyboardInterrupt:
         return 130

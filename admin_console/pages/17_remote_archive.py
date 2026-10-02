@@ -18,7 +18,7 @@ from admin_console.utils.db import get_conn
 from admin_console.utils.session_actor import session_actor
 from audit_logger import audit_log
 
-SOURCE = ROOT / "data/raw/typed/Vidacha_Pultiv_In_Order_review.xlsx"
+SOURCE = ROOT / "data/raw/typed/Remote_Control_Handover_Batch_1.xlsx"
 
 
 def excel_is_open():
@@ -33,11 +33,9 @@ def load_rows():
         sheet = wb.active
         result = []
         for row_number, cells in enumerate(
-            sheet.iter_rows(min_row=4, max_col=4, values_only=True), start=4
+            sheet.iter_rows(min_row=5, max_col=5, values_only=True), start=5
         ):
-            apartment, name, amount, quantity = cells
-            if str(name or "").strip().upper() == "ІТОГО:":
-                break
+            apartment, name, amount, quantity, signature = cells
             if amount is None and quantity is None and not apartment and not name:
                 continue
             result.append({
@@ -46,6 +44,7 @@ def load_rows():
                 "name": "" if name is None else str(name).strip(),
                 "amount": float(amount or 0),
                 "quantity": int(quantity or 0),
+                "signature": signature is True,
             })
         return result
     finally:
@@ -111,7 +110,7 @@ def save_row(row_number, apartment, name, actor, evidence):
 
 st.set_page_config(page_title="Архив пультов", page_icon="📜", layout="wide")
 st.title("📜 Архив выдачи пультов")
-st.caption("Источник — Vidacha_Pultiv_In_Order_review.xlsx в data/raw/typed. Сортировка на экране не меняет порядок файла.")
+st.caption("Источник — Remote_Control_Handover_Batch_1.xlsx в data/raw/typed. Сортировка на экране не меняет порядок файла.")
 st.info("Это архивный разбор, а не подтверждение оплаты или выдачи. Записи пока не попадают в «Мои заказы» жителя.")
 actor = session_actor()
 try:
@@ -119,8 +118,10 @@ try:
 except (FileNotFoundError, OSError) as exc:
     st.error(str(exc))
     st.stop()
-left, right = st.columns(2)
+left, middle, issued, right = st.columns(4)
 left.metric("Строк в архиве", len(rows))
+middle.metric("С подписью", sum(row["signature"] for row in rows))
+issued.metric("Пультов с подписью", sum(row["quantity"] for row in rows if row["signature"]))
 right.metric("Без номера квартиры", sum(not row["apartment"] for row in rows))
 if excel_is_open():
     st.warning("Ведомость открыта в Excel: просмотр доступен, сохранение из консоли временно заблокировано.")
@@ -131,14 +132,16 @@ frame = pd.DataFrame([{
     "№": row["excel_row"], "Кв.": row["apartment"] or "—",
     "ФИО": row["name"] or "—", "Сумма": row["amount"],
     "Шт.": row["quantity"],
+    "Подпись": row["signature"],
 } for row in shown_rows])
-selection = st.dataframe(frame, hide_index=True, width=700, height=580,
+selection = st.dataframe(frame, hide_index=True, width="stretch", height=580,
     column_config={
         "№": st.column_config.NumberColumn("№", width=60, format="%d"),
         "Кв.": st.column_config.TextColumn("Кв.", width=80),
-        "ФИО": st.column_config.TextColumn("ФИО", width=340),
+        "ФИО": st.column_config.TextColumn("ФИО", width=300),
         "Сумма": st.column_config.NumberColumn("грн", width=95, format="%.0f"),
         "Шт.": st.column_config.NumberColumn("Шт.", width=60, format="%d"),
+        "Подпись": st.column_config.CheckboxColumn("Подпись", width=100),
     },
     on_select="rerun", selection_mode="single-row", key=f"remote_archive_file_selection_{sort_mode}")
 selected = selection.selection.rows
@@ -147,7 +150,9 @@ if not selected:
     st.stop()
 row = shown_rows[selected[0]]
 st.subheader(f"Строка Excel {row['excel_row']} · квартира {row['apartment'] or 'не указана'}")
-st.write(f"{row['amount']:.0f} грн · {row['quantity']} пульт(а/ов)")
+st.write(f"{row['amount']:.0f} грн · {row['quantity']} пульт(а/ов) · подпись: {'есть' if row['signature'] else 'нет'}")
+if row["quantity"] > 10:
+    st.warning("Количество пультов выглядит ошибочным; проверьте бумажный оригинал перед подсчётом выдачи.")
 with st.form(f"remote_archive_file_edit_{row['excel_row']}"):
     apartment = st.text_input("Номер квартиры", value=row["apartment"])
     name = st.text_input("ФИО", value=row["name"])

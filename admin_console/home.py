@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 STREAMLIT_ROOT = Path(__file__).resolve().parent
@@ -14,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import streamlit as st
 
 from admin_console.utils.db import get_conn
+from bot_security_watch import recent_events
 
 st.set_page_config(page_title="Рабочий стол администратора", page_icon="🏢", layout="wide")
 
@@ -63,6 +65,25 @@ def dashboard_data() -> dict[str, int | float]:
 data = dashboard_data()
 st.title("🏢 Рабочий стол администратора")
 st.caption("Открывается первым. Здесь только то, что требует решения или контроля сейчас.")
+
+security_checks = [event for event in recent_events(limit=200)
+                   if event.get("kind") in {"OK", "ALERT", "CONFLICT", "UNAUTHORIZED"}]
+latest_security = security_checks[-1] if security_checks else None
+if latest_security:
+    try:
+        security_age = datetime.now(timezone.utc) - datetime.fromisoformat(latest_security["at"])
+    except (KeyError, ValueError):
+        security_age = None
+    if latest_security["kind"] != "OK":
+        st.error("🚨 Контроль бота: обнаружена тревога. Откройте подробности.")
+    elif security_age is None or security_age.total_seconds() > 600:
+        st.warning("🛡️ Контроль бота: последняя проверка старше 10 минут. Проверьте состояние.")
+    else:
+        st.success("🛡️ Контроль бота: профиль и вебхук соответствуют эталону.")
+else:
+    st.warning("🛡️ Контроль бота ещё не выполнялся.")
+if st.button("Открыть контроль безопасности бота", use_container_width=True):
+    st.switch_page("pages/18_bot_security.py")
 
 st.markdown("### Срочно и в работе")
 left, middle, right = st.columns(3)
